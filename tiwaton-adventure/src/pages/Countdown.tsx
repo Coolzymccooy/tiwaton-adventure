@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, Trash2, Mail, Bell } from 'lucide-react';
+import { Calendar, /*Clock,*/ Plus, Trash2, Mail, Bell } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import type { CountdownEvent } from '../types';
 
@@ -111,7 +111,11 @@ const CountdownPage: React.FC = () => {
                <div className="relative z-10">
                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     {evt.name}
-                    {evt.notificationEmail && <Bell size={12} className="text-amber-400" title="Notifications Enabled" />}
+                   {evt.notificationEmail && (
+  <span title="Notifications Enabled" className="inline-flex">
+    <Bell size={12} className="text-amber-400" />
+  </span>
+)}
                  </h3>
                  <div className="text-xs text-slate-500 font-mono mt-1">
                    {new Date(evt.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
