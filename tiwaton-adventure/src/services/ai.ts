@@ -65,6 +65,7 @@ export const AIService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
+    if (!r.ok) return null;  
     const data = await r.json();
     return data.imageDataUrl ?? null;
   },

@@ -32,7 +32,7 @@ const DrawingPage: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<'brush' | 'pencil' | 'eraser' | 'magic' | 'pipette'>('brush');
   
-  const [gallery, setGallery] = useState<Drawing[]>([]);
+  const [_gallery, setGallery] = useState<Drawing[]>([]);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   
   // Modals & Loading

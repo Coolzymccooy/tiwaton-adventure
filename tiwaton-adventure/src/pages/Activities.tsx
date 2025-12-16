@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, /*useEffect*/ } from 'react';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
 import { AudioService } from '../services/audio'; // TTS
-import { Loader2, BrainCircuit, Trophy, Star, Music, Book, Trophy as Cup, ArrowRight, Check, X, XCircle } from 'lucide-react';
+import { Loader2, /*BrainCircuit, Trophy, Star,*/ Music, Book, Trophy as Cup, /*ArrowRight, */Check, X, XCircle } from 'lucide-react';
 
 type Category = 'Bible' | 'Music' | 'Football';
 

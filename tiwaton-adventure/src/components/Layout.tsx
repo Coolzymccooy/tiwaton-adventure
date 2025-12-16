@@ -13,14 +13,14 @@ interface LayoutProps {
   currentView: View;
   onNavigate: (view: View) => void;
   children: React.ReactNode;
-  childName: string;
+  _childName: string;
 }
 
 const Layout: React.FC<LayoutProps> = ({
   currentView,
   onNavigate,
   children,
-  childName,
+  //childName,
 }) => {
   const navItems = [
     { view: View.HOME, icon: Home, label: 'HQ' },

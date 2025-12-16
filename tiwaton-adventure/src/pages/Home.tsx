@@ -9,15 +9,15 @@ import type { FamilyProfile, GameStat, ParentComment, CountdownEvent } from '../
 import { StorageService } from '../services/storage';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {
-  Sparkles,
-  Trophy,
-  Star,
-  Gamepad2,
-  Palette,
-  BrainCircuit,
+ // Sparkles,
+  //Trophy,
+ // Star,
+ // Gamepad2,
+ // Palette,
+ // BrainCircuit,
   MessageCircle,
   Send,
-  CalendarClock,
+ // CalendarClock,
 } from 'lucide-react';
 
 interface HomeProps {

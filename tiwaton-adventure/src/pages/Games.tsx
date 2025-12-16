@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Search, HelpCircle, ArrowLeft, RefreshCw, Trophy, Star, XCircle } from 'lucide-react';
+import { /*Calculator, Search, HelpCircle, ArrowLeft, RefreshCw,*/ Trophy, /*Star,*/ XCircle } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
 

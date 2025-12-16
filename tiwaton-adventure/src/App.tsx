@@ -46,7 +46,7 @@ const App: React.FC = () => {
     <Layout 
       currentView={currentView} 
       onNavigate={setCurrentView}
-      childName={profile.childName}
+      _childName={profile.childName}
     >
       {renderView()}
     </Layout>
