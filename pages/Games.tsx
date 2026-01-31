@@ -762,6 +762,85 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       const res = isAdd ? a + b : a - b;
       q = { text: `${a} ${isAdd ? '+' : '-'} ${b}`, ans: res, speak: `${a} ${isAdd ? 'plus' : 'minus'} ${b}. What is the answer?`, visual: null };
       opts = [res, res + (Math.random() > 0.5 ? 1 : 10), res - (Math.random() > 0.5 ? 1 : 5), res + 2].sort(() => Math.random() - 0.5);
+    } else if (planet === 'Fractions') {
+      const denominators = [2, 3, 4, 6, 8];
+      const denom = denominators[Math.floor(Math.random() * denominators.length)];
+      const numeratorMax = Math.min(denom - 1, currentLevel + 2);
+      let numerA = Math.floor(Math.random() * numeratorMax) + 1;
+      let numerB = Math.floor(Math.random() * numeratorMax) + 1;
+      const isAdd = Math.random() > 0.3;
+      let resultNumer = isAdd ? numerA + numerB : numerA - numerB;
+      if (resultNumer < 0) {
+        [numerA, numerB] = [Math.max(numerA, numerB), Math.min(numerA, numerB)];
+        resultNumer = numerA - numerB;
+      }
+      const base =
+        isAdd || numerA >= numerB
+          ? `${numerA}/${denom}` + (isAdd ? ` + ${numerB}/${denom}` : ` - ${numerB}/${denom}`)
+          : `${numerA}/${denom} + ${numerB}/${denom}`;
+      const answer = Number((resultNumer / denom).toFixed(3));
+      q = {
+        text: `What is ${isAdd ? 'the sum of' : 'the difference between'} ${numerA}/${denom} and ${numerB}/${denom}?`,
+        ans: answer,
+        speak: `What is ${numerA}/${denom} ${isAdd ? 'plus' : 'minus'} ${numerB}/${denom}?`,
+        visual: null,
+      };
+      const delta = Math.max(0.25, 1 / denom);
+      opts = [
+        answer,
+        Number((answer + delta).toFixed(3)),
+        Math.max(0, Number((answer - delta).toFixed(3))),
+        Number((answer + delta * 2).toFixed(3)),
+      ];
+    } else if (planet === 'Time') {
+      const hours = Math.floor(Math.random() * Math.min(4, currentLevel + 2)) + 1;
+      const minutes = [0, 15, 30, 45][Math.floor(Math.random() * 4)];
+      const totalMinutes = hours * 60 + minutes;
+      q = {
+        text: `How many minutes are in ${hours} hour${hours > 1 ? 's' : ''}${minutes ? ` and ${minutes} minutes` : ''}?`,
+        ans: totalMinutes,
+        speak: `How many minutes are in ${hours} hours and ${minutes} minutes?`,
+        visual: null,
+      };
+      opts = [
+        totalMinutes,
+        totalMinutes + 5,
+        Math.max(10, totalMinutes - 5),
+        totalMinutes + 15,
+      ];
+    } else if (planet === 'Money') {
+      const priceA = Number((Math.random() * 5 + 1).toFixed(2));
+      const priceB = Number((Math.random() * 4 + 0.5).toFixed(2));
+      const totalCost = Number((priceA + priceB).toFixed(2));
+      q = {
+        text: `You spend $${priceA} on one toy and $${priceB} on another. What is the total cost?`,
+        ans: totalCost,
+        speak: `If you spend ${priceA} dollars and ${priceB} dollars, what is the total?`,
+        visual: null,
+      };
+      opts = [
+        totalCost,
+        Number((totalCost + 0.5).toFixed(2)),
+        Number(Math.max(0, (totalCost - 0.75)).toFixed(2)),
+        Number((totalCost + 1).toFixed(2)),
+      ];
+    } else if (planet === 'Data') {
+      const items = ["Apples", "Bananas", "Cherries", "Dates"];
+      const values = items.map(() => Math.floor(Math.random() * 10) + 5);
+      const statTotal = values.reduce((acc, val) => acc + val, 0);
+      const maxLabel = items[values.indexOf(Math.max(...values))];
+      q = {
+        text: `The chart shows ${items[0]}: ${values[0]}, ${items[1]}: ${values[1]}, ${items[2]}: ${values[2]}, ${items[3]}: ${values[3]}. How many pieces are there in total?`,
+        ans: statTotal,
+        speak: `Add up the numbers for ${items[0]}, ${items[1]}, ${items[2]}, and ${items[3]}. What is the total?`,
+        visual: [],
+      };
+      opts = [
+        statTotal,
+        statTotal + 3,
+        Math.max(0, statTotal - 2),
+        statTotal + 5,
+      ];
     } else {
       q = { text: `${currentLevel} + ${currentLevel}`, ans: currentLevel * 2, speak: `What is ${currentLevel} plus ${currentLevel}?`, visual: null };
       opts = [currentLevel * 2, currentLevel + 1, currentLevel - 1, currentLevel + 5];
