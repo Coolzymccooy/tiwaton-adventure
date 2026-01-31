@@ -6,12 +6,13 @@ const router = express.Router();
 
 // ---- Gemini client ----
 const apiKey = process.env.GEMINI_API_KEY;
+let ai = null;
 
 if (!apiKey) {
   console.warn("[ai] WARNING: GEMINI_API_KEY is not set. AI endpoints will fail.");
+} else {
+  ai = new GoogleGenAI({ apiKey });
 }
-
-const ai = new GoogleGenAI({ apiKey });
 
 // ---- helpers ----
 function mustHave(body, key) {
