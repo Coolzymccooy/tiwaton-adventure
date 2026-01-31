@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StorageService } from '../services/storage';
-import { FamilyProfile, Drawing, ParentComment } from '../types';
+import { getInsightsSummary, InsightSummary } from '../services/insights';
+import { FamilyProfile, Drawing } from '../types';
 import { 
   Users, Activity, Star, MessageSquare, Trash2, 
   ChevronRight, ArrowLeft, BarChart3, Clock, 
@@ -19,6 +20,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [newComment, setNewComment] = useState('');
   const [usageData, setUsageData] = useState<any>({});
+  const [insights, setInsights] = useState<InsightSummary | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
   
   // Profile Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -41,6 +44,28 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadInsights = async () => {
+      if (cancelled) return;
+      setInsightsLoading(true);
+      try {
+        const summary = await getInsightsSummary();
+        if (!cancelled) {
+          setInsights(summary);
+        }
+      } finally {
+        if (!cancelled) {
+          setInsightsLoading(false);
+        }
+      }
+    };
+    loadInsights();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectedProfile = profiles.find(p => p.id === selectedChildId);
   const childDrawings = drawings.filter(d => d.author === selectedProfile?.childName);
   const childUsage = selectedChildId ? usageData[selectedChildId] || {} : {};
@@ -52,6 +77,29 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
       return total + childTotal;
     }, 0) / 60
   );
+
+  const topViews = useMemo(() => {
+    if (!insights) return [];
+    return Object.entries(insights.viewMetrics)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 4);
+  }, [insights]);
+
+  const errorsList = insights?.recentErrors || [];
+
+  const formatTimestamp = (value: number) =>
+    new Date(value).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const formatViewLabel = (value: string) => {
+    if (!value) return 'Unknown';
+    const cleaned = value.replace(/^View\\./i, '');
+    return cleaned.replace(/_/g, ' ');
+  };
 
   const handleUpdateProfile = () => {
     if (!selectedProfile || !editName) return;
@@ -111,6 +159,84 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
           <ArrowLeft size={18}/> BACK TO HUB
         </button>
       </div>
+
+      <section className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <InsightStat
+            label="Telemetry Captured"
+            value={insights?.totalEvents ?? '—'}
+            detail="Events logged across sessions"
+            icon={<BarChart3 size={20} className="text-indigo-400" />}
+            loading={insightsLoading}
+          />
+          <InsightStat
+            label="Avg View Duration"
+            value={insights?.averageDuration ? `${insights.averageDuration}s` : '—'}
+            detail="Heartbeat samples per view"
+            icon={<Clock size={20} className="text-emerald-400" />}
+            loading={insightsLoading}
+          />
+          <InsightStat
+            label="Failures Recorded"
+            value={insights?.failureCount ?? 0}
+            detail="Errors captured per view"
+            icon={<MessageSquare size={20} className="text-rose-400" />}
+            loading={insightsLoading}
+          />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="bg-slate-900/60 border border-white/5 rounded-[2.5rem] p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">Most-Visited Flows</h4>
+              {insightsLoading && <span className="text-[10px] uppercase tracking-[0.3em] text-indigo-400">refreshing</span>}
+            </div>
+            {insightsLoading ? (
+              <p className="text-sm text-slate-500 italic">Loading insight data...</p>
+            ) : topViews.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No telemetry yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {topViews.map(([view, meta]) => (
+                  <div key={view} className="flex flex-col gap-1 p-3 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="flex items-center justify-between text-sm uppercase tracking-[0.3em] text-slate-400">
+                      <span>{formatViewLabel(view)}</span>
+                      <span className="text-xs text-slate-500">{meta.failures} errors</span>
+                    </div>
+                    <div className="flex items-center justify-between text-white font-black">
+                      <span className="text-lg">{meta.count} visits</span>
+                      <span className="text-sm text-slate-400">{meta.avgDuration}s avg</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="bg-slate-900/60 border border-white/5 rounded-[2.5rem] p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">Recent Errors</h4>
+              {insightsLoading && <span className="text-[10px] uppercase tracking-[0.3em] text-indigo-400">waiting</span>}
+            </div>
+            {insightsLoading ? (
+              <p className="text-sm text-slate-500 italic">Collecting telemetry...</p>
+            ) : errorsList.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No errors logged yet.</p>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+                {errorsList.map((error) => (
+                  <div key={`${error.view}-${error.timestamp}`} className="p-3 bg-white/5 rounded-2xl border border-white/5">
+                    <p className="text-white text-sm font-black tracking-tight">{error.error}</p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 uppercase tracking-[0.4em] mt-2">
+                      <span>{formatViewLabel(error.view)}</span>
+                      <span>{error.event}</span>
+                      <span>{formatTimestamp(error.timestamp)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       <div className="grid lg:grid-cols-12 gap-8">
         {/* Profile Sidebar */}
@@ -257,6 +383,32 @@ const StatCard = ({ icon, label, value, color }: any) => (
       <p className="text-slate-500 font-black uppercase tracking-widest text-[10px] mb-2">{label}</p>
       <p className="text-3xl font-black text-white uppercase tracking-tighter leading-none">{value}</p>
     </div>
+  </div>
+);
+
+const InsightStat = ({
+  label,
+  value,
+  detail,
+  icon,
+  loading,
+}: {
+  label: string;
+  value: string | number;
+  detail?: string;
+  icon: React.ReactNode;
+  loading?: boolean;
+}) => (
+  <div className="bg-slate-900/60 border border-white/5 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-slate-500">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {loading && <span className="text-[10px] uppercase tracking-[0.3em] text-indigo-400">updating</span>}
+    </div>
+    <p className="text-3xl font-black text-white uppercase tracking-tighter">{loading ? '–––' : value}</p>
+    {detail && <p className="text-slate-400 text-sm leading-relaxed">{detail}</p>}
   </div>
 );
 

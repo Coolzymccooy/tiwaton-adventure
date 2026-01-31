@@ -13,6 +13,8 @@ $RECYCLE.BIN/
 ### Node / React ###
 node_modules/
 dist/
+.idea/
+server/data/
 build/
 out/
 coverage/

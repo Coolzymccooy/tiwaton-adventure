@@ -12,6 +12,7 @@ import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
 import { AudioService } from '../services/audio'; 
 import { Drawing, AppMode, View } from '../types';
+import { useI18n } from '../i18n/I18nProvider';
 
 // --- CONFIGURATION ---
 const COLORS = [
@@ -56,6 +57,7 @@ interface DrawingPageProps {
 }
 
 const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
+  const { t } = useI18n();
   const profile = StorageService.getCurrentProfile();
   
   const canvasRef = useRef<HTMLCanvasElement>(null); 
@@ -83,7 +85,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [appMode, setAppMode] = useState<AppMode>(profile?.mode || 'KIDS');
   const [showLibrary, setShowLibrary] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingText, setLoadingText] = useState("Sprinkling Magic Dust...");
+  const [loadingText, setLoadingText] = useState(t('drawing.loadingMagicDust'));
   const [transformedImage, setTransformedImage] = useState<string | null>(null);
   const [gallery, setGallery] = useState<Drawing[]>([]);
   const [showGallery, setShowGallery] = useState(false);
@@ -277,7 +279,7 @@ useEffect(() => {
       setShowLibrary(false);
       if (item.type === 'instant' && item.url) {
           setIsGenerating(true);
-          setLoadingText("Loading Template...");
+          setLoadingText(t('drawing.loadingTemplate'));
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.src = item.url;
@@ -297,7 +299,7 @@ useEffect(() => {
           }
       } else {
           setIsGenerating(true);
-          setLoadingText("Drawing your picture...");
+          setLoadingText(t('drawing.loadingDrawing'));
           AudioService.speak("I'm drawing it now!");
           const imageUrl = await AIService.generateColoringPage(item.prompt);
           setIsGenerating(false);
@@ -322,7 +324,7 @@ useEffect(() => {
   const handleMagicTransform = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
-    setLoadingText("Converting to Real Life...");
+    setLoadingText(t('drawing.loadingTransform'));
     AudioService.speak("Adding magic!");
     const currentImage = canvasRef.current.toDataURL('image/png');
     const result = await AIService.transformSketch(currentImage);
@@ -339,7 +341,7 @@ useEffect(() => {
   const handleAutoFix = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
-    setLoadingText("Fixing lines...");
+    setLoadingText(t('drawing.loadingClean'));
     const current = canvasRef.current.toDataURL();
     const cleaned = await AIService.cleanupDrawing(current);
     setIsGenerating(false);
@@ -383,7 +385,7 @@ useEffect(() => {
           AudioService.speak("Now draw the Setting.");
       } else if (storyStep === 'SETTING') {
           setStoryStep('GENERATING');
-          setLoadingText("Writing story...");
+          setLoadingText(t('drawing.loadingDrawing'));
           setIsGenerating(true);
           const story = await AIService.generateStoryFromAssets(newAssets);
           setIsGenerating(false);
@@ -632,11 +634,11 @@ useEffect(() => {
           type="button"
           onClick={async () => {
             await saveStoryToLibrary(storyResult.title, storyResult.content);
-            AudioService.speak("Saved!");
+            AudioService.speak(t('drawing.storySaved'));
           }}
           className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-900 text-white hover:bg-slate-800"
         >
-          <Save className="w-4 h-4" /> Save
+          <Save className="w-4 h-4" /> {t('drawing.saveLabel')}
         </button>
 
         <button
@@ -644,7 +646,7 @@ useEffect(() => {
           onClick={() => downloadStoryTxt(storyResult.title, storyResult.content)}
           className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700"
         >
-          <Download className="w-4 h-4" /> Download
+          <Download className="w-4 h-4" /> {t('drawing.downloadLabel')}
         </button>
 
         <button
@@ -652,7 +654,7 @@ useEffect(() => {
           onClick={closeStoryModal}
           className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-100 hover:bg-slate-200"
         >
-          Close
+          {t('drawing.closeLabel')}
         </button>
       </div>
     </div>
@@ -664,7 +666,7 @@ useEffect(() => {
         <div className="absolute inset-0 z-40 bg-slate-900/95 flex items-center justify-center p-4 rounded-3xl animate-fade-in">
            <div className="bg-slate-800 p-6 rounded-2xl max-w-3xl w-full border border-slate-700 shadow-2xl max-h-[80vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-display text-white">Choose a Template</h3>
+              <h3 className="text-2xl font-display text-white">{t('drawing.templateHeader')}</h3>
               <button onClick={() => setShowLibrary(false)} className="text-white"><X /></button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -685,16 +687,16 @@ useEffect(() => {
         </div>
       )}
 
-      {storyStep !== 'NONE' && storyStep !== 'DONE' && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 animate-bounce-in border-2 border-white">
-              <span className="font-bold text-lg">
-                  {storyStep === 'HERO' ? 'Step 1: Draw the Hero!' : storyStep === 'VILLAIN' ? 'Step 2: Draw the Villain!' : 'Step 3: Draw the Home!'}
-              </span>
-              <button onClick={advanceStory} title="Next Step" className="bg-white text-indigo-600 px-4 py-1 rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-1">
-                  Next <ChevronRight size={16} />
-              </button>
-          </div>
-      )}
+          {storyStep !== 'NONE' && storyStep !== 'DONE' && (
+              <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 animate-bounce-in border-2 border-white">
+                  <span className="font-bold text-lg">
+                      {storyStep === 'HERO' ? t('drawing.storyStepHero') : storyStep === 'VILLAIN' ? t('drawing.storyStepVillain') : t('drawing.storyStepSetting')}
+                  </span>
+                  <button onClick={advanceStory} title={t('drawing.storyNextButton')} className="bg-white text-indigo-600 px-4 py-1 rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-1">
+                      {t('drawing.storyNextButton')} <ChevronRight size={16} />
+                  </button>
+              </div>
+          )}
 
       <div className="flex-1 relative bg-slate-200 overflow-hidden cursor-crosshair touch-none" ref={containerRef}>
           <div 
@@ -799,10 +801,10 @@ useEffect(() => {
                
                <div className="flex gap-2 shrink-0">
                    <button onClick={() => setShowLibrary(true)} data-tooltip="Open Coloring Library" className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-600">
-                       <ImageIcon size={14} /> Templates
+                       <ImageIcon size={14} /> {t('drawing.templatesLabel')}
                    </button>
-                   <button onClick={startStoryMode} data-tooltip="Turn Drawings into Stories" className="flex items-center gap-1 bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
-                       <Layers size={14} /> Story Mode
+                   <button onClick={startStoryMode} data-tooltip={t('drawing.storyModeHint')} className="flex items-center gap-1 bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
+                       <Layers size={14} /> {t('drawing.storyModeLabel')}
                    </button>
                    <button onClick={handleAutoFix} data-tooltip="AI Line Cleanup" className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
                        <Wand2 size={14} /> Fix
@@ -868,7 +870,7 @@ useEffect(() => {
                 <button onClick={() => setShowGallery(false)} className="text-slate-400 hover:text-white"><X size={18}/></button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1">
-                {gallery.length === 0 && <p className="text-slate-500 text-center text-sm py-10">Empty! Go draw something awesome.</p>}
+                {gallery.length === 0 && <p className="text-slate-500 text-center text-sm py-10">{t('drawing.galleryEmpty')}</p>}
                 {gallery.map(img => (
                     <div key={img.id} className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition-colors">
                         <img src={img.dataUrl} className="w-full h-40 object-contain bg-white" />

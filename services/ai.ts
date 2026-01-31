@@ -3,51 +3,7 @@
 
 type StoryResult = { title: string; content: string };
 
-// NOTE:
-// - Keep this NON-sensitive (Vite exposes VITE_* vars to the browser bundle).
-// - In dev, you can omit it and rely on a Vite proxy for /api.
-const RAW_API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL?.toString()?.trim() || "";
-
-// Avoid accidental double-slashes when you set something like
-// VITE_API_BASE_URL=https://api.example.com/
-const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
-
-/**
- * If VITE_API_BASE_URL is empty:
- * - dev: use Vite proxy (recommended)
- * - prod: same-origin (/api/...)
- */
-function apiUrl(path: string) {
-  if (!path.startsWith("/")) path = "/" + path;
-  return API_BASE ? `${API_BASE}${path}` : path;
-}
-
-async function postJson<T>(path: string, body: any): Promise<T> {
-  // Abort fetch if it hangs (common when prod base URL is wrong or backend is down)
-  const controller = new AbortController();
-  const timeoutMs = Number((import.meta as any).env?.VITE_API_TIMEOUT_MS || 30000);
-  const t = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  const res = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    // If you ever add session cookies, this keeps it working.
-    credentials: "include",
-    signal: controller.signal,
-  });
-
-  window.clearTimeout(t);
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const msg = text?.slice(0, 500) || "";
-    throw new Error(`API ${path} failed: ${res.status} ${msg}`);
-  }
-  return res.json() as Promise<T>;
-}
-
+import { apiUrl, postJson } from './api';
 /**
  * Optional: shrink big drawings before upload (keeps your app snappy + avoids 413 errors).
  * Accepts data URLs like "data:image/png;base64,..."

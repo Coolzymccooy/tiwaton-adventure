@@ -4,6 +4,8 @@ import Layout from './components/Layout';
 import { View } from './types';
 import type { FamilyProfile } from './types';
 import { StorageService } from './services/storage';
+import { I18nProvider } from './i18n/I18nProvider';
+import { SyncService } from './services/sync';
 
 // Pages
 import Home from './pages/Home';
@@ -22,6 +24,13 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
 
+  const resolveView = (candidate?: string | null): View => {
+    if (candidate && Object.values(View).includes(candidate as View)) {
+      return candidate as View;
+    }
+    return View.HOME;
+  };
+
   useEffect(() => {
     const hasProfiles = StorageService.hasProfiles();
     if (!hasProfiles) {
@@ -30,7 +39,8 @@ const App: React.FC = () => {
         const active = StorageService.getCurrentProfile();
         if (active) {
             setProfile(active);
-            setCurrentView(View.HOME);
+            const maybeView = StorageService.getLastView();
+            setCurrentView(resolveView(maybeView));
             if (active.mode === 'PARENT') setIsAdminMode(true);
         } else {
             setCurrentView(View.LANDING);
@@ -38,11 +48,23 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLogin = (p: FamilyProfile) => {
-      setProfile(p);
+  useEffect(() => {
+    if (!profile) return;
+    StorageService.setLastView(currentView);
+    const snapshot = StorageService.buildSnapshot(profile.id, currentView);
+    SyncService.sendSnapshot(snapshot);
+  }, [profile, currentView]);
+
+  const handleLogin = async (p: FamilyProfile) => {
       StorageService.setCurrentProfile(p.id);
-      setIsAdminMode(p.mode === 'PARENT');
-      setCurrentView(View.HOME);
+      const snapshot = await SyncService.fetchSnapshot(p.id);
+      if (snapshot) {
+        StorageService.applySnapshot(snapshot);
+      }
+      const active = StorageService.getCurrentProfile() || p;
+      setProfile(active);
+      setIsAdminMode(active.mode === 'PARENT');
+      setCurrentView(resolveView(snapshot?.lastView));
   };
 
   const handleLogout = () => {
@@ -118,14 +140,16 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      currentView={currentView} 
-      onNavigate={setCurrentView}
-      childName={profile?.childName || ''}
-      onLogout={handleLogout}
-    >
-      {renderView()}
-    </Layout>
+    <I18nProvider>
+      <Layout
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        childName={profile?.childName || ''}
+        onLogout={handleLogout}
+      >
+        {renderView()}
+      </Layout>
+    </I18nProvider>
   );
 };
 

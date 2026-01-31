@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { StorageService } from '../services/storage';
 import { View, FamilyProfile } from '../types';
 import { 
@@ -10,6 +10,9 @@ import {
   MousePointer2, Lightbulb, LayoutDashboard
 } from 'lucide-react';
 
+import { useI18n } from '../i18n/I18nProvider';
+import { getLogoUrl } from '../components/logo';
+
 interface LandingProps {
   onAction: (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => void;
   activeProfile: FamilyProfile | null;
@@ -18,11 +21,19 @@ interface LandingProps {
 const SPLASH_WORDS = ["Imagination", "Discovery", "Victory", "Learning", "Creativity", "Adventure"];
 
 const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
+  const { t } = useI18n();
   const [hasProfiles, setHasProfiles] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [wordIndex, setWordIndex] = useState(0);
   const [isSplashing, setIsSplashing] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const logoUrl = getLogoUrl();
+  const heroTemplate = t('landing.heroSubtitle');
+  const heroWord = SPLASH_WORDS[wordIndex];
+  const heroSegments = heroTemplate.split('{word}');
+  const heroBefore = heroSegments[0] || '';
+  const heroAfter = heroSegments.slice(1).join('{word}');
+  const heroFullSubtitle = `${heroBefore}${heroWord}${heroAfter}`;
 
   useEffect(() => {
     setHasProfiles(StorageService.hasProfiles());
@@ -56,40 +67,40 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
     }
   };
 
-  const features = [
+  const features = useMemo(() => [
     {
       icon: <BrainCircuit size={40} />,
-      title: "Logical Reasoning",
-      desc: "Our Math Galaxy helps kids develop critical thinking through space-themed arithmetic battles.",
+      title: t('landing.featureReasoningTitle'),
+      desc: t('landing.featureReasoningDesc'),
       color: "from-blue-500 to-indigo-600",
       tag: "SMART",
       tooltip: "Space Math Adventures"
     },
     {
       icon: <Palette size={40} />,
-      title: "Creative Expression",
-      desc: "An AI-powered Art Studio where sketches turn into 3D masterpieces using magic transformations.",
+      title: t('landing.featureArtTitle'),
+      desc: t('landing.featureArtDesc'),
       color: "from-pink-500 to-rose-600",
       tag: "CREATE",
       tooltip: "Sketch-to-Magic Tool"
     },
     {
       icon: <GraduationCap size={40} />,
-      title: "Faith-Based Learning",
-      desc: "Interactive Bible Quests and tournaments that make spiritual growth an epic adventure.",
+      title: t('landing.featureVisionTitle'),
+      desc: t('landing.featureVisionDesc'),
       color: "from-amber-500 to-orange-600",
       tag: "LEARN",
       tooltip: "Ancient Bible Quests"
     },
     {
       icon: <Target size={40} />,
-      title: "Vocabulary Mastery",
-      desc: "Infinite Word Search and Crossword challenges that build spelling and reading fluency.",
+      title: t('landing.featureWordTitle'),
+      desc: t('landing.featureWordDesc'),
       color: "from-emerald-500 to-teal-600",
       tag: "READ",
       tooltip: "Arcade Word Puzzles"
     }
-  ];
+  ], [t]);
 
   return (
     <div 
@@ -103,8 +114,12 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
           className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
           data-tooltip={activeProfile ? "Back to the Hub" : "Return to Top"}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)] border border-white/10 group-hover:rotate-12 transition-transform">
-            <span className="font-display text-white font-bold text-xl">T</span>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)] border border-white/10 group-hover:rotate-12 transition-transform overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Tiwaton mark" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-display text-white font-bold text-xl">T</span>
+            )}
           </div>
           <h1 className="font-display text-2xl text-white tracking-tighter drop-shadow-lg hidden sm:block">Tiwaton</h1>
         </div>
@@ -178,7 +193,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
             ) : (
               <div className="glass-capsule text-indigo-300">
                  <Sparkles size={16} className="text-yellow-400 animate-spin-slow"/> 
-                 <span>THE NEW STANDARD FOR FAMILY ADVENTURES</span>
+                 <span>{t('landing.sparkleTag')}</span>
               </div>
             )}
           </div>
@@ -198,18 +213,18 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
             {/* SPLASH WORD SLIDER SUBTEXT */}
             <div className="flex flex-col items-center justify-center gap-4">
               <div className="text-slate-300 text-xl sm:text-3xl font-medium tracking-tight leading-snug">
-                A high-definition universe where 
+                {heroBefore}
                 <span className="inline-block min-w-[200px] sm:min-w-[300px] px-4">
                    <span className={`inline-block font-black italic text-white text-3xl sm:text-5xl transition-all duration-500 ${isSplashing ? 'opacity-100 scale-100 blur-0 translate-y-0' : 'opacity-0 scale-50 blur-xl translate-y-4'}`}>
-                      {SPLASH_WORDS[wordIndex]}
+                      {heroWord}
                    </span>
                 </span>
-                meets <span className="text-white font-black italic">Growth</span>. 
+                {heroAfter}
               </div>
             </div>
             
             <p className="text-indigo-400 font-black text-xs sm:text-sm tracking-[0.6em] uppercase italic opacity-70">
-              EDUCATE • INSPIRE • CHALLENGE • CONNECT
+              {heroFullSubtitle}
             </p>
           </div>
 
@@ -225,7 +240,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
             >
               <div className={`absolute inset-0 bg-gradient-to-r ${activeProfile ? 'from-emerald-500 to-teal-500' : 'from-indigo-500 to-purple-500'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
               <span className="relative z-10 flex items-center justify-center gap-4 py-8 group-hover:text-white transition-colors duration-500">
-                {activeProfile ? 'CONTINUE MISSION' : (hasProfiles ? 'START ADVENTURE' : 'CREATE THE HUB')} 
+                {activeProfile ? t('landing.ctaResume') : t('landing.ctaPrimary')}
                 <Rocket size={32} className={`group-hover:scale-110 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform ${activeProfile ? 'text-emerald-400 group-hover:text-white' : ''}`} />
               </span>
             </button>
@@ -238,7 +253,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
               >
                 <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2rem]"></div>
                 <div className="relative z-10 flex items-center justify-center gap-2">
-                  <LogIn size={18} className="text-indigo-400 group-hover:scale-110 transition-transform"/> {activeProfile ? 'SWITCH HERO' : 'SIGN IN'}
+                  <LogIn size={18} className="text-indigo-400 group-hover:scale-110 transition-transform"/> {t('landing.ctaSecondary')}
                 </div>
               </button>
               <button 
@@ -248,7 +263,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
               >
                 <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2rem]"></div>
                 <div className="relative z-10 flex items-center justify-center gap-2">
-                  <RefreshCcw size={18} className="text-amber-400 group-hover:rotate-180 transition-transform duration-700"/> RESET HUB
+                    <RefreshCcw size={18} className="text-amber-400 group-hover:rotate-180 transition-transform duration-700"/> {t('landing.resetButton')}
                 </div>
               </button>
             </div>
@@ -257,7 +272,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
 
         {/* Scroll Indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce opacity-40 cursor-pointer" onClick={() => scrollToSection('vision')}>
-           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Discover More</span>
+           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{t('landing.discoverMore')}</span>
            <ChevronDown size={20} className="text-slate-400"/>
         </div>
       </section>
@@ -269,9 +284,9 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
                 <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
                    <Lightbulb size={14}/> THE VISION
                 </div>
-                <h2 className="font-display text-6xl text-white italic leading-tight">Empowering young minds through <span className="text-indigo-400">Play</span>.</h2>
+                <h2 className="font-display text-6xl text-white italic leading-tight">{t('landing.visionTitle')}</h2>
                 <p className="text-slate-400 text-lg leading-relaxed font-medium">
-                  Tiwaton isn't just an app—it's a digital ecosystem designed to stimulate cognitive development. By blending gaming mechanics with high-quality educational content, we turn every screen session into a milestone of growth.
+                  {t('landing.visionSubtitle')}
                 </p>
                 <div className="grid grid-cols-2 gap-6">
                     <div className="p-6 bg-slate-900/50 rounded-3xl border border-white/5 group hover:border-indigo-500/30 transition-all" data-tooltip="Gamified Learning Logic">
@@ -374,7 +389,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
                 className={`glossy-button max-w-md mx-auto relative group overflow-hidden ${activeProfile ? 'border-emerald-500' : ''}`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-r ${activeProfile ? 'from-emerald-500 to-teal-500' : 'from-emerald-500 to-teal-500'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/><span className="relative z-10 flex items-center justify-center gap-4 py-8 group-hover:text-white transition-colors duration-500">
-                  {activeProfile ? 'RESUME HUB' : 'GO TO HUB'} <ArrowRight size={32} className="group-hover:translate-x-2 transition-transform duration-500" />
+                  {activeProfile ? t('landing.ctaResume') : t('landing.ctaPrimary')} <ArrowRight size={32} className="group-hover:translate-x-2 transition-transform duration-500" />
                 </span>
               </button>
           </div>
@@ -382,7 +397,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
           <footer className="mt-40 border-t border-white/5 pt-10 pb-20">
              <div className="flex flex-col items-center gap-6">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-display text-2xl text-white shadow-2xl">T</div>
-                <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.5em]">© 2025 TIWATON ADVENTURE SYSTEMS</p>
+                <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.5em]">{t('landing.footerTag')}</p>
                 <div className="flex gap-8 opacity-40">
                    <Gamepad2 size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Spelling & Logic Games" />
                    <BookOpen size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Reading & Adventures" />

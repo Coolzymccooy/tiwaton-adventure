@@ -11,6 +11,21 @@ const KEYS = {
   EVENTS: 'tiwaton_events',
   USAGE: 'tiwaton_usage'
 };
+const LAST_VIEW_KEY = 'tiwaton_last_view';
+
+export type SnapshotPayload = {
+  profileId: string;
+  profiles: FamilyProfile[];
+  stories: Story[];
+  drawings: Drawing[];
+  gameStats: GameStat;
+  events: CountdownEvent[];
+  usage: Record<string, Record<string, number>>;
+  lastView?: string;
+};
+
+const readStories = () => JSON.parse(localStorage.getItem(KEYS.STORIES) || '[]');
+const readDrawings = () => JSON.parse(localStorage.getItem(KEYS.DRAWINGS) || '[]');
 
 export const StorageService = {
   getProfiles: (): FamilyProfile[] => {
@@ -146,5 +161,32 @@ export const StorageService = {
     const list = StorageService.getEvents().filter(e => e.id !== id);
     localStorage.setItem(KEYS.EVENTS, JSON.stringify(list));
     return list;
+  }
+,
+  setLastView: (view: string) => {
+    if (!view) return;
+    localStorage.setItem(LAST_VIEW_KEY, view);
+  },
+  getLastView: () => localStorage.getItem(LAST_VIEW_KEY),
+  buildSnapshot: (profileId: string, lastView?: string): SnapshotPayload => ({
+    profileId,
+    profiles: StorageService.getProfiles(),
+    stories: readStories(),
+    drawings: readDrawings(),
+    gameStats: StorageService.getGameStats(),
+    events: StorageService.getEvents(),
+    usage: StorageService.getFamilyUsage(),
+    lastView,
+  }),
+  applySnapshot: (snapshot: SnapshotPayload | null) => {
+    if (!snapshot) return;
+    localStorage.setItem(KEYS.PROFILES, JSON.stringify(snapshot.profiles || StorageService.getProfiles()));
+    localStorage.setItem(KEYS.GAME_STATS, JSON.stringify(snapshot.gameStats || StorageService.getGameStats()));
+    localStorage.setItem(KEYS.STORIES, JSON.stringify(snapshot.stories || []));
+    localStorage.setItem(KEYS.DRAWINGS, JSON.stringify(snapshot.drawings || []));
+    localStorage.setItem(KEYS.EVENTS, JSON.stringify(snapshot.events || []));
+    localStorage.setItem(KEYS.USAGE, JSON.stringify(snapshot.usage || {}));
+    StorageService.setCurrentProfile(snapshot.profileId);
+    if (snapshot.lastView) localStorage.setItem(LAST_VIEW_KEY, snapshot.lastView);
   }
 };

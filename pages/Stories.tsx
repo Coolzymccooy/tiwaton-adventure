@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Volume2, Mic, Sparkles, ChevronDown, ChevronUp, StopCircle } from 'lucide-react';
 import type { Story } from '../types';
 import { StorageService } from '../services/storage';
+import { useI18n } from '../i18n/I18nProvider';
 
 // ✅ Longer, more engaging versions (aimed at ~3+ mins read-aloud each)
 // Drop this in place of your existing DEFAULT_STORIES.
@@ -163,6 +164,7 @@ const StoriesPage: React.FC = () => {
   const [newContent, setNewContent] = useState('');
   const [speakingStoryId, setSpeakingStoryId] = useState<string | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
+  const { t } = useI18n();
 
   useEffect(() => {
     loadUserStories();
@@ -218,16 +220,17 @@ const StoriesPage: React.FC = () => {
     const stats = StorageService.getGameStats();
     stats.xp += 50;
     StorageService.saveGameStats(stats);
-    alert('Story Saved! +50 XP');
+    alert(t('stories.savedAlert'));
   };
 
   return (
     <div className="flex flex-col gap-6">
       {/* Create Story Section */}
       <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-xl">
-        <h3 className="font-display text-2xl text-pink-400 mb-4 flex items-center gap-2">
-          <Sparkles /> Write an Adventure
+        <h3 className="font-display text-2xl text-pink-400 mb-2 flex items-center gap-2">
+          <Sparkles /> {t('stories.createTitle')}
         </h3>
+        <p className="text-slate-400 text-sm">{t('stories.createSubtitle')}</p>
         <div className="space-y-4">
           <input 
               value={newTitle}
@@ -248,7 +251,7 @@ const StoriesPage: React.FC = () => {
             title="Save your new story"
             className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform"
           >
-            Save to Library
+            {t('stories.saveButton')}
           </button>
         </div>
       </div>
@@ -257,11 +260,11 @@ const StoriesPage: React.FC = () => {
       <div className="space-y-4">
         <button 
           onClick={() => setIsLibraryOpen(!isLibraryOpen)}
-          title={isLibraryOpen ? "Collapse Library" : "Expand Library"}
+          title={isLibraryOpen ? t('stories.libraryToggleCollapse') : t('stories.libraryToggleExpand')}
           className="w-full flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 hover:bg-slate-700 transition-colors"
         >
           <h3 className="font-display text-2xl text-amber-400 flex items-center gap-2">
-            <BookOpen /> Story Library ({stories.length})
+            <BookOpen /> {t('stories.libraryTitle')} ({stories.length})
           </h3>
           {isLibraryOpen ? <ChevronUp /> : <ChevronDown />}
         </button>
@@ -274,7 +277,7 @@ const StoriesPage: React.FC = () => {
                 <div key={story.id} className={`bg-slate-800/50 border ${isPlaying ? 'border-amber-500 bg-slate-800' : 'border-slate-700'} rounded-xl p-5 hover:bg-slate-800 transition-colors`}>
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-bold text-lg text-slate-100">{story.title}</h4>
-                    {story.isUserCreated && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full uppercase">Family Made</span>}
+                    {story.isUserCreated && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full uppercase">{t('stories.familyMadeTag')}</span>}
                   </div>
                   <p className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 mb-4">
                     {story.content}
@@ -282,10 +285,10 @@ const StoriesPage: React.FC = () => {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => handleSpeak(story.content, story.id)}
-                      title={isPlaying ? "Stop Reading" : "Read Aloud"}
+                      title={isPlaying ? t('stories.stopReading') : t('stories.readAloud')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${isPlaying ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'}`}
                     >
-                      {isPlaying ? <><StopCircle size={16} /> Stop Reading</> : <><Volume2 size={16} /> Read Aloud</>}
+                      {isPlaying ? <><StopCircle size={16} /> {t('stories.stopReading')}</> : <><Volume2 size={16} /> {t('stories.readAloud')}</>}
                     </button>
                   </div>
                 </div>

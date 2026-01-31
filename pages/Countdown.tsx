@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Plus, Trash2, Mail, Bell } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import type { CountdownEvent } from '../types';
+import { useI18n } from '../i18n/I18nProvider';
 
 const CountdownPage: React.FC = () => {
+  const { t } = useI18n();
   const [events, setEvents] = useState<CountdownEvent[]>([]);
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
@@ -47,9 +49,9 @@ const CountdownPage: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
            <h2 className="font-display text-3xl text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">
-             Events Radar
+             {t('countdown.title')}
            </h2>
-           <p className="text-slate-400 text-sm">Counting down to fun!</p>
+           <p className="text-slate-400 text-sm">{t('countdown.subtitle')}</p>
         </div>
         {!showAdd && (
           <button 
@@ -57,19 +59,19 @@ const CountdownPage: React.FC = () => {
             title="Create New Event"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl font-bold text-white shadow-lg text-sm"
           >
-            <Plus size={16} /> New Event
+            <Plus size={16} /> {t('countdown.addButton')}
           </button>
         )}
       </div>
 
       {showAdd && (
         <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 animate-fade-in">
-          <h3 className="text-lg font-bold mb-3">Add Event</h3>
+          <h3 className="text-lg font-bold mb-3">{t('countdown.addTitle')}</h3>
           <div className="space-y-3">
             <input 
               value={newEventName}
               onChange={e => setNewEventName(e.target.value)}
-              placeholder="Event Name (e.g. Disney Trip)"
+              placeholder={t('countdown.eventNamePlaceholder')}
               title="Event Name"
               className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 outline-none focus:border-indigo-500"
             />
@@ -86,14 +88,14 @@ const CountdownPage: React.FC = () => {
                   type="email"
                   value={notificationEmail}
                   onChange={e => setNotificationEmail(e.target.value)}
-                  placeholder="Parent Email for Reminders (Optional)"
+                  placeholder={t('countdown.notifyPlaceholder')}
                   title="Notification Email"
                   className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 pl-10 outline-none focus:border-indigo-500"
                 />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={handleAdd} title="Save Event" className="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded-lg font-bold text-sm">Save & Notify</button>
-              <button onClick={() => setShowAdd(false)} title="Cancel" className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg font-bold text-sm">Cancel</button>
+              <button onClick={handleAdd} title="Save Event" className="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded-lg font-bold text-sm">{t('countdown.saveButton')}</button>
+              <button onClick={() => setShowAdd(false)} title="Cancel" className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg font-bold text-sm">{t('countdown.cancelButton')}</button>
             </div>
           </div>
         </div>
@@ -123,11 +125,11 @@ const CountdownPage: React.FC = () => {
 
                <div className="flex items-center gap-4 relative z-10">
                   {time.passed ? (
-                    <span className="text-sm font-bold text-green-400 bg-green-900/30 px-3 py-1 rounded-full">Today!</span>
+                    <span className="text-sm font-bold text-green-400 bg-green-900/30 px-3 py-1 rounded-full">{t('countdown.todayLabel')}</span>
                   ) : (
                     <div className="text-right">
                        <span className="text-2xl font-black text-indigo-300 block leading-none">{time.days}</span>
-                       <span className="text-[10px] text-slate-500 uppercase tracking-widest">Days Left</span>
+                       <span className="text-[10px] text-slate-500 uppercase tracking-widest">{t('countdown.daysLeftLabel')}</span>
                     </div>
                   )}
                   <button onClick={() => handleDelete(evt.id)} title="Delete Event" className="text-slate-600 hover:text-red-400 transition-colors">
@@ -141,7 +143,7 @@ const CountdownPage: React.FC = () => {
         {events.length === 0 && !showAdd && (
           <div className="text-center py-12 opacity-50">
             <Calendar size={48} className="mx-auto mb-4 text-slate-600" />
-            <p>No events yet. Start the countdown!</p>
+            <p>{t('countdown.noEvents')}</p>
           </div>
         )}
       </div>

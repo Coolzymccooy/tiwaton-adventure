@@ -46,7 +46,11 @@ app.get("/api/health", (_, res) => res.json({ ok: true }));
 
 // ---- routes ----
 const aiRouter = require("./routes/ai.routes.cjs");
+const syncRouter = require("./routes/sync.routes.cjs");
+const insightsRouter = require("./routes/insights.routes.cjs");
 app.use("/api/ai", aiRouter);
+app.use("/api/sync", syncRouter);
+app.use("/api/insights", insightsRouter);
 
 // ---- global error handler ----
 app.use((err, req, res, next) => {

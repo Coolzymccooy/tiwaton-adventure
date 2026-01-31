@@ -9,6 +9,7 @@ import {
   ArrowRight, Check, X, ArrowLeft, Zap, ScrollText, Music2, Goal, 
   AlertCircle, RefreshCcw, Flame, Crown, Sparkles, Lock, Home
 } from 'lucide-react';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface ActivitiesPageProps {
     onNavigate?: (view: View) => void;
@@ -22,12 +23,297 @@ interface Question {
   funnyComment?: string;
 }
 
-const BIBLE_WORLDS = [
-  { id: 'creation', label: 'The Beginning', icon: '🌍', desc: 'Creation & Eden', badge: 'Genesis Star' },
-  { id: 'heroes', label: 'Ancient Heroes', icon: '🚢', desc: 'Noah & Moses', badge: 'Ark Builder' },
-  { id: 'brave', label: 'Brave Hearts', icon: '🦁', desc: 'David & Daniel', badge: 'Lion Heart' },
-  { id: 'miracles', label: 'Jesus’ Miracles', icon: '🍞', desc: 'Water & Bread', badge: 'Healer' },
-  { id: 'promise', label: 'The Big Promise', icon: '🕊️', desc: 'Easter & Beyond', badge: 'Spirit Guide' }
+﻿type LocalBibleQuestion = {
+  question: { en: string; de: string };
+  options: { en: string[]; de: string[] };
+  correctIndex: number;
+  explanation: { en: string; de: string };
+  funnyComment?: { en: string; de: string };
+};
+
+const LOCAL_BIBLE_BANK: Record<string, LocalBibleQuestion[]> = {
+  creation: [
+    {
+      question: {
+        en: 'Who built the ark to survive the flood?',
+        de: 'Wer baute die Arche, um die Sintflut zu überstehen?'
+      },
+      options: {
+        en: ['Noah', 'Abraham', 'Moses', 'Isaac'],
+        de: ['Noah', 'Abraham', 'Mose', 'Isaak']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Noah obeyed God and built the ark exactly as instructed.',
+        de: 'Noah gehorchte Gott und baute die Arche genau nach Anweisung.'
+      },
+      funnyComment: {
+        en: 'Boat-building masterclass.',
+        de: 'Bootsbau-Meisterklasse.'
+      }
+    },
+    {
+      question: {
+        en: 'What did God create on the first day?',
+        de: 'Was schuf Gott am ersten Tag?'
+      },
+      options: {
+        en: ['Light', 'Animals', 'People', 'Plants'],
+        de: ['Licht', 'Tiere', 'Menschen', 'Pflanzen']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'God said, “Let there be light” before anything else.',
+        de: 'Gott sprach: „Es werde Licht“ noch bevor etwas anderes entstand.'
+      }
+    }
+  ],
+  patriarchs: [
+    {
+      question: {
+        en: 'Who received the promise of descendants as numerous as the stars?',
+        de: 'Wer erhielt das Versprechen zahlreicher Nachkommen wie die Sterne?'
+      },
+      options: {
+        en: ['Isaac', 'Jacob', 'Abraham', 'Moses'],
+        de: ['Isaak', 'Jakob', 'Abraham', 'Mose']
+      },
+      correctIndex: 2,
+      explanation: {
+        en: 'God made that covenant with Abraham.',
+        de: 'Gott schloss diesen Bund mit Abraham.'
+      }
+    },
+    {
+      question: {
+        en: 'Which wife became pregnant with Isaac after many years of waiting?',
+        de: 'Welche Frau wurde nach langer Wartezeit Mutter von Isaak?'
+      },
+      options: {
+        en: ['Sarah', 'Rebekah', 'Rachel', 'Leah'],
+        de: ['Sarah', 'Rebekka', 'Rachel', 'Lea']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Sarah finally trusted God and Isaac was born.',
+        de: 'Sarah vertraute Gott und Isaak wurde geboren.'
+      }
+    }
+  ],
+  exodus: [
+    {
+      question: {
+        en: 'Who led the Israelites out of Egypt?',
+        de: 'Wer führte die Israeliten aus Ägypten?'
+      },
+      options: {
+        en: ['Moses', 'Aaron', 'Joshua', 'Joseph'],
+        de: ['Mose', 'Aaron', 'Josua', 'Josef']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Moses trusted God and stood before Pharaoh.',
+        de: 'Mose vertraute Gott und trat vor den Pharao.'
+      }
+    },
+    {
+      question: {
+        en: 'Which sea did Moses part for the people to pass through?',
+        de: 'Welches Meer teilte Mose, damit das Volk hindurchziehen konnte?'
+      },
+      options: {
+        en: ['Red Sea', 'Dead Sea', 'Sea of Galilee', 'Mediterranean'],
+        de: ['Rotes Meer', 'Totes Meer', 'See Genezareth', 'Mittelmeer']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'God told Moses to stretch out his staff over the Red Sea.',
+        de: 'Gott sagte Mose, er solle seinen Stab über das Rote Meer halten.'
+      }
+    }
+  ],
+  judges: [
+    {
+      question: {
+        en: 'Which judge defeated the Midianites with just 300 men and torches?',
+        de: 'Welcher Richter besiegte die Midianiter mit nur 300 Männern und Fackeln?'
+      },
+      options: {
+        en: ['Gideon', 'Samson', 'Deborah', 'Samuel'],
+        de: ['Gideon', 'Simson', 'Debora', 'Samuel']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Gideon trusted God and surprised the enemy at night.',
+        de: 'Gideon vertraute Gott und überraschte den Feind nachts.'
+      }
+    },
+    {
+      question: {
+        en: 'Who was the prophetess judge that led Israel and sang a victory song?',
+        de: 'Welche Prophetin-Richterin führte Israel und sang einen Siegesgesang?'
+      },
+      options: {
+        en: ['Deborah', 'Ruth', 'Esther', 'Miriam'],
+        de: ['Debora', 'Rut', 'Esther', 'Mirjam']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Deborah led the people with courage and praised God after the win.',
+        de: 'Debora führte das Volk mutig und lobte Gott nach dem Sieg.'
+      }
+    }
+  ],
+  kings: [
+    {
+      question: {
+        en: 'Which shepherd boy was anointed to become king of Israel?',
+        de: 'Welcher Hirtenjunge wurde gesalbt, um König von Israel zu werden?'
+      },
+      options: {
+        en: ['David', 'Saul', 'Solomon', 'Hezekiah'],
+        de: ['David', 'Saul', 'Salomo', 'Hiskia']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'David was chosen by Samuel while tending sheep.',
+        de: 'David wurde von Samuel während der Schafhütung ausgewählt.'
+      }
+    },
+    {
+      question: {
+        en: 'Which king built the temple in Jerusalem?',
+        de: 'Welcher König ließ den Tempel in Jerusalem bauen?'
+      },
+      options: {
+        en: ['David', 'Solomon', 'Rehoboam', 'Uzziah'],
+        de: ['David', 'Salomo', 'Rehabeam', 'Usija']
+      },
+      correctIndex: 1,
+      explanation: {
+        en: 'Solomon built the temple to honor God with beautiful structure.',
+        de: 'Salomo baute den Tempel, um Gott mit einem prächtigen Bau zu ehren.'
+      }
+    }
+  ],
+  prophets: [
+    {
+      question: {
+        en: 'Which prophet saw dry bones come back to life in a vision?',
+        de: 'Welcher Prophet sah in einer Vision trockene Knochen wieder lebendig werden?'
+      },
+      options: {
+        en: ['Ezekiel', 'Isaiah', 'Daniel', 'Amos'],
+        de: ['Ezechiel', 'Jesaja', 'Daniel', 'Amos']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Ezekiel’s vision showed God bringing hope and new life.',
+        de: 'Ezechiels Vision zeigte, dass Gott Hoffnung und neues Leben schenkt.'
+      }
+    },
+    {
+      question: {
+        en: 'Which prophet reminded kings to act justly and love mercy?',
+        de: 'Welcher Prophet erinnerte Könige daran, gerecht zu handeln und Barmherzigkeit zu lieben?'
+      },
+      options: {
+        en: ['Micah', 'Jonah', 'Hosea', 'Nahum'],
+        de: ['Micha', 'Jona', 'Hosea', 'Nahum']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Micah wrote that God wants justice, mercy, and humility.',
+        de: 'Micha schrieb, dass Gott Gerechtigkeit, Barmherzigkeit und Demut möchte.'
+      }
+    }
+  ],
+  gospels: [
+    {
+      question: {
+        en: 'What did Jesus turn water into at the wedding in Cana?',
+        de: 'Wasserde Jesus bei der Hochzeit zu Kana verwandelt?'
+      },
+      options: {
+        en: ['Wine', 'Bread', 'Fish', 'Milk'],
+        de: ['Wein', 'Brot', 'Fisch', 'Milch']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Jesus turned water into wine to bless the celebration.',
+        de: 'Jesus verwandelte Wasser in Wein, um die Feier zu segnen.'
+      }
+    },
+    {
+      question: {
+        en: 'Which gospel writer described Jesus feeding 5,000 people?',
+        de: 'Welcher Evangelist beschrieb, wie Jesus 5.000 Menschen speiste?'
+      },
+      options: {
+        en: ['Matthew', 'Mark', 'Luke', 'John'],
+        de: ['Matthäus', 'Markus', 'Lukas', 'Johannes']
+      },
+      correctIndex: 3,
+      explanation: {
+        en: 'John wrote about the miracle beside the Sea of Galilee.',
+        de: 'Johannes berichtete von dem Wunder am See Genezareth.'
+      }
+    }
+  ],
+  earlyChurch: [
+    {
+      question: {
+        en: 'Which apostle wrote many letters to the churches?',
+        de: 'Welcher Apostel schrieb viele Briefe an die Gemeinden?'
+      },
+      options: {
+        en: ['Paul', 'Peter', 'James', 'John'],
+        de: ['Paulus', 'Petrus', 'Jakobus', 'Johannes']
+      },
+      correctIndex: 0,
+      explanation: {
+        en: 'Paul traveled widely and penned letters to believers.',
+        de: 'Paulus reiste weit und schrieb Briefe an Gläubige.'
+      }
+    },
+    {
+      question: {
+        en: 'In which city were believers first called Christians?',
+        de: 'In welcher Stadt nannte man die Gläubigen zuerst Christen?'
+      },
+      options: {
+        en: ['Jerusalem', 'Antioch', 'Rome', 'Corinth'],
+        de: ['Jerusalem', 'Antiochia', 'Rom', 'Korinth']
+      },
+      correctIndex: 1,
+      explanation: {
+        en: 'The believers in Antioch were the first to bear the name Christian.',
+        de: 'In Antiochia wurden die Gläubigen erstmals Christen genannt.'
+      }
+    }
+  ]
+};
+
+const getOfflineQuestions = (worldId: string, locale: 'en' | 'de'): Question[] => {
+  const bucket = LOCAL_BIBLE_BANK[worldId] || [];
+  return bucket.map((entry) => ({
+    question: entry.question[locale],
+    options: entry.options[locale],
+    correctIndex: entry.correctIndex,
+    explanation: entry.explanation[locale],
+    funnyComment: entry.funnyComment ? entry.funnyComment[locale] : undefined,
+  }));
+};
+
+﻿const BIBLE_WORLDS = [
+  { id: 'creation', label: 'The Beginning', icon: '🌅', desc: 'Creation & Eden', badge: 'Genesis Star' },
+  { id: 'patriarchs', label: 'Patriarch Promise', icon: '🛕', desc: 'Abraham & Sarah', badge: 'Promise Keeper' },
+  { id: 'exodus', label: 'Exodus Trail', icon: '🔥', desc: 'Moses & the Wilderness', badge: 'Desert Guide' },
+  { id: 'judges', label: 'Judges & Courage', icon: '🛡️', desc: 'Deborah to Samson', badge: 'Courage Shield' },
+  { id: 'kings', label: 'Kingdom Builders', icon: '👑', desc: 'David, Solomon & the Temple', badge: 'Royal Honor' },
+  { id: 'prophets', label: 'Voice of the Prophets', icon: '📜', desc: 'Isaiah, Jeremiah & Hope', badge: 'Prophet Quill' },
+  { id: 'gospels', label: 'Good News', icon: '✝️', desc: 'Jesus & Miracles', badge: 'Good News Badge' },
+  { id: 'earlyChurch', label: 'Early Church', icon: '✨', desc: 'Acts & Letters', badge: 'Faith Flame' }
 ];
 
 const CATEGORY_META = {
@@ -41,24 +327,28 @@ const CorrectionCard: React.FC<{
   selectedIndex: number; 
   onNext: () => void 
 }> = ({ question, selectedIndex, onNext }) => {
+    const { t } = useI18n();
     useEffect(() => {
         AudioService.speak(`Incorrect. ${question.explanation}`);
     }, [question]);
+    const incorrectText = t('activities.incorrectDescription', undefined, { option: question.options[selectedIndex] });
+    const funny = question.funnyComment ? ` ${question.funnyComment}` : '';
 
     return (
         <div className="absolute inset-x-0 bottom-0 top-[20%] z-[60] bg-slate-950/95 backdrop-blur-3xl rounded-t-[3rem] border-t-4 border-rose-500 p-6 sm:p-10 flex flex-col animate-slide-up shadow-[0_-40px_100px_rgba(244,63,94,0.3)]">
-            <div className="flex-1 overflow-y-auto custom-scrollbar mb-4">
+                <div className="flex-1 overflow-y-auto custom-scrollbar mb-4">
                 <div className="flex items-center gap-3 mb-4 text-rose-400">
                     <X size={32} className="bg-rose-500/20 p-1.5 rounded-xl" />
-                    <h3 className="text-3xl font-black italic uppercase tracking-tighter">Incorrect</h3>
+                    <h3 className="text-3xl font-black italic uppercase tracking-tighter">{t('activities.incorrectTitle')}</h3>
                 </div>
                 
                 <p className="text-white text-lg mb-6 font-medium leading-tight opacity-90">
-                    Choosing <span className="text-rose-400 font-black italic">"{question.options[selectedIndex]}"</span> {question.funnyComment || "doesn't quite match the story this time!"}
+                    {incorrectText}
+                    {funny}
                 </p>
 
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-4">
-                   <p className="text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-2">The Correct Answer Is</p>
+                   <p className="text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-2">{t('activities.correctionPrompt')}</p>
                    <h4 className="text-2xl font-black text-white mb-2 italic tracking-tight">{question.options[question.correctIndex]}</h4>
                    <p className="text-slate-300 text-sm leading-relaxed font-sans">{question.explanation}</p>
                 </div>
@@ -68,7 +358,7 @@ const CorrectionCard: React.FC<{
                 onClick={onNext}
                 className="w-full py-5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(159,18,57)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3"
             >
-                CONTINUE JOURNEY <ArrowRight size={22}/>
+                {t('activities.correctionButton')} <ArrowRight size={22}/>
             </button>
         </div>
     );
@@ -90,6 +380,7 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
 
   const stats = StorageService.getGameStats();
   const bibleProgress = stats.quizProgress.find(p => p.category === 'Bible')?.bibleWorldLevel || 0;
+  const { t, locale } = useI18n();
 
   useEffect(() => { 
     return () => {
@@ -102,6 +393,7 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
 
   const startLevel = async (worldId: string) => {
     const world = BIBLE_WORLDS.find(w => w.id === worldId);
+    const fallbackQuestions = getOfflineQuestions(worldId, locale);
     setSelectedWorldId(worldId);
     setLoading(true);
     setMode('PLAYING');
@@ -134,8 +426,14 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
     } catch (e) {
         console.error("Failed to load quiz", e);
         setLoading(false);
-        setMode('MENU');
-        alert("The magic scrolls are dusty! Please try again.");
+        if (fallbackQuestions.length > 0) {
+          setQuestions(fallbackQuestions);
+          setTimeout(() => AudioService.speak(fallbackQuestions[0].question), 800);
+          AudioService.speak(t('activities.offlineNote'));
+        } else {
+          setMode('MENU');
+        }
+        alert(t('activities.fallbackAlert'));
     }
   };
 
@@ -200,8 +498,8 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
             <div className="absolute inset-0 flex items-center justify-center text-3xl">📜</div>
         </div>
         <div>
-            <h2 className="text-3xl font-display text-white mb-2 animate-pulse tracking-tight">Gathering Ancient Scrolls...</h2>
-            <p className="text-indigo-400 font-black uppercase tracking-widest text-[10px]">Preparing your mission</p>
+            <h2 className="text-3xl font-display text-white mb-2 animate-pulse tracking-tight">{t('activities.loadingTitle')}</h2>
+            <p className="text-indigo-400 font-black uppercase tracking-widest text-[10px]">{t('activities.loadingSubtitle')}</p>
         </div>
     </div>
   );
@@ -216,15 +514,15 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
             <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 p-8 backdrop-blur-3xl animate-fade-in">
                 <div className="text-center max-w-sm animate-float">
                     <div className="text-8xl mb-8 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{world?.icon}</div>
-                    <h2 className="text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">Victory!</h2>
-                    <p className="text-white text-lg font-bold mb-6">You Conquered {world?.label}!</p>
+                    <h2 className="text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">{t('activities.victoryTitle')}</h2>
+                    <p className="text-white text-lg font-bold mb-6">{t('activities.victorySubtitle')}</p>
                     <div className="bg-indigo-600/30 p-6 rounded-[2rem] border border-white/10 mb-6">
                         <div className="flex items-center justify-center gap-3 text-white font-black text-3xl mb-1">
                              <Zap className="text-yellow-300" /> +150
                         </div>
-                        <p className="text-indigo-300 font-black uppercase text-[9px] tracking-widest">XP EARNED</p>
+                        <p className="text-indigo-300 font-black uppercase text-[9px] tracking-widest">{t('activities.victoryXpLabel')}</p>
                     </div>
-                    <button onClick={() => setMode('MENU')} className="w-full py-5 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(161,98,7)] transition-all active:scale-95">RETURN TO HUB</button>
+                    <button onClick={() => setMode('MENU')} className="w-full py-5 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(161,98,7)] transition-all active:scale-95">{t('activities.retryButton')}</button>
                 </div>
             </div>
         )}
@@ -305,14 +603,14 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
           >
              <Home size={16}/> EXIT TO HUB
           </button>
-          <div className="bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full text-indigo-400 text-[9px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
-             <BrainCircuit size={12}/> Academic Center
-          </div>
+        <div className="bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full text-indigo-400 text-[9px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
+           <BrainCircuit size={12}/> {t('activities.header')}
+        </div>
       </div>
 
-      <header className="text-center mb-8">
-        <h1 className="font-display text-6xl text-white italic tracking-tighter drop-shadow-2xl mb-2">Bible Quest</h1>
-        <p className="text-slate-500 text-lg font-medium tracking-tight px-4">Journey through history's greatest adventures!</p>
+        <header className="text-center mb-8">
+        <h1 className="font-display text-6xl text-white italic tracking-tighter drop-shadow-2xl mb-2">{t('activities.header')}</h1>
+        <p className="text-slate-500 text-lg font-medium tracking-tight px-4">{t('activities.description')}</p>
       </header>
 
       {/* World Selection Grid - Optimized */}

@@ -39,10 +39,19 @@ export const AudioService = {
   private: {
     queue: [] as { text: string; mood: string }[],
     isSpeaking: false,
-    heartbeat: null as any
+    heartbeat: null as any,
+    locale: 'en'
   },
 
-  speak: (text: string, mood: 'sarcastic' | 'excited' | 'neutral' = 'neutral', priority: 'high' | 'low' = 'low') => {
+  setLocale: (locale: 'en' | 'de') => {
+    AudioService.private.locale = locale;
+  },
+
+  speak: (
+    text: string,
+    mood: 'sarcastic' | 'excited' | 'neutral' = 'neutral',
+    priority: 'high' | 'low' = 'low'
+  ) => {
     if (!('speechSynthesis' in window)) return;
 
     if (priority === 'high') {
@@ -52,7 +61,7 @@ export const AudioService = {
     }
 
     let processedText = text;
-    if (mood === 'sarcastic' && !text.includes("?")) {
+    if (mood === 'sarcastic' && !text.includes("?") && AudioService.private.locale !== 'de') {
       const remarks = AudioService.SARCASM.intro;
       processedText = `${remarks[Math.floor(Math.random() * remarks.length)]} ${text}`;
     }
@@ -96,9 +105,14 @@ export const AudioService = {
 
     if (selectedVoice) utterance.voice = selectedVoice;
 
-    if (mood === 'sarcastic') {
-      utterance.rate = 0.8; 
-      utterance.pitch = 0.85; 
+    const locale = AudioService.private.locale || 'en';
+    utterance.lang = locale === 'de' ? 'de-DE' : 'en-US';
+    if (locale === 'de') {
+      utterance.rate = 0.85;
+      utterance.pitch = 0.95;
+    } else if (mood === 'sarcastic') {
+      utterance.rate = 0.8;
+      utterance.pitch = 0.85;
     } else if (mood === 'excited') {
       utterance.rate = 0.9;
       utterance.pitch = 1.15;

@@ -1,8 +1,11 @@
 
 import React, { useEffect } from 'react';
 import { View } from '../types';
-import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home, LogOut } from 'lucide-react';
+import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home } from 'lucide-react';
 import { StorageService } from '../services/storage';
+import { useI18n } from '../i18n/I18nProvider';
+import { SyncService } from '../services/sync';
+import { getLogoUrl } from './logo';
 
 interface LayoutProps {
   currentView: View;
@@ -20,6 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
 
     const interval = setInterval(() => {
       StorageService.trackUsage(profile.id, currentView, 10);
+      SyncService.logTelemetry({ profileId: profile.id, view: currentView, event: 'view-heartbeat', durationSeconds: 10 });
     }, 10000);
 
     return () => clearInterval(interval);
@@ -37,8 +41,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
   const isDrawingMode = currentView === View.DRAWING;
   const isLandingMode = currentView === View.LANDING;
   const isLoginMode = currentView === View.LOGIN;
-  
   const showNav = !isLandingMode && !isLoginMode && !isDrawingMode;
+  const { locale, setLocale, t } = useI18n();
 
   const handleLogoClick = () => {
     onNavigate(View.HOME);
@@ -64,19 +68,29 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
               data-tooltip="Return to Tiwaton Hub"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[1rem] bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-white/10 group-hover:rotate-12 transition-transform">
-                <span className="font-display text-white font-bold text-xl">T</span>
+                {getLogoUrl() ? (
+                  <img src={getLogoUrl()!} alt="Tiwaton mark" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="font-display text-white font-bold text-xl">T</span>
+                )}
               </div>
               <h1 className="font-display text-2xl sm:text-3xl text-white tracking-tighter drop-shadow-lg">Tiwaton</h1>
             </div>
             
             <div className="flex items-center gap-4">
-               {childName && (
-                   <div className="flex items-center gap-3 bg-slate-900/60 px-4 py-2 rounded-full border border-white/5 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 shadow-inner">
-                     <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
-                     <span className="hidden sm:inline">{childName}'S ADVENTURE</span>
-                     <span className="sm:hidden">{childName}</span>
-                   </div>
-               )}
+              {childName && (
+                <div className="flex items-center gap-3 bg-slate-900/60 px-4 py-2 rounded-full border border-white/5 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 shadow-inner">
+                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
+                  <span className="hidden sm:inline">{childName}'S ADVENTURE</span>
+                  <span className="sm:hidden">{childName}</span>
+                </div>
+              )}
+              <button
+                onClick={() => setLocale(locale === 'en' ? 'de' : 'en')}
+                className="px-4 py-2 bg-white/10 rounded-full border border-white/10 text-[9px] font-black uppercase tracking-[0.3em] text-white hover:bg-white/20 transition-all"
+              >
+                {t('landing.shared.languageButton')}
+              </button>
             </div>
           </div>
         </header>
