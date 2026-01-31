@@ -1,0 +1,904 @@
+
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { 
+  Eraser, Download, Save, Trash2, Palette, 
+  Wand2, Image as ImageIcon, Sparkles, X, Loader2, Undo2, Redo2, 
+  PaintBucket, SprayCan, Highlighter, Circle as CircleIcon, 
+  Square, Star, Split, Stamp, FolderOpen, Edit2, 
+  Layers, Move, ZoomIn, ZoomOut, Hand, MousePointer2, Settings2, Grid,
+  Music, Volume2, VolumeX, Play, Pause, ChevronRight, Check, Home
+} from 'lucide-react';
+import { StorageService } from '../services/storage';
+import { AIService } from '../services/ai';
+import { AudioService } from '../services/audio'; 
+import { Drawing, AppMode, View } from '../types';
+
+// --- CONFIGURATION ---
+const COLORS = [
+  '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308', 
+  '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', 
+  '#f43f5e', '#881337', '#78350f', '#1e293b', '#94a3b8'
+];
+
+const STICKERS = ["⭐", "❤️", "🦄", "🦁", "🚀", "REX", "👑", "🌈", "🔥", "⚽", "👀", "🎈", "🦋", "🍄", "🍦", "🎸", "🍕", "🚗", "👻", "🤖", "🐱", "🐶"];
+
+const LIBRARY_CATEGORIES = [
+  { id: 'animals', label: 'Animals', emoji: '🦁', prompt: 'a cute baby animal', type: 'ai' },
+  { id: 'dinos', label: 'Dinosaurs', emoji: '🦖', prompt: 'a friendly dinosaur', type: 'ai' },
+  { id: 'space', label: 'Space', emoji: '🚀', prompt: 'rockets and planets', type: 'ai' },
+  { id: 'fantasy', label: 'Fantasy', emoji: '🦄', prompt: 'a unicorn', type: 'ai' },
+  { id: 'ocean', label: 'Ocean', emoji: '🐠', prompt: 'fish under water', type: 'ai' },
+  { id: 'cars', label: 'Cars', emoji: '🚗', prompt: 'race car', type: 'ai' },
+  { id: 'instant_mandala', label: 'Mandala', emoji: '🌸', type: 'instant', url: 'https://cdn.pixabay.com/photo/2022/03/30/15/34/mandala-7101569_960_720.png' },
+  { id: 'instant_butterfly', label: 'Butterfly', emoji: '🦋', type: 'instant', url: 'https://cdn.pixabay.com/photo/2016/04/01/09/59/butterfly-1299967_960_720.png' },
+  { id: 'instant_robot', label: 'Robot', emoji: '🤖', type: 'instant', url: 'https://cdn.pixabay.com/photo/2013/07/12/12/48/robot-146313_960_720.png' },
+  { id: 'instant_flower', label: 'Flower', emoji: '🌻', type: 'instant', url: 'https://cdn.pixabay.com/photo/2014/04/03/10/38/flower-310952_960_720.png' }
+];
+
+const MUSIC_TRACKS = [
+    { id: 'calm', label: 'Calm Forest', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
+    { id: 'happy', label: 'Happy Day', url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3' },
+    { id: 'adventure', label: 'Adventure', url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3' },
+    { id: 'fun', label: 'Fun Play', url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_27315e9854.mp3' },
+    { id: 'uplifting', label: 'Uplifting', url: 'https://cdn.pixabay.com/download/audio/2024/09/25/audio_03138382c2.mp3' },
+    { id: 'piano', label: 'Soft Piano', url: 'https://cdn.pixabay.com/download/audio/2022/02/10/audio_fc8c63959c.mp3' },
+    { id: 'ukulele', label: 'Ukulele', url: 'https://cdn.pixabay.com/download/audio/2022/11/22/audio_febc508520.mp3' },
+    { id: 'jazz', label: 'Kids Jazz', url: 'https://cdn.pixabay.com/download/audio/2023/06/23/audio_732b144883.mp3' },
+    { id: 'ambient', label: 'Space Ambient', url: 'https://cdn.pixabay.com/download/audio/2023/09/06/audio_243764b85c.mp3' },
+    { id: 'lullaby', label: 'Lullaby', url: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_145b53e7f4.mp3' }
+];
+
+type ToolType = 'brush' | 'pencil' | 'marker' | 'neon' | 'spray' | 'rainbow' | 'eraser' | 'fill' | 'rect' | 'circle' | 'star' | 'sticker' | 'watercolor' | 'pan';
+type StoryBuilderStep = 'NONE' | 'HERO' | 'VILLAIN' | 'SETTING' | 'GENERATING' | 'DONE';
+
+interface DrawingPageProps {
+    onNavigate?: (view: View) => void;
+}
+
+const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
+  const profile = StorageService.getCurrentProfile();
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null); 
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null); 
+  const tempCanvasRef = useRef<HTMLCanvasElement>(null); 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
+
+  const [tool, setTool] = useState<ToolType>('marker');
+  const [color, setColor] = useState('#ef4444');
+  const [brushSize, setBrushSize] = useState(10);
+  const [selectedSticker, setSelectedSticker] = useState<string>(STICKERS[0]);
+  const [isSymmetry, setIsSymmetry] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyStep, setHistoryStep] = useState(-1);
+
+  const [appMode, setAppMode] = useState<AppMode>(profile?.mode || 'KIDS');
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingText, setLoadingText] = useState("Sprinkling Magic Dust...");
+  const [transformedImage, setTransformedImage] = useState<string | null>(null);
+  const [gallery, setGallery] = useState<Drawing[]>([]);
+  const [showGallery, setShowGallery] = useState(false);
+
+  const [currentTrack, setCurrentTrack] = useState<string | null>(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [showMusicMenu, setShowMusicMenu] = useState(false);
+  const [volume, setVolume] = useState(0.5);
+
+  const [storyStep, setStoryStep] = useState<StoryBuilderStep>('NONE');
+  const [storyAssets, setStoryAssets] = useState<string[]>([]);
+  const [storyResult, setStoryResult] = useState<{title: string, content: string} | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => setTimeout(initCanvas, 100);
+    window.addEventListener('resize', handleResize);
+    setTimeout(initCanvas, 300); 
+    loadGallery();
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+    };
+  }, []);
+
+  useEffect(() => {
+      if (currentTrack) {
+          const trackUrl = MUSIC_TRACKS.find(t => t.id === currentTrack)?.url;
+          if (trackUrl) {
+              if (!audioRef.current) {
+                  audioRef.current = new Audio(trackUrl);
+                  audioRef.current.loop = true;
+                  audioRef.current.onerror = () => { console.log("Audio load error"); setIsMusicPlaying(false); };
+              } else {
+                  if (audioRef.current.src !== trackUrl) {
+                      audioRef.current.src = trackUrl;
+                  }
+              }
+              audioRef.current.volume = volume;
+              if (isMusicPlaying) audioRef.current.play().catch(e => console.log("Audio play blocked"));
+              else audioRef.current.pause();
+          }
+      } else {
+          if (audioRef.current) audioRef.current.pause();
+      }
+  }, [currentTrack, isMusicPlaying]);
+
+  useEffect(() => {
+      if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
+
+  const initCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const bgCanvas = bgCanvasRef.current;
+    const tempCanvas = tempCanvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container || !bgCanvas || !tempCanvas) return;
+
+    if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        const savedData = historyStep >= 0 ? history[historyStep] : null;
+
+        [canvas, bgCanvas, tempCanvas].forEach(c => {
+            c.width = w;
+            c.height = h;
+        });
+        
+        const bgCtx = bgCanvas.getContext('2d');
+        if (bgCtx) {
+            bgCtx.fillStyle = '#ffffff';
+            bgCtx.fillRect(0, 0, w, h);
+        }
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx && savedData) {
+           const img = new Image();
+           img.src = savedData;
+           img.onload = () => ctx.drawImage(img, 0, 0);
+        } else if (ctx && !savedData) {
+            saveHistory();
+        }
+    }
+  }, [history, historyStep]);
+
+  const loadGallery = async () => {
+      const g = await StorageService.getDrawings();
+      setGallery(g);
+  };
+
+  const handleSaveToGallery = async (customDataUrl?: string, isMagic = false) => {
+    if (!canvasRef.current && !customDataUrl) return;
+    let dataUrl = customDataUrl;
+    if (!dataUrl && canvasRef.current) {
+        const combinedCanvas = document.createElement('canvas');
+        combinedCanvas.width = canvasRef.current.width;
+        combinedCanvas.height = canvasRef.current.height;
+        const ctx = combinedCanvas.getContext('2d');
+        if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+            ctx.drawImage(canvasRef.current, 0, 0);
+        }
+        dataUrl = combinedCanvas.toDataURL('image/png');
+    }
+
+    if (dataUrl && profile) {
+        const newDrawing: Drawing = {
+            id: Date.now().toString(),
+            dataUrl,
+            author: profile.childName,
+            timestamp: Date.now(),
+            isMagic
+        };
+        await StorageService.saveDrawing(newDrawing);
+        await loadGallery();
+        AudioService.speak("Saved to gallery!");
+        if (!isMagic) setShowGallery(true); 
+    }
+  };
+
+  const closeStoryModal = () => {
+  setStoryResult(null);
+  setStoryStep('NONE');
+};
+
+const downloadStoryTxt = (title: string, content: string) => {
+  const safeTitle = (title || "story").replace(/[^\w\- ]+/g, "").trim() || "story";
+  const text = `${title}\n\n${content}\n`;
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${safeTitle}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const saveStoryToLibrary = async (title: string, content: string) => {
+  await StorageService.addStory({
+    id: crypto.randomUUID(),
+    title,
+    content,
+    isUserCreated: true,
+  });
+};
+
+useEffect(() => {
+  if (!storyResult) return;
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") closeStoryModal();
+  };
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [storyResult]);
+
+
+  const handleLoadFromGallery = (dataUrl: string) => {
+      const img = new Image();
+      img.src = dataUrl;
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+          const ctx = canvasRef.current?.getContext('2d');
+          if (ctx && canvasRef.current) {
+               ctx.clearRect(0,0, canvasRef.current.width, canvasRef.current.height);
+               ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+               saveHistory();
+               AudioService.speak("Ready to edit!");
+               setShowGallery(false);
+          }
+      }
+  };
+
+  const handleDownload = (urlToDownload?: string) => {
+      const targetUrl = urlToDownload || canvasRef.current?.toDataURL('image/png');
+      if (!targetUrl) return;
+      AudioService.speak("Downloading!");
+      const link = document.createElement('a');
+      link.href = targetUrl;
+      link.download = `tiwaton-art-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const handleTemplateSelection = async (item: any) => {
+      setShowLibrary(false);
+      if (item.type === 'instant' && item.url) {
+          setIsGenerating(true);
+          setLoadingText("Loading Template...");
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = item.url;
+          img.onload = () => {
+              const ctx = canvasRef.current?.getContext('2d');
+              if (ctx && canvasRef.current) {
+                  ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                  ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                  saveHistory();
+                  AudioService.speak("Ready!");
+              }
+              setIsGenerating(false);
+          };
+          img.onerror = () => {
+              setIsGenerating(false);
+              alert("Could not load image. Try another.");
+          }
+      } else {
+          setIsGenerating(true);
+          setLoadingText("Drawing your picture...");
+          AudioService.speak("I'm drawing it now!");
+          const imageUrl = await AIService.generateColoringPage(item.prompt);
+          setIsGenerating(false);
+          if (imageUrl && canvasRef.current) {
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.src = imageUrl;
+              img.onload = () => {
+                  const ctx = canvasRef.current?.getContext('2d');
+                  if (ctx && canvasRef.current) {
+                      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                      ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                      saveHistory();
+                  }
+              };
+          } else {
+              AudioService.speak("Oops, magic failed.");
+          }
+      }
+  };
+
+  const handleMagicTransform = async () => {
+    if (!canvasRef.current) return;
+    setIsGenerating(true);
+    setLoadingText("Converting to Real Life...");
+    AudioService.speak("Adding magic!");
+    const currentImage = canvasRef.current.toDataURL('image/png');
+    const result = await AIService.transformSketch(currentImage);
+    setIsGenerating(false);
+    if (result) {
+      setTransformedImage(result);
+      AudioService.speak("Wow! Saved to your gallery.");
+      await handleSaveToGallery(result, true);
+    } else {
+      AudioService.speak("Magic spell failed.");
+    }
+  };
+
+  const handleAutoFix = async () => {
+    if (!canvasRef.current) return;
+    setIsGenerating(true);
+    setLoadingText("Fixing lines...");
+    const current = canvasRef.current.toDataURL();
+    const cleaned = await AIService.cleanupDrawing(current);
+    setIsGenerating(false);
+    if (cleaned) {
+        const img = new Image();
+        img.src = cleaned;
+        img.onload = () => {
+            const ctx = canvasRef.current?.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0,0, canvasRef.current!.width, canvasRef.current!.height);
+                ctx.drawImage(img, 0, 0, canvasRef.current!.width, canvasRef.current!.height);
+                saveHistory();
+            }
+        }
+        AudioService.speak("All clean.");
+    }
+  };
+
+  const startStoryMode = () => {
+      setStoryStep('HERO');
+      setStoryAssets([]);
+      const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) ctx.clearRect(0,0, canvasRef.current!.width, canvasRef.current!.height);
+      saveHistory();
+      AudioService.speak("Story Mode! Draw the Hero.");
+  };
+
+  const advanceStory = async () => {
+      if (!canvasRef.current) return;
+      const data = canvasRef.current.toDataURL('image/png');
+      const newAssets = [...storyAssets, data];
+      setStoryAssets(newAssets);
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0,0, canvasRef.current.width, canvasRef.current.height);
+      saveHistory();
+      if (storyStep === 'HERO') {
+          setStoryStep('VILLAIN');
+          AudioService.speak("Now draw the Villain.");
+      } else if (storyStep === 'VILLAIN') {
+          setStoryStep('SETTING');
+          AudioService.speak("Now draw the Setting.");
+      } else if (storyStep === 'SETTING') {
+          setStoryStep('GENERATING');
+          setLoadingText("Writing story...");
+          setIsGenerating(true);
+          const story = await AIService.generateStoryFromAssets(newAssets);
+          setIsGenerating(false);
+          if (story) {
+              setStoryResult({ title: story.title, content: story.content });
+              setStoryStep('DONE');
+              AudioService.speak("Story ready!");
+          } else {
+              setStoryStep('NONE');
+              AudioService.speak("Oops, magic failed.");
+          }
+      }
+  };
+
+  const toCanvasSpace = (clientX: number, clientY: number) => {
+      const container = containerRef.current;
+      if(!container) return {x:0, y:0};
+      const cRect = container.getBoundingClientRect();
+      const mouseX = clientX - cRect.left;
+      const mouseY = clientY - cRect.top;
+      return {
+          x: (mouseX - transform.x) / transform.scale,
+          y: (mouseY - transform.y) / transform.scale
+      };
+  };
+
+  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+      const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+
+      if (tool === 'pan' || (e as React.MouseEvent).button === 1) {
+          setIsPanning(true);
+          setLastPan({x: clientX, y: clientY});
+          return;
+      }
+      const {x, y} = toCanvasSpace(clientX, clientY);
+      setStartPos({x, y});
+      setIsDrawing(true);
+      const ctx = canvasRef.current?.getContext('2d');
+      if (!ctx || !canvasRef.current) return;
+      if (tool === 'fill') {
+          ctx.fillStyle = color;
+          ctx.fillRect(0,0,canvasRef.current.width, canvasRef.current.height);
+          saveHistory();
+          AudioService.playEffect('click');
+          setIsDrawing(false);
+          return;
+      }
+      if (tool === 'sticker') {
+          ctx.font = `${brushSize * 3}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(selectedSticker, x, y);
+          AudioService.playEffect('click');
+          if (isSymmetry) ctx.fillText(selectedSticker, canvasRef.current.width - x, y);
+          saveHistory();
+          setIsDrawing(false);
+          return;
+      }
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+
+      if (tool === 'pencil') ctx.lineWidth = Math.max(1, brushSize / 4);
+      else if (tool === 'neon') {
+           ctx.lineWidth = brushSize;
+           ctx.shadowBlur = 15;
+           ctx.shadowColor = color;
+      }
+      else if (tool === 'watercolor') {
+           ctx.lineWidth = brushSize * 1.5;
+           ctx.globalAlpha = 0.3;
+      }
+      else if (tool === 'eraser') {
+           ctx.globalCompositeOperation = 'destination-out';
+           ctx.lineWidth = brushSize * 2;
+      }
+      else ctx.lineWidth = brushSize;
+  };
+
+  const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+      const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+
+      if (isPanning) {
+          const dx = clientX - lastPan.x;
+          const dy = clientY - lastPan.y;
+          setTransform(t => ({...t, x: t.x + dx, y: t.y + dy}));
+          setLastPan({x: clientX, y: clientY});
+          return;
+      }
+      if (!isDrawing) return;
+      const {x, y} = toCanvasSpace(clientX, clientY);
+      const ctx = canvasRef.current?.getContext('2d');
+      if (!ctx || !canvasRef.current) return;
+      if (['rect', 'circle', 'star'].includes(tool) && startPos) {
+          const tempCtx = tempCanvasRef.current?.getContext('2d');
+          if (tempCtx) {
+              tempCtx.clearRect(0, 0, tempCanvasRef.current!.width, tempCanvasRef.current!.height);
+              tempCtx.strokeStyle = color;
+              tempCtx.lineWidth = 2;
+              const w = x - startPos.x;
+              const h = y - startPos.y;
+              tempCtx.beginPath();
+              if (tool === 'rect') tempCtx.rect(startPos.x, startPos.y, w, h);
+              else if (tool === 'circle') tempCtx.ellipse(startPos.x + w/2, startPos.y + h/2, Math.abs(w/2), Math.abs(h/2), 0, 0, 2*Math.PI);
+              tempCtx.stroke();
+          }
+          return;
+      }
+      if (tool === 'rainbow') {
+        const hue = (Date.now() / 5) % 360;
+        ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+      }
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      if (isSymmetry) {
+           const width = canvasRef.current.width;
+           ctx.fillRect(width - x, y, brushSize, brushSize);
+      }
+  };
+
+  const handlePointerUp = () => {
+      setIsPanning(false);
+      if (!isDrawing) return;
+      setIsDrawing(false);
+      if (['rect', 'circle', 'star'].includes(tool) && startPos && canvasRef.current) {
+          const tempCtx = tempCanvasRef.current?.getContext('2d');
+          if (tempCtx) tempCtx.clearRect(0,0, tempCanvasRef.current!.width, tempCanvasRef.current!.height);
+      }
+      const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) ctx.closePath();
+      saveHistory();
+  };
+
+  const saveHistory = () => {
+    if (!canvasRef.current) return;
+    const dataUrl = canvasRef.current.toDataURL();
+    const newHistory = history.slice(0, historyStep + 1);
+    newHistory.push(dataUrl);
+    if (newHistory.length > 20) newHistory.shift();
+    setHistory(newHistory);
+    setHistoryStep(newHistory.length - 1);
+  };
+
+  const undo = () => {
+      if (historyStep > 0) {
+          const prev = historyStep - 1;
+          const img = new Image();
+          img.src = history[prev];
+          img.onload = () => {
+              const ctx = canvasRef.current?.getContext('2d');
+              if (ctx && canvasRef.current) {
+                  ctx.clearRect(0,0, canvasRef.current.width, canvasRef.current.height);
+                  ctx.drawImage(img, 0, 0);
+                  setHistoryStep(prev);
+              }
+          };
+      }
+  };
+
+  return (
+    <div className="flex flex-col h-full relative select-none overflow-hidden bg-slate-100">
+      
+      {isGenerating && (
+        <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
+          <Loader2 className="w-16 h-16 text-amber-400 animate-spin mb-4" />
+          <h3 className="text-2xl font-display text-white animate-pulse">{loadingText}</h3>
+        </div>
+      )}
+
+      {transformedImage && (
+        <div className="absolute inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-4">
+          <div className="bg-slate-800 p-4 rounded-2xl max-w-4xl w-full flex flex-col gap-4 border border-amber-400/30 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-display text-amber-400">Magic Result</h3>
+              <button onClick={() => setTransformedImage(null)} title="Close" className="p-2 hover:bg-slate-700 rounded-full text-white"><X /></button>
+            </div>
+            <img src={transformedImage} className="max-h-[60vh] object-contain rounded-lg shadow-2xl bg-black" />
+            <div className="flex justify-end gap-2">
+               <button onClick={() => handleDownload(transformedImage)} title="Save Image" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold flex items-center gap-2">
+                 <Download size={18} /> Download
+               </button>
+            </div>
+            <p className="text-slate-400 text-sm text-center">Automatically saved to Parent Gallery.</p>
+          </div>
+        </div>
+      )}
+
+      {storyResult && (
+  <div
+    className="fixed inset-0 z-[9999] bg-slate-900/80 flex items-center justify-center p-4"
+    onMouseDown={(e) => {
+      // close only when clicking the dark backdrop
+      if (e.target === e.currentTarget) closeStoryModal();
+    }}
+  >
+    <div className="max-w-2xl w-full bg-white rounded-2xl p-6 relative shadow-2xl max-h-[85vh] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-display text-3xl text-indigo-600 pr-10">
+          {storyResult.title}
+        </h2>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            closeStoryModal();
+          }}
+          className="shrink-0 inline-flex items-center justify-center rounded-full w-10 h-10 bg-slate-100 hover:bg-slate-200"
+          aria-label="Close story"
+          type="button"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Thumbnails */}
+      <div className="flex gap-2 mt-3 mb-4 justify-center">
+        {storyAssets.map((s, i) => (
+          <img
+            key={i}
+            src={s}
+            className="w-20 h-20 border rounded object-contain bg-slate-50"
+            alt={`Story asset ${i + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="overflow-auto max-h-[52vh] rounded-xl border p-4">
+        <p className="whitespace-pre-wrap text-base sm:text-lg font-sans text-slate-800 leading-relaxed">
+          {storyResult.content}
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-4 flex flex-wrap gap-2 justify-end">
+        <button
+          type="button"
+          onClick={async () => {
+            await saveStoryToLibrary(storyResult.title, storyResult.content);
+            AudioService.speak("Saved!");
+          }}
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <Save className="w-4 h-4" /> Save
+        </button>
+
+        <button
+          type="button"
+          onClick={() => downloadStoryTxt(storyResult.title, storyResult.content)}
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700"
+        >
+          <Download className="w-4 h-4" /> Download
+        </button>
+
+        <button
+          type="button"
+          onClick={closeStoryModal}
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-100 hover:bg-slate-200"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+      {showLibrary && (
+        <div className="absolute inset-0 z-40 bg-slate-900/95 flex items-center justify-center p-4 rounded-3xl animate-fade-in">
+           <div className="bg-slate-800 p-6 rounded-2xl max-w-3xl w-full border border-slate-700 shadow-2xl max-h-[80vh] overflow-y-auto custom-scrollbar">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-display text-white">Choose a Template</h3>
+              <button onClick={() => setShowLibrary(false)} className="text-white"><X /></button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {LIBRARY_CATEGORIES.map(cat => (
+                <button 
+                  key={cat.id} 
+                  onClick={() => handleTemplateSelection(cat)} 
+                  data-tooltip={`Draw a ${cat.label}`}
+                  className={`p-4 rounded-xl transition-all flex flex-col items-center gap-2 group border hover:border-indigo-400 ${cat.type === 'instant' ? 'bg-indigo-900/50 border-indigo-500' : 'bg-slate-700 border-slate-600'}`}
+                >
+                   <span className="text-5xl group-hover:scale-125 transition-transform">{cat.emoji}</span>
+                   <span className="font-bold text-white">{cat.label}</span>
+                   {cat.type === 'instant' && <span className="text-[10px] bg-green-500 text-white px-2 rounded-full">INSTANT</span>}
+                </button>
+              ))}
+            </div>
+           </div>
+        </div>
+      )}
+
+      {storyStep !== 'NONE' && storyStep !== 'DONE' && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 animate-bounce-in border-2 border-white">
+              <span className="font-bold text-lg">
+                  {storyStep === 'HERO' ? 'Step 1: Draw the Hero!' : storyStep === 'VILLAIN' ? 'Step 2: Draw the Villain!' : 'Step 3: Draw the Home!'}
+              </span>
+              <button onClick={advanceStory} title="Next Step" className="bg-white text-indigo-600 px-4 py-1 rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-1">
+                  Next <ChevronRight size={16} />
+              </button>
+          </div>
+      )}
+
+      <div className="flex-1 relative bg-slate-200 overflow-hidden cursor-crosshair touch-none" ref={containerRef}>
+          <div 
+            className="absolute origin-top-left"
+            style={{ 
+                width: '100%', 
+                height: '100%',
+                transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`
+            }}
+          >
+              <canvas ref={bgCanvasRef} className="absolute inset-0 pointer-events-none" />
+              {showGrid && <div className="absolute inset-0 pointer-events-none" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: 0.1}}></div>}
+              <canvas 
+                ref={canvasRef}
+                className="absolute inset-0 touch-none"
+                onMouseDown={handlePointerDown}
+                onMouseMove={handlePointerMove}
+                onMouseUp={handlePointerUp}
+                onMouseLeave={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
+              />
+              <canvas ref={tempCanvasRef} className="absolute inset-0 pointer-events-none" />
+          </div>
+
+          <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
+             <div className="flex gap-2">
+                <button 
+                    onClick={() => onNavigate && onNavigate(View.HOME)} 
+                    data-tooltip="Return to Hub"
+                    data-tooltip-pos="bottom"
+                    className="bg-slate-800 text-white px-3 py-2 rounded-lg text-xs font-bold border border-slate-600 shadow-lg flex items-center gap-2 hover:bg-slate-700"
+                >
+                    <Home size={14}/> Exit
+                </button>
+                <button 
+                    onClick={() => setAppMode(appMode === 'KIDS' ? 'STUDIO' : 'KIDS')} 
+                    data-tooltip="Switch Studio Difficulty"
+                    data-tooltip-pos="bottom"
+                    className="bg-slate-800 text-white px-3 py-2 rounded-lg text-xs font-bold border border-slate-600 shadow-lg flex items-center gap-2"
+                >
+                    <Settings2 size={14}/> {appMode} MODE
+                </button>
+                <div className="relative">
+                    <button 
+                        onClick={() => setShowMusicMenu(!showMusicMenu)}
+                        data-tooltip="Ambient Music Player"
+                        data-tooltip-pos="bottom"
+                        className={`px-3 py-2 rounded-lg border shadow-lg flex items-center gap-2 ${isMusicPlaying ? 'bg-indigo-600 text-white border-indigo-400' : 'bg-slate-800 text-slate-300 border-slate-600'}`}
+                    >
+                        {isMusicPlaying ? <Volume2 size={16} className="animate-pulse"/> : <VolumeX size={16}/>}
+                    </button>
+                    {showMusicMenu && (
+                        <div className="absolute top-full left-0 mt-2 bg-slate-900 border border-slate-700 p-2 rounded-xl w-48 shadow-xl flex flex-col gap-1">
+                            <div className="text-xs font-bold text-slate-500 px-2 py-1">SOUNDTRACKS</div>
+                            {MUSIC_TRACKS.map(track => (
+                                <button 
+                                    key={track.id}
+                                    onClick={() => {
+                                        if (currentTrack === track.id && isMusicPlaying) {
+                                            setIsMusicPlaying(false);
+                                        } else {
+                                            setCurrentTrack(track.id);
+                                            setIsMusicPlaying(true);
+                                        }
+                                    }}
+                                    className={`text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center ${currentTrack === track.id ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                                >
+                                    {track.label}
+                                    {currentTrack === track.id && isMusicPlaying && <Music size={12} className="animate-bounce"/>}
+                                </button>
+                            ))}
+                            <div className="h-px bg-slate-700 my-1"></div>
+                            <div className="px-2 py-1 flex items-center gap-2">
+                                <Volume2 size={12} className="text-slate-400"/>
+                                <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full accent-indigo-500 h-1"/>
+                            </div>
+                        </div>
+                    )}
+                </div>
+             </div>
+          </div>
+
+          {appMode === 'STUDIO' && (
+              <div className="absolute bottom-24 right-4 z-30 flex flex-col gap-2 bg-slate-800 p-2 rounded-xl border border-slate-600 shadow-xl">
+                  <button onClick={() => setTransform(t => ({...t, scale: Math.min(5, t.scale + 0.2)}))} data-tooltip="Zoom In" className="p-2 text-white hover:bg-slate-700 rounded"><ZoomIn size={20}/></button>
+                  <button onClick={() => setTransform(t => ({...t, scale: Math.max(0.5, t.scale - 0.2)}))} data-tooltip="Zoom Out" className="p-2 text-white hover:bg-slate-700 rounded"><ZoomOut size={20}/></button>
+                  <button onClick={() => setTool('pan')} data-tooltip="Pan Canvas" className={`p-2 rounded ${tool === 'pan' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}><Hand size={20}/></button>
+                  <button onClick={() => setTransform({x:0, y:0, scale: 1})} data-tooltip="Reset Viewport" className="p-2 text-white hover:bg-slate-700 rounded text-xs font-bold">100%</button>
+                  <button onClick={() => setShowGrid(!showGrid)} data-tooltip="Toggle Guides" className={`p-2 rounded ${showGrid ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}><Grid size={20}/></button>
+              </div>
+          )}
+      </div>
+
+      <div className="bg-slate-800 border-t border-slate-700 p-2 flex flex-col gap-2 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+          <div className="flex justify-between items-center px-1 overflow-x-auto gap-2">
+               <div className="flex gap-1 shrink-0">
+                   <button onClick={undo} data-tooltip="Undo Last Stroke" className="p-2 text-slate-300 hover:text-white bg-slate-700/50 rounded-lg hover:bg-slate-700"><Undo2 size={18}/></button>
+                   <button onClick={() => {}} data-tooltip="Redo Action" className="p-2 text-slate-300 hover:text-white bg-slate-700/50 rounded-lg hover:bg-slate-700"><Redo2 size={18}/></button>
+               </div>
+               
+               <div className="flex gap-2 shrink-0">
+                   <button onClick={() => setShowLibrary(true)} data-tooltip="Open Coloring Library" className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-600">
+                       <ImageIcon size={14} /> Templates
+                   </button>
+                   <button onClick={startStoryMode} data-tooltip="Turn Drawings into Stories" className="flex items-center gap-1 bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
+                       <Layers size={14} /> Story Mode
+                   </button>
+                   <button onClick={handleAutoFix} data-tooltip="AI Line Cleanup" className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
+                       <Wand2 size={14} /> Fix
+                   </button>
+                   <button onClick={handleMagicTransform} data-tooltip="3D Magic Realism" className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
+                       <Sparkles size={14} /> Real!
+                   </button>
+               </div>
+
+               <div className="flex gap-1 shrink-0">
+                   <button onClick={() => handleSaveToGallery()} data-tooltip="Save Masterpiece" className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Save size={18}/></button>
+                   <button onClick={() => handleDownload()} data-tooltip="Save to Device" className="p-2 bg-green-600 hover:bg-green-500 text-white rounded-lg"><Download size={18}/></button>
+                   <button onClick={() => setShowGallery(true)} data-tooltip="View Gallery" className="p-2 bg-slate-700 hover:bg-slate-600 text-amber-400 rounded-lg"><FolderOpen size={18}/></button>
+               </div>
+          </div>
+
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 custom-scrollbar">
+               <div className="flex gap-1 shrink-0 pl-1">
+                  {COLORS.map(c => (
+                      <button 
+                        key={c} 
+                        onClick={() => setColor(c)} 
+                        data-tooltip={`Switch to ${c}`}
+                        className={`w-7 h-7 rounded-full border-2 transition-transform ${color === c ? 'border-white scale-110 ring-2 ring-indigo-500 ring-offset-1 ring-offset-slate-800' : 'border-slate-600 hover:scale-105'}`} 
+                        style={{backgroundColor: c}} 
+                      />
+                  ))}
+                  <div className="relative w-7 h-7 rounded-full overflow-hidden border-2 border-slate-600 ml-1" data-tooltip="Custom Color Picker">
+                      <input type="color" value={color} onChange={e => setColor(e.target.value)} className="absolute inset-0 w-full h-full p-0 border-0 opacity-0 cursor-pointer" title="Custom Color" />
+                      <div className="w-full h-full" style={{backgroundColor: color}}></div>
+                  </div>
+               </div>
+               
+               <div className="w-px h-8 bg-slate-700 shrink-0"></div>
+
+               <div className="flex gap-1 shrink-0">
+                  <ToolBtn active={tool==='marker'} onClick={()=>setTool('marker')} icon={<Palette size={18}/>} tooltip="Magic Marker" />
+                  <ToolBtn active={tool==='pencil'} onClick={()=>setTool('pencil')} icon={<Edit2 size={18}/>} tooltip="Sketch Pencil" />
+                  <ToolBtn active={tool==='fill'} onClick={()=>setTool('fill')} icon={<PaintBucket size={18}/>} tooltip="Fill Nebula" />
+                  <ToolBtn active={tool==='spray'} onClick={()=>setTool('spray')} icon={<SprayCan size={18}/>} tooltip="Spray Dust" />
+                  <ToolBtn active={tool==='eraser'} onClick={()=>setTool('eraser')} icon={<Eraser size={18}/>} tooltip="Black Hole Eraser" />
+                  <ToolBtn active={tool==='sticker'} onClick={()=>setTool('sticker')} icon={<Stamp size={18}/>} tooltip="Place Sticker" />
+               </div>
+               
+               <div className="w-24 shrink-0 px-2" data-tooltip="Adjust Brush Size">
+                  <input type="range" min="2" max="50" value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-600 rounded-lg cursor-pointer" title="Brush Size" />
+               </div>
+          </div>
+          
+          {tool === 'sticker' && (
+              <div className="flex gap-2 overflow-x-auto pb-1 px-1 border-t border-slate-700 pt-2 animate-fade-in">
+                  {STICKERS.map(s => (
+                      <button key={s} onClick={() => setSelectedSticker(s)} className={`text-2xl p-2 rounded-xl transition-all hover:bg-slate-700 ${selectedSticker===s ? 'bg-slate-700 scale-110 shadow-inner' : ''}`} data-tooltip={`Pick ${s}`}>{s}</button>
+                  ))}
+              </div>
+          )}
+      </div>
+
+      {showGallery && (
+        <div className="absolute top-0 right-0 bottom-0 z-50 w-72 bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col p-4 animate-slide-in-right">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-white flex items-center gap-2"><FolderOpen size={18} className="text-amber-400"/> My Art</h3>
+                <button onClick={() => setShowGallery(false)} className="text-slate-400 hover:text-white"><X size={18}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1">
+                {gallery.length === 0 && <p className="text-slate-500 text-center text-sm py-10">Empty! Go draw something awesome.</p>}
+                {gallery.map(img => (
+                    <div key={img.id} className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition-colors">
+                        <img src={img.dataUrl} className="w-full h-40 object-contain bg-white" />
+                        <div className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button onClick={() => handleLoadFromGallery(img.dataUrl)} data-tooltip="Load in Studio" className="p-2 bg-indigo-600 rounded-full text-white hover:scale-110 transition-transform"><Edit2 size={16}/></button>
+                            <button onClick={() => handleDownload(img.dataUrl)} data-tooltip="Download High-Res" className="p-2 bg-green-600 rounded-full text-white hover:scale-110 transition-transform"><Download size={16}/></button>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-[10px] text-slate-300 font-mono flex justify-between">
+                                <span>{new Date(img.timestamp).toLocaleDateString()}</span>
+                                {img.isMagic && <Sparkles size={10} className="text-amber-400"/>}
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ToolBtn = ({active, onClick, icon, tooltip}: any) => (
+    <button 
+        onClick={onClick} 
+        data-tooltip={tooltip}
+        className={`p-2.5 rounded-xl transition-all ${active ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+    >
+        {icon}
+    </button>
+)
+
+export default DrawingPage;

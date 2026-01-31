@@ -1,0 +1,31 @@
+{
+  "name": "adventure-server",
+  "version": "1.0.0",
+  "description": "Backend server for Adventure AI features",
+  "main": "index.cjs",
+  "type": "commonjs",
+"scripts": {
+  "backend": "node server/index.cjs",
+  "frontend": "vite --port 3010",
+  "dev": "node server/index.cjs",
+  "start": "node server/index.cjs"
+},
+  "dependencies": {
+    "@google/genai": "^1.38.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "lucide-react": "^0.562.0",
+    "node-fetch": "^3.3.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "vite": "^7.3.1"
+  }
+}
+
+

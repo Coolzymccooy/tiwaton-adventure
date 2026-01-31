@@ -1,0 +1,132 @@
+
+import React, { useState, useEffect } from 'react';
+import Layout from './components/Layout';
+import { View } from './types';
+import type { FamilyProfile } from './types';
+import { StorageService } from './services/storage';
+
+// Pages
+import Home from './pages/Home';
+import StoriesPage from './pages/Stories';
+import DrawingPage from './pages/Drawing';
+import ActivitiesPage from './pages/Activities';
+import GamesPage from './pages/Games';
+import CountdownPage from './pages/Countdown';
+import Login, { ViewMode } from './pages/Login';
+import Landing from './pages/Landing';
+import ParentDashboard from './pages/ParentDashboard';
+
+const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<View>(View.LANDING);
+  const [profile, setProfile] = useState<FamilyProfile | null>(null);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
+
+  useEffect(() => {
+    const hasProfiles = StorageService.hasProfiles();
+    if (!hasProfiles) {
+      setCurrentView(View.LANDING);
+    } else {
+        const active = StorageService.getCurrentProfile();
+        if (active) {
+            setProfile(active);
+            setCurrentView(View.HOME);
+            if (active.mode === 'PARENT') setIsAdminMode(true);
+        } else {
+            setCurrentView(View.LANDING);
+        }
+    }
+  }, []);
+
+  const handleLogin = (p: FamilyProfile) => {
+      setProfile(p);
+      StorageService.setCurrentProfile(p.id);
+      setIsAdminMode(p.mode === 'PARENT');
+      setCurrentView(View.HOME);
+  };
+
+  const handleLogout = () => {
+      setProfile(null);
+      setIsAdminMode(false);
+      StorageService.setCurrentProfile('');
+      setCurrentView(View.LANDING);
+  };
+
+  const handleLandingAction = (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => {
+      if (action === 'CONTINUE' && profile) {
+          setCurrentView(View.HOME);
+          return;
+      }
+
+      if (action === 'LOGIN') {
+          setLoginInitialView('SIGN_IN_ENTRY');
+      } else if (action === 'SETUP') {
+          setLoginInitialView('SETUP_ADMIN');
+      } else if (action === 'RESET') {
+          setLoginInitialView('FORGOT_FLOW');
+      }
+      setCurrentView(View.LOGIN);
+  };
+
+  const renderView = () => {
+    if (currentView === View.LANDING) {
+        return <Landing onAction={handleLandingAction} activeProfile={profile} />;
+    }
+
+    if (currentView === View.LOGIN) {
+        return <Login 
+          onLogin={handleLogin} 
+          initialViewMode={loginInitialView} 
+          onBackToLanding={() => setCurrentView(View.LANDING)}
+        />;
+    }
+
+    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} />; 
+
+    switch (currentView) {
+      case View.HOME:
+        return <Home 
+          onNavigate={setCurrentView} 
+          profile={profile} 
+          setProfile={setProfile} 
+          onLogout={handleLogout} 
+          isAdminMode={isAdminMode}
+          setIsAdminMode={setIsAdminMode}
+        />;
+      case View.PARENT_DASHBOARD:
+        return <ParentDashboard onBack={() => setCurrentView(View.HOME)} />;
+      case View.STORIES:
+        return <StoriesPage />;
+      case View.DRAWING:
+        return <DrawingPage onNavigate={setCurrentView} />;
+      case View.ACTIVITIES:
+        return <ActivitiesPage onNavigate={setCurrentView} />;
+      case View.GAMES:
+        return <GamesPage />;
+      case View.COUNTDOWN:
+        return <CountdownPage />;
+      default:
+        return <Home 
+          onNavigate={setCurrentView} 
+          profile={profile} 
+          setProfile={setProfile} 
+          onLogout={handleLogout} 
+          isAdminMode={isAdminMode}
+          setIsAdminMode={setIsAdminMode}
+        />;
+    }
+  };
+
+  return (
+    <Layout 
+      currentView={currentView} 
+      onNavigate={setCurrentView}
+      childName={profile?.childName || ''}
+      onLogout={handleLogout}
+    >
+      {renderView()}
+    </Layout>
+  );
+};
+
+export default App;

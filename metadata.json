@@ -1,0 +1,7 @@
+{
+  "name": "Tiwaton Adventure",
+  "description": "The ultimate family adventure hub featuring drawing, stories, games, and countdowns.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
