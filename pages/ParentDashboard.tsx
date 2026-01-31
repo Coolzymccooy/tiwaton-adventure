@@ -22,6 +22,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
   const [usageData, setUsageData] = useState<any>({});
   const [insights, setInsights] = useState<InsightSummary | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
+  const [flowIndex, setFlowIndex] = useState(0);
+  const [errorIndex, setErrorIndex] = useState(0);
   
   // Profile Edit State
   const [isEditing, setIsEditing] = useState(false);
