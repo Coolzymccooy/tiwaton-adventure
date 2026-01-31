@@ -80,7 +80,20 @@ export const AudioService = {
     
     const voices = window.speechSynthesis.getVoices();
     const preferredVoices = ['Google US English', 'Samantha', 'en-US'];
-    let selectedVoice = voices.find(v => preferredVoices.some(p => v.name.includes(p))) || voices.find(v => v.lang.startsWith('en'));
+    const normalizeName = (voice?: SpeechSynthesisVoice) => (voice?.name ?? '').toLowerCase();
+
+    let selectedVoice = voices.find(voice =>
+      preferredVoices.some(pref => normalizeName(voice).includes(pref.toLowerCase()))
+    );
+
+    if (!selectedVoice) {
+      selectedVoice = voices.find(voice => normalizeName(voice).includes('english'));
+    }
+
+    if (!selectedVoice && voices.length > 0) {
+      selectedVoice = voices[0];
+    }
+
     if (selectedVoice) utterance.voice = selectedVoice;
 
     if (mood === 'sarcastic') {
