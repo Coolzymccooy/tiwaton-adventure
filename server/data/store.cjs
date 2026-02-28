@@ -55,4 +55,23 @@ module.exports = {
     saveTelemetry(list.slice(-5000));
   },
   loadTelemetry,
+  findSnapshotByCredentials(identity, secret) {
+    const data = loadSnapshots();
+    const normalizedIdentity = identity.trim().toLowerCase();
+
+    for (const snapshot of Object.values(data)) {
+      if (!snapshot.profiles) continue;
+
+      const match = snapshot.profiles.find(p => {
+        if (p.mode === 'PARENT') {
+          return p.email && p.email.toLowerCase() === normalizedIdentity && p.pin === secret;
+        } else {
+          return p.childName.toLowerCase() === normalizedIdentity && (p.password || '').toLowerCase() === secret.trim().toLowerCase();
+        }
+      });
+
+      if (match) return snapshot;
+    }
+    return null;
+  }
 };

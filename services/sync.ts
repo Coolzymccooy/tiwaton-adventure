@@ -47,6 +47,18 @@ export const SyncService = {
     }
   },
 
+  async loginGlobal(identity: string, secret: string): Promise<SnapshotPayload | null> {
+    try {
+      const res = await postSnapshot('/api/sync/login', { identity, secret });
+      // The API returns { ok: true, snapshot: ... } or an error.
+      if (!res.ok) return null;
+      return (res as any).snapshot ?? null;
+    } catch (error) {
+      console.warn('Global login check failed', error);
+      return null;
+    }
+  },
+
   async logTelemetry(payload: TelemetryPayload) {
     try {
       await postSnapshot('/api/sync/telemetry', payload);

@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
+import { SyncService } from '../services/sync';
 import { FamilyProfile } from '../types';
-import { 
-  ShieldCheck, Plus, ArrowRight, Smile, KeyRound, 
-  AlertTriangle, ChevronLeft, LogIn, HelpCircle, User, Lock
+import {
+    ShieldCheck, Plus, ArrowRight, Smile, KeyRound,
+    AlertTriangle, ChevronLeft, LogIn, HelpCircle, User, Lock
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -22,7 +23,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [profiles, setProfiles] = useState<FamilyProfile[]>([]);
     const [selectedProfile, setSelectedProfile] = useState<FamilyProfile | null>(null);
     const [authInput, setAuthInput] = useState('');
-    const [loginIdentifier, setLoginIdentifier] = useState(''); 
+    const [loginIdentifier, setLoginIdentifier] = useState('');
     const [error, setError] = useState('');
 
     // Setup Form State
@@ -30,7 +31,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [adminEmail, setAdminEmail] = useState('');
     const [adminPin, setAdminPin] = useState('');
     const [recoveryKey, setRecoveryKey] = useState('');
-    
+
     const [childName, setChildName] = useState('');
     const [childAge, setChildAge] = useState('');
     const [childPass, setChildPass] = useState('');
@@ -38,6 +39,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     // Forgot Flow State
     const [resetInput, setResetInput] = useState('');
     const [resetStep, setResetStep] = useState<'CHOICE' | 'VERIFY' | 'NEW_CREDS'>('CHOICE');
+
+    // Email Verification State
+    const [verificationCode, setVerificationCode] = useState('');
+    const [inputVerificationCode, setInputVerificationCode] = useState('');
 
     useEffect(() => {
         const stored = StorageService.getProfiles();
@@ -49,34 +54,56 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
     }, [initialViewMode]);
 
-    const handleGlobalSignIn = () => {
+    const handleGlobalSignIn = async () => {
         if (!loginIdentifier || !authInput) {
             setError(t('login.errorMissingCredentials'));
             return;
         }
 
-        const match = profiles.find(p => 
+        const match = profiles.find(p =>
             (p.childName.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
         );
 
-        if (!match) {
-            setError(t('login.errorAccountNotFound'));
+        if (match) {
+            const isAuthorized = match.mode === 'PARENT'
+                ? authInput === match.pin
+                : authInput.toLowerCase() === (match.password || '').toLowerCase();
+
+            if (isAuthorized) {
+                setError('');
+                if (match.mode === 'PARENT') {
+                    setViewMode('USER_GRID');
+                } else {
+                    onLogin(match);
+                }
+            } else {
+                setError(t('login.errorIncorrect'));
+            }
             return;
         }
 
-        const isAuthorized = match.mode === 'PARENT' 
-            ? authInput === match.pin 
-            : authInput.toLowerCase() === (match.password || '').toLowerCase();
-
-        if (isAuthorized) {
+        // Global check if no local profile found
+        const snapshot = await SyncService.loginGlobal(loginIdentifier, authInput);
+        if (snapshot && snapshot.profiles) {
+            StorageService.applySnapshot(snapshot);
+            setProfiles(snapshot.profiles);
             setError('');
-            if (match.mode === 'PARENT') {
-                setViewMode('USER_GRID');
+
+            const globalMatch = snapshot.profiles.find(p =>
+                (p.childName.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
+            );
+
+            if (globalMatch) {
+                if (globalMatch.mode === 'PARENT') {
+                    setViewMode('USER_GRID');
+                } else {
+                    onLogin(globalMatch);
+                }
             } else {
-                onLogin(match);
+                setError(t('login.errorAccountNotFound'));
             }
         } else {
-            setError(t('login.errorIncorrect'));
+            setError(t('login.errorAccountNotFound'));
         }
     };
 
@@ -85,11 +112,30 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             setError(t('login.errorAllFields'));
             return;
         }
+
+        // Generate a random 4-digit code for mock verification
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        setVerificationCode(code);
+
+        // In a real app, send email here. We simulate by showing an alert/toast.
+        console.log(`[Mock Email] Verification code for ${adminEmail} is: ${code}`);
+
+        setViewMode('VERIFY_ACCOUNT');
+        setError('');
+    };
+
+    const handleVerifyEmail = () => {
+        if (inputVerificationCode !== verificationCode && inputVerificationCode !== '0000') {
+            setError('Incorrect verification code. (Hint: check console or use 0000)');
+            return;
+        }
+
         const p = StorageService.createParentProfile(adminName, adminEmail, adminPin);
         setRecoveryKey(p.recoveryKey || '');
         setProfiles(StorageService.getProfiles());
         setViewMode('RECOVERY_INFO');
         setError('');
+        setInputVerificationCode('');
     };
 
     const handleChildSetup = (finish = false) => {
@@ -131,7 +177,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
         const admin = profiles.find(p => p.mode === 'PARENT');
         if (!admin) return;
-        
+
         StorageService.updateProfile({ ...admin, pin: resetInput });
         alert(t('login.alertPinSaved'));
         setViewMode('SIGN_IN_ENTRY');
@@ -140,13 +186,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     };
 
     const BackButton = ({ onClick }: { onClick?: () => void }) => (
-      <button 
-        type="button" 
-        onClick={onClick} 
-        className="absolute top-6 left-6 text-slate-500 hover:text-white transition-all z-[100] active:scale-90"
-      >
-        <ChevronLeft size={32}/>
-      </button>
+        <button
+            type="button"
+            onClick={onClick}
+            className="absolute top-6 left-6 text-slate-500 hover:text-white transition-all z-[100] active:scale-90"
+        >
+            <ChevronLeft size={32} />
+        </button>
     );
 
     // --- RENDER VIEWS ---
@@ -157,7 +203,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 <BackButton onClick={onBackToLanding} />
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-600 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-2xl border-2 border-white/10">
-                        <LogIn size={40} className="text-white"/>
+                        <LogIn size={40} className="text-white" />
                     </div>
                     <h1 className="text-4xl sm:text-5xl font-display text-white mb-2 italic tracking-tighter">{t('login.signInTitle')}</h1>
                     <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.signInSubtitle')}</p>
@@ -166,38 +212,38 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">{t('login.identityLabel')}</label>
                         <div className="relative">
-                            <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18}/>
-                            <input 
-                                value={loginIdentifier} 
-                                onChange={e => setLoginIdentifier(e.target.value)} 
-                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all" 
-                                placeholder={t('login.placeholderIdentity')} 
+                            <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                            <input
+                                value={loginIdentifier}
+                                onChange={e => setLoginIdentifier(e.target.value)}
+                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
+                                placeholder={t('login.placeholderIdentity')}
                             />
                         </div>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">{t('login.secretLabel')}</label>
                         <div className="relative">
-                            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18}/>
-                            <input 
-                                type="password" 
-                                value={authInput} 
-                                onChange={e => setAuthInput(e.target.value)} 
-                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all" 
-                                placeholder={t('login.placeholderSecret')} 
+                            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                            <input
+                                type="password"
+                                value={authInput}
+                                onChange={e => setAuthInput(e.target.value)}
+                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
+                                placeholder={t('login.placeholderSecret')}
                             />
                         </div>
                     </div>
                     {error && <p className="text-rose-500 text-[10px] font-black text-center animate-pulse uppercase tracking-wider">{error}</p>}
-                        <button 
-                            onClick={handleGlobalSignIn} 
-                            disabled={!loginIdentifier || !authInput}
-                            className="w-full py-5 sm:py-7 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-indigo-900 active:border-b-0 active:translate-y-1 transition-all"
-                        >
-                            {t('login.enterButton')}
-                        </button>
+                    <button
+                        onClick={handleGlobalSignIn}
+                        disabled={!loginIdentifier || !authInput}
+                        className="w-full py-5 sm:py-7 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-indigo-900 active:border-b-0 active:translate-y-1 transition-all"
+                    >
+                        {t('login.enterButton')}
+                    </button>
                     <div className="flex flex-col gap-2 pt-4 border-t border-white/5 items-center">
-                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-1"><HelpCircle size={12}/> {t('login.resetAccess')}</button>
+                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-1"><HelpCircle size={12} /> {t('login.resetAccess')}</button>
                         <button onClick={() => setViewMode('SETUP_ADMIN')} className="text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em]">{t('login.signupPrompt')}</button>
                     </div>
                 </div>
@@ -210,7 +256,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             <div className="max-w-md w-full bg-[#0b1120] p-8 sm:p-12 rounded-[3.5rem] border-2 border-white/5 shadow-2xl relative animate-fade-in flex flex-col items-center">
                 <BackButton onClick={onBackToLanding} />
                 <div className="text-center mb-8">
-                    <ShieldCheck size={64} className="mx-auto text-indigo-500 mb-4 animate-float"/>
+                    <ShieldCheck size={64} className="mx-auto text-indigo-500 mb-4 animate-float" />
                     <h1 className="text-4xl sm:text-5xl font-display text-white mb-1 italic tracking-tighter">{t('login.setupTitle')}</h1>
                     <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.setupSubtitle')}</p>
                 </div>
@@ -220,6 +266,43 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     <input type="password" maxLength={4} value={adminPin} onChange={e => setAdminPin(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-center text-4xl tracking-[0.6em] outline-none" placeholder={t('login.setupPinPlaceholder')} />
                     {error && <p className="text-red-500 text-[10px] font-black text-center animate-pulse">{error}</p>}
                     <button onClick={handleAdminSetup} className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-indigo-900 active:border-b-0 transition-all">{t('login.createButton')}</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    if (viewMode === 'VERIFY_ACCOUNT') return (
+        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in">
+            <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-sky-500/20 text-center shadow-2xl relative flex flex-col items-center">
+                <BackButton onClick={() => setViewMode('SETUP_ADMIN')} />
+                <div className="w-16 h-16 bg-sky-500/10 rounded-full flex items-center justify-center mb-6">
+                    <ShieldCheck size={32} className="text-sky-400" />
+                </div>
+                <h2 className="text-3xl font-display text-white mb-2 italic tracking-tighter">Verify Email</h2>
+                <p className="text-slate-400 text-sm mb-2">We sent a 4-digit code to <br /><span className="text-white font-bold">{adminEmail}</span></p>
+
+                {/* Simulated Email Notice */}
+                <div className="bg-sky-900/40 border border-sky-500/30 text-sky-200 text-xs p-3 rounded-xl mb-6 flex animate-pulse items-center justify-center gap-2">
+                    <span>Mock Mode: Your code is <b className="text-white">{verificationCode}</b></span>
+                </div>
+
+                <div className="space-y-6 w-full mt-4">
+                    <input
+                        type="text"
+                        maxLength={4}
+                        value={inputVerificationCode}
+                        onChange={e => setInputVerificationCode(e.target.value)}
+                        placeholder="••••"
+                        className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-6 text-white text-center text-3xl tracking-widest outline-none focus:border-sky-500 transition-all"
+                    />
+                    {error && <p className="text-red-500 text-[10px] font-black uppercase">{error}</p>}
+                    <button
+                        onClick={handleVerifyEmail}
+                        disabled={inputVerificationCode.length < 4}
+                        className="w-full py-6 bg-sky-600 disabled:opacity-50 hover:bg-sky-500 rounded-2xl text-white font-black text-xl italic uppercase shadow-xl transition-all"
+                    >
+                        Verify & Continue
+                    </button>
                 </div>
             </div>
         </div>
@@ -242,7 +325,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[4rem] border-2 border-pink-500/20 shadow-2xl relative">
                 <BackButton onClick={() => setViewMode('USER_GRID')} />
                 <div className="text-center mb-8">
-                    <Smile size={64} className="mx-auto text-pink-500 mb-4 animate-float"/>
+                    <Smile size={64} className="mx-auto text-pink-500 mb-4 animate-float" />
                     <h1 className="text-4xl sm:text-5xl font-display text-white mb-1 italic tracking-tighter">{t('login.childTitle')}</h1>
                     <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.childSubtitle')}</p>
                 </div>
@@ -276,7 +359,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     </button>
                 ))}
                 <button onClick={() => setViewMode('SETUP_CHILD')} className="p-8 rounded-[3rem] border-2 border-dashed border-slate-800 hover:border-slate-500 transition-all flex flex-col items-center justify-center text-slate-600 hover:text-slate-300 min-h-[160px]">
-                    <Plus size={40}/>
+                    <Plus size={40} />
                     <span className="font-black text-[9px] uppercase mt-4">{t('login.newHero')}</span>
                 </button>
             </div>
@@ -287,14 +370,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in overflow-hidden">
             <div className="max-w-sm w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-amber-500/20 text-center shadow-2xl relative flex flex-col items-center">
                 <BackButton onClick={() => setViewMode('SIGN_IN_ENTRY')} />
-                <AlertTriangle size={64} className="mx-auto text-amber-500 mb-6 animate-pulse"/>
+                <AlertTriangle size={64} className="mx-auto text-amber-500 mb-6 animate-pulse" />
                 <h2 className="text-3xl font-display text-white mb-6 italic tracking-tighter">{t('login.forgotTitle')}</h2>
-               
+
                 {resetStep === 'CHOICE' && (
                     <div className="space-y-4 w-full">
                         <p className="text-slate-400 text-sm mb-6 leading-relaxed">{t('login.forgotSubtitle')}</p>
-                        <button 
-                            onClick={() => setResetStep('VERIFY')} 
+                        <button
+                            onClick={() => setResetStep('VERIFY')}
                             className="w-full py-6 bg-slate-800/30 hover:bg-slate-800/50 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest transition-all"
                         >
                             {t('login.forgotStart')}
@@ -304,15 +387,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
                 {resetStep === 'VERIFY' && (
                     <div className="space-y-6 w-full">
-                            <input 
-                                value={resetInput} 
-                                onChange={e => setResetInput(e.target.value)} 
-                                placeholder={t('login.forgotVerifyPlaceholder')} 
-                                className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-4 text-white text-center outline-none focus:border-amber-500 transition-all" 
-                            />
+                        <input
+                            value={resetInput}
+                            onChange={e => setResetInput(e.target.value)}
+                            placeholder={t('login.forgotVerifyPlaceholder')}
+                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-4 text-white text-center outline-none focus:border-amber-500 transition-all"
+                        />
                         {error && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">{error}</p>}
-                        <button 
-                            onClick={handleResetVerify} 
+                        <button
+                            onClick={handleResetVerify}
                             disabled={!resetInput}
                             className="w-full py-5 bg-amber-600 disabled:opacity-50 hover:bg-amber-500 rounded-2xl text-white font-black text-[10px] uppercase transition-all shadow-xl"
                         >
@@ -323,17 +406,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
                 {resetStep === 'NEW_CREDS' && (
                     <div className="space-y-6 w-full">
-                        <input 
-                            type="password" 
-                            maxLength={4} 
-                            value={resetInput} 
-                            onChange={e => setResetInput(e.target.value)} 
-                            placeholder={t('login.forgotNewPinPlaceholder')} 
-                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-6 text-white text-center text-3xl tracking-widest outline-none focus:border-indigo-500 transition-all" 
+                        <input
+                            type="password"
+                            maxLength={4}
+                            value={resetInput}
+                            onChange={e => setResetInput(e.target.value)}
+                            placeholder={t('login.forgotNewPinPlaceholder')}
+                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-6 text-white text-center text-3xl tracking-widest outline-none focus:border-indigo-500 transition-all"
                         />
                         {error && <p className="text-red-500 text-[10px] font-black uppercase">{error}</p>}
-                        <button 
-                            onClick={handleSaveNewCreds} 
+                        <button
+                            onClick={handleSaveNewCreds}
                             disabled={resetInput.length < 4}
                             className="w-full py-6 bg-indigo-600 disabled:opacity-50 hover:bg-indigo-500 rounded-2xl text-white font-black text-xl italic uppercase shadow-xl transition-all"
                         >
