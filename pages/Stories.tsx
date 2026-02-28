@@ -182,19 +182,19 @@ const StoriesPage: React.FC = () => {
         setSpeakingStoryId(null);
         return;
       }
-      
+
       // Cancel any current speech
       window.speechSynthesis.cancel();
-      
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.onend = () => setSpeakingStoryId(null);
-      
+
       const voices = window.speechSynthesis.getVoices();
       const preferred = voices.find(v => v.name.includes('Google US English') || v.lang === 'en-US');
       if (preferred) utterance.voice = preferred;
       utterance.rate = 0.9;
       utterance.pitch = 1.1;
-      
+
       window.speechSynthesis.speak(utterance);
       setSpeakingStoryId(id);
     } else {
@@ -204,7 +204,7 @@ const StoriesPage: React.FC = () => {
 
   const handleSaveStory = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
-    
+
     const story: Story = {
       id: Date.now().toString(),
       title: newTitle,
@@ -226,27 +226,27 @@ const StoriesPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       {/* Create Story Section */}
-      <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 shadow-xl">
+      <div className="bg-slate-800/80 p-5 sm:p-6 rounded-2xl border border-slate-700 shadow-xl">
         <h3 className="font-display text-2xl text-pink-400 mb-2 flex items-center gap-2">
           <Sparkles /> {t('stories.createTitle')}
         </h3>
         <p className="text-slate-400 text-sm">{t('stories.createSubtitle')}</p>
         <div className="space-y-4">
-          <input 
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none"
-              placeholder="Title (e.g. The Magic Sofa)"
-              title="Story Title"
-            />
-          <textarea 
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none resize-none"
-              placeholder="Once upon a time..."
-              title="Story Content"
-            />
-          <button 
+          <input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none"
+            placeholder="Title (e.g. The Magic Sofa)"
+            title="Story Title"
+          />
+          <textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none resize-none"
+            placeholder="Once upon a time..."
+            title="Story Content"
+          />
+          <button
             onClick={handleSaveStory}
             title="Save your new story"
             className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform"
@@ -258,7 +258,7 @@ const StoriesPage: React.FC = () => {
 
       {/* Library Section (Collapsible) */}
       <div className="space-y-4">
-        <button 
+        <button
           onClick={() => setIsLibraryOpen(!isLibraryOpen)}
           title={isLibraryOpen ? t('stories.libraryToggleCollapse') : t('stories.libraryToggleExpand')}
           className="w-full flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 hover:bg-slate-700 transition-colors"
@@ -270,7 +270,7 @@ const StoriesPage: React.FC = () => {
         </button>
 
         {isLibraryOpen && (
-          <div className="grid gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+          <div className="grid gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
             {stories.map((story) => {
               const isPlaying = speakingStoryId === story.id;
               return (
@@ -282,8 +282,8 @@ const StoriesPage: React.FC = () => {
                   <p className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 mb-4">
                     {story.content}
                   </p>
-                  <div className="flex gap-2">
-                    <button 
+                  <div className="flex flex-wrap gap-2">
+                    <button
                       onClick={() => handleSpeak(story.content, story.id)}
                       title={isPlaying ? t('stories.stopReading') : t('stories.readAloud')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${isPlaying ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'}`}

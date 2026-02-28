@@ -18,14 +18,14 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
   const [stats, setStats] = useState<GameStat>(StorageService.getGameStats());
   const [comments, setComments] = useState<ParentComment[]>([]);
   const [familyProfiles, setFamilyProfiles] = useState<FamilyProfile[]>([]);
-  
+
   const [pinInput, setPinInput] = useState('');
   const [showPinPad, setShowPinPad] = useState(false);
 
   useEffect(() => {
     setStats(StorageService.getGameStats());
     setComments(StorageService.getComments());
-    setFamilyProfiles(StorageService.getProfiles().sort((a,b) => (a.id === 'admin' ? -1 : 1)));
+    setFamilyProfiles(StorageService.getProfiles().sort((a, b) => (a.id === 'admin' ? -1 : 1)));
   }, [profile.id]);
 
   const handleLogoutClick = () => onLogout();
@@ -39,15 +39,15 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
     // Re-fetch profiles directly to ensure we have the latest data
     const allProfiles = StorageService.getProfiles();
     const parent = allProfiles.find(p => p.mode === 'PARENT' || p.id === 'admin');
-    
+
     if (parent && pinInput === parent.pin) {
-        setIsAdminMode(true);
-        onNavigate(View.PARENT_DASHBOARD);
-        setShowPinPad(false);
-        setPinInput('');
+      setIsAdminMode(true);
+      onNavigate(View.PARENT_DASHBOARD);
+      setShowPinPad(false);
+      setPinInput('');
     } else {
-        alert("Incorrect Parent PIN. Please try again.");
-        setPinInput('');
+      alert("Incorrect Parent PIN. Please try again.");
+      setPinInput('');
     }
   };
 
@@ -58,189 +58,189 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
   // Mock leaderboard data (in a real app, this would be computed from storage for each user)
   const leaderboardData = familyProfiles.map(p => ({
-      name: p.childName,
-      avatar: p.avatar,
-      xp: p.id === profile.id ? stats.xp : Math.floor(Math.random() * 500) + 100,
-      id: p.id
-  })).sort((a,b) => b.xp - a.xp);
+    name: p.childName,
+    avatar: p.avatar,
+    xp: p.id === profile.id ? stats.xp : Math.floor(Math.random() * 500) + 100,
+    id: p.id
+  })).sort((a, b) => b.xp - a.xp);
 
   return (
     <div className="space-y-8 animate-fade-in pb-32 max-w-5xl mx-auto px-4">
-      
+
       {/* PIN PAD MODAL */}
       {showPinPad && (
-          <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-4">
-              <div className="bg-[#0b1120] p-8 sm:p-12 rounded-[3.5rem] border border-white/5 w-full max-w-md text-center shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative animate-scale-in">
-                  
-                  {/* RETURN BUTTON */}
-                  <button 
-                    onClick={closePinPad}
-                    className="absolute top-8 right-8 p-3 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-2xl"
-                    aria-label="Close"
-                  >
-                    <X size={24} />
-                  </button>
+        <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto custom-scrollbar">
+          <div className="bg-[#0b1120] p-6 sm:p-12 rounded-[3.5rem] border border-white/5 w-full max-w-md text-center shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative animate-scale-in my-8 shrink-0">
 
-                  <div className="mb-10">
-                    <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
-                      <Lock size={40} className="text-indigo-400"/>
-                    </div>
-                    <h3 className="text-4xl font-display text-white mb-2 italic tracking-tighter">Admin Only</h3>
-                    <p className="text-slate-500 text-[10px] uppercase tracking-[0.4em] font-black">Verify Parent Identity</p>
-                  </div>
+            {/* RETURN BUTTON */}
+            <button
+              onClick={closePinPad}
+              className="absolute top-8 right-8 p-3 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-2xl"
+              aria-label="Close"
+            >
+              <X size={24} />
+            </button>
 
-                  <div className="flex justify-center mb-12 gap-5">
-                        {[...Array(4)].map((_, i) => (
-                          <div key={i} className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${pinInput.length > i ? 'bg-indigo-400 border-indigo-400 scale-125 shadow-[0_0_15px_rgba(129,140,248,0.5)]' : 'bg-transparent border-slate-700'}`}></div>
-                        ))}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4 mb-10 max-w-xs mx-auto">
-                      {[1,2,3,4,5,6,7,8,9].map(n => (
-                          <button 
-                            key={n} 
-                            onClick={() => pinInput.length < 4 && setPinInput(p => p + n.toString())} 
-                            className="p-6 bg-slate-900/60 rounded-[1.5rem] text-3xl font-black text-white active:scale-90 hover:bg-slate-800 transition-all border border-white/5"
-                          >
-                            {n}
-                          </button>
-                      ))}
-                      <button onClick={() => setPinInput('')} className="p-6 text-rose-500 font-black text-xs uppercase tracking-widest hover:bg-rose-500/10 rounded-2xl transition-all">CLR</button>
-                      <button 
-                        onClick={() => pinInput.length < 4 && setPinInput(p => p + '0')} 
-                        className="p-6 bg-slate-900/60 rounded-[1.5rem] text-3xl font-black text-white active:scale-90 hover:bg-slate-800 transition-all border border-white/5"
-                      >
-                        0
-                      </button>
-                      <button onClick={closePinPad} className="p-6 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-white/5 rounded-2xl transition-all">ESC</button>
-                  </div>
-
-                  <button 
-                    onClick={verifyPinForHQ} 
-                    disabled={pinInput.length < 4} 
-                    className="w-full py-6 bg-indigo-600 disabled:opacity-30 rounded-[2rem] font-black text-2xl hover:bg-indigo-500 text-white shadow-2xl transition-all border-b-4 border-indigo-900 active:translate-y-1 active:border-b-0"
-                  >
-                    UNLOCK HUB
-                  </button>
+            <div className="mb-10">
+              <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+                <Lock size={40} className="text-indigo-400" />
               </div>
+              <h3 className="text-4xl font-display text-white mb-2 italic tracking-tighter">Admin Only</h3>
+              <p className="text-slate-500 text-[10px] uppercase tracking-[0.4em] font-black">Verify Parent Identity</p>
+            </div>
+
+            <div className="flex justify-center mb-12 gap-5">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${pinInput.length > i ? 'bg-indigo-400 border-indigo-400 scale-125 shadow-[0_0_15px_rgba(129,140,248,0.5)]' : 'bg-transparent border-slate-700'}`}></div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-10 max-w-xs mx-auto">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                <button
+                  key={n}
+                  onClick={() => pinInput.length < 4 && setPinInput(p => p + n.toString())}
+                  className="p-6 bg-slate-900/60 rounded-[1.5rem] text-3xl font-black text-white active:scale-90 hover:bg-slate-800 transition-all border border-white/5"
+                >
+                  {n}
+                </button>
+              ))}
+              <button onClick={() => setPinInput('')} className="p-6 text-rose-500 font-black text-xs uppercase tracking-widest hover:bg-rose-500/10 rounded-2xl transition-all">CLR</button>
+              <button
+                onClick={() => pinInput.length < 4 && setPinInput(p => p + '0')}
+                className="p-6 bg-slate-900/60 rounded-[1.5rem] text-3xl font-black text-white active:scale-90 hover:bg-slate-800 transition-all border border-white/5"
+              >
+                0
+              </button>
+              <button onClick={closePinPad} className="p-6 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-white/5 rounded-2xl transition-all">ESC</button>
+            </div>
+
+            <button
+              onClick={verifyPinForHQ}
+              disabled={pinInput.length < 4}
+              className="w-full py-6 bg-indigo-600 disabled:opacity-30 rounded-[2rem] font-black text-2xl hover:bg-indigo-500 text-white shadow-2xl transition-all border-b-4 border-indigo-900 active:translate-y-1 active:border-b-0"
+            >
+              UNLOCK HUB
+            </button>
           </div>
+        </div>
       )}
 
       {/* Profile Header */}
-      <div className="relative overflow-hidden rounded-[3.5rem] bg-slate-900 border-2 border-white/5 p-8 shadow-2xl flex flex-col md:flex-row items-center gap-8">
+      <div className="relative overflow-hidden rounded-[3.5rem] bg-slate-900 border-2 border-white/5 p-6 sm:p-8 shadow-2xl flex flex-col md:flex-row items-center gap-8">
         <div className="relative shrink-0">
-            <div className="text-8xl bg-slate-800 rounded-[2.5rem] p-6 border-4 border-indigo-500/30 shadow-2xl">
-                {profile.avatar}
-            </div>
-            <div className="absolute -bottom-2 -right-2 bg-indigo-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-black border-4 border-slate-900">
-                {stats.level}
-            </div>
+          <div className="text-8xl bg-slate-800 rounded-[2.5rem] p-6 border-4 border-indigo-500/30 shadow-2xl">
+            {profile.avatar}
+          </div>
+          <div className="absolute -bottom-2 -right-2 bg-indigo-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-black border-4 border-slate-900">
+            {stats.level}
+          </div>
         </div>
 
         <div className="flex-1 text-center md:text-left">
-            <h2 className="font-display text-6xl text-white mb-2 italic tracking-tighter">Hey, {profile.childName}!</h2>
-            <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
-                <span className="px-5 py-2 bg-indigo-500/10 text-indigo-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-indigo-500/20 flex items-center gap-2">
-                   <TrendingUp size={14}/> Level {stats.level}
-                </span>
-                <span className="px-5 py-2 bg-amber-500/10 text-amber-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-amber-500/20 flex items-center gap-2">
-                   <Sparkles size={14}/> {stats.xp} XP Points
-                </span>
-            </div>
+          <h2 className="font-display text-6xl text-white mb-2 italic tracking-tighter">Hey, {profile.childName}!</h2>
+          <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
+            <span className="px-5 py-2 bg-indigo-500/10 text-indigo-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-indigo-500/20 flex items-center gap-2">
+              <TrendingUp size={14} /> Level {stats.level}
+            </span>
+            <span className="px-5 py-2 bg-amber-500/10 text-amber-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-amber-500/20 flex items-center gap-2">
+              <Sparkles size={14} /> {stats.xp} XP Points
+            </span>
+          </div>
         </div>
 
         <div className="flex gap-3">
-            <button onClick={handleHqClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-8 py-5 rounded-[2rem] text-sm font-black transition-all border-b-8 border-slate-950 active:translate-y-1">
-                <ShieldCheck size={20} className={isAdminMode ? "text-emerald-400" : "text-slate-400"}/> {isAdminMode ? 'DASHBOARD' : 'HQ ACCESS'}
-            </button>
-            <button onClick={handleLogoutClick} className="p-5 bg-slate-800 hover:bg-red-900/30 text-slate-500 hover:text-red-400 rounded-[2rem] border-b-8 border-slate-950 active:translate-y-1">
-                <LogOut size={24}/>
-            </button>
+          <button onClick={handleHqClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-8 py-5 rounded-[2rem] text-sm font-black transition-all border-b-8 border-slate-950 active:translate-y-1">
+            <ShieldCheck size={20} className={isAdminMode ? "text-emerald-400" : "text-slate-400"} /> {isAdminMode ? 'DASHBOARD' : 'HQ ACCESS'}
+          </button>
+          <button onClick={handleLogoutClick} className="p-5 bg-slate-800 hover:bg-red-900/30 text-slate-500 hover:text-red-400 rounded-[2rem] border-b-8 border-slate-950 active:translate-y-1">
+            <LogOut size={24} />
+          </button>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-8 space-y-8">
-              {/* Featured Quest */}
-              <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-[3.5rem] shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
-                  <div className="bg-slate-900/80 backdrop-blur-xl p-10 rounded-[3.4rem] flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-125 transition-transform"></div>
-                      <div className="flex items-center gap-6 relative z-10">
-                          <div className="bg-white/10 p-5 rounded-[1.5rem] animate-float"><Palette size={48} className="text-white"/></div>
-                          <div>
-                              <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
-                              <h3 className="font-display text-4xl text-white">"Paint a Neon Jungle!"</h3>
-                          </div>
-                      </div>
-                      <div className="bg-white text-pink-600 px-10 py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-xl group-hover:bg-pink-50 transition-colors">START +200 XP</div>
-                  </div>
+        {/* Main Content Area */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* Featured Quest */}
+          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-[3.5rem] shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
+            <div className="bg-slate-900/80 backdrop-blur-xl p-6 sm:p-10 rounded-[3.4rem] flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-125 transition-transform"></div>
+              <div className="flex items-center gap-6 relative z-10">
+                <div className="bg-white/10 p-5 rounded-[1.5rem] animate-float"><Palette size={48} className="text-white" /></div>
+                <div>
+                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
+                  <h3 className="font-display text-4xl text-white">"Paint a Neon Jungle!"</h3>
+                </div>
               </div>
-
-              {/* Grid Menu */}
-              <div className="grid grid-cols-2 gap-6">
-                <LaunchCard icon="🧠" label="Brain Quiz" color="bg-indigo-600" onClick={() => onNavigate(View.ACTIVITIES)} />
-                <LaunchCard icon="👾" label="Game Zone" color="bg-emerald-600" onClick={() => onNavigate(View.GAMES)} />
-                <LaunchCard icon="🎭" label="Art Studio" color="bg-pink-600" onClick={() => onNavigate(View.DRAWING)} />
-                <LaunchCard icon="📖" label="Adventures" color="bg-amber-600" onClick={() => onNavigate(View.STORIES)} />
-              </div>
+              <div className="bg-white text-pink-600 px-10 py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-xl group-hover:bg-pink-50 transition-colors">START +200 XP</div>
+            </div>
           </div>
 
-          {/* Sidebar Area: HQ Leaderboard */}
-          <div className="lg:col-span-4 space-y-6">
-              <div className="bg-slate-900/50 backdrop-blur-xl border-2 border-white/5 rounded-[3.5rem] p-8 shadow-2xl relative overflow-hidden">
-                  <div className="flex items-center gap-3 mb-8">
-                      <div className="p-3 bg-indigo-600/20 rounded-2xl"><Trophy className="text-indigo-400" size={24}/></div>
-                      <div>
-                          <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">HQ Leaderboard</h4>
-                          <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Global Standings</p>
-                      </div>
-                  </div>
-
-                  <div className="space-y-4">
-                      {leaderboardData.map((user, idx) => (
-                          <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.name === profile.childName ? 'bg-indigo-600 border-indigo-400 shadow-lg' : 'bg-slate-800/40 border-white/5'}`}>
-                              <div className="flex items-center gap-3">
-                                  <span className="text-xl font-black text-slate-600 w-5 italic">{idx + 1}</span>
-                                  <span className="text-4xl">{user.avatar}</span>
-                                  <span className="text-sm font-black text-white uppercase tracking-tighter italic">{user.name}</span>
-                              </div>
-                              <div className="text-right">
-                                  <p className="text-sm font-black text-white">{user.xp}</p>
-                                  <p className="text-[8px] font-black text-indigo-300 uppercase tracking-tighter">XP</p>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-
-                  <button 
-                    onClick={() => onNavigate(View.ACTIVITIES)} 
-                    className="w-full mt-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center justify-center gap-2 group transition-all"
-                  >
-                    GO EARN XP <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
-                  </button>
-              </div>
-
-              {/* Love Note from Parents */}
-              {comments.length > 0 && (
-                  <div className="bg-pink-600/10 border-2 border-pink-500/20 rounded-[3rem] p-8 animate-slide-up">
-                      <MessageCircle className="text-pink-400 mb-4" size={32}/>
-                      <p className="text-xl text-slate-200 font-medium italic leading-tight">"{comments[0].text}"</p>
-                      <p className="text-[9px] text-pink-400 font-black uppercase tracking-widest mt-4">— From Admin</p>
-                  </div>
-              )}
+          {/* Grid Menu */}
+          <div className="grid grid-cols-2 gap-6">
+            <LaunchCard icon="🧠" label="Brain Quiz" color="bg-indigo-600" onClick={() => onNavigate(View.ACTIVITIES)} />
+            <LaunchCard icon="👾" label="Game Zone" color="bg-emerald-600" onClick={() => onNavigate(View.GAMES)} />
+            <LaunchCard icon="🎭" label="Art Studio" color="bg-pink-600" onClick={() => onNavigate(View.DRAWING)} />
+            <LaunchCard icon="📖" label="Adventures" color="bg-amber-600" onClick={() => onNavigate(View.STORIES)} />
           </div>
+        </div>
+
+        {/* Sidebar Area: HQ Leaderboard */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-slate-900/50 backdrop-blur-xl border-2 border-white/5 rounded-[3.5rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="p-3 bg-indigo-600/20 rounded-2xl"><Trophy className="text-indigo-400" size={24} /></div>
+              <div>
+                <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">HQ Leaderboard</h4>
+                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Global Standings</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {leaderboardData.map((user, idx) => (
+                <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.name === profile.childName ? 'bg-indigo-600 border-indigo-400 shadow-lg' : 'bg-slate-800/40 border-white/5'}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-black text-slate-600 w-5 italic">{idx + 1}</span>
+                    <span className="text-4xl">{user.avatar}</span>
+                    <span className="text-sm font-black text-white uppercase tracking-tighter italic">{user.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-white">{user.xp}</p>
+                    <p className="text-[8px] font-black text-indigo-300 uppercase tracking-tighter">XP</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => onNavigate(View.ACTIVITIES)}
+              className="w-full mt-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center justify-center gap-2 group transition-all"
+            >
+              GO EARN XP <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+
+          {/* Love Note from Parents */}
+          {comments.length > 0 && (
+            <div className="bg-pink-600/10 border-2 border-pink-500/20 rounded-[3rem] p-6 sm:p-8 animate-slide-up">
+              <MessageCircle className="text-pink-400 mb-4" size={32} />
+              <p className="text-xl text-slate-200 font-medium italic leading-tight">"{comments[0].text}"</p>
+              <p className="text-[9px] text-pink-400 font-black uppercase tracking-widest mt-4">— From Admin</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 const LaunchCard = ({ icon, label, color, onClick }: any) => (
-    <button onClick={onClick} className="group bg-slate-900 p-10 rounded-[2.5rem] border-2 border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 shadow-2xl relative overflow-hidden flex flex-col items-center">
-       <div className={`absolute top-0 left-0 w-full h-2 ${color}`}></div>
-       <div className="text-7xl group-hover:scale-125 transition-transform duration-500 group-hover:rotate-6 mb-4">{icon}</div>
-       <span className="font-black text-white uppercase tracking-widest text-[10px] opacity-60 group-hover:opacity-100">{label}</span>
-    </button>
+  <button onClick={onClick} className="group bg-slate-900 p-6 sm:p-10 rounded-[2.5rem] border-2 border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 shadow-2xl relative overflow-hidden flex flex-col items-center">
+    <div className={`absolute top-0 left-0 w-full h-2 ${color}`}></div>
+    <div className="text-7xl group-hover:scale-125 transition-transform duration-500 group-hover:rotate-6 mb-4">{icon}</div>
+    <span className="font-black text-white uppercase tracking-widest text-[10px] opacity-60 group-hover:opacity-100">{label}</span>
+  </button>
 );
 
 export default Home;

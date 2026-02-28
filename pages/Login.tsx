@@ -198,7 +198,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     // --- RENDER VIEWS ---
 
     if (viewMode === 'SIGN_IN_ENTRY') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] font-sans overflow-hidden">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] font-sans overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-8 sm:p-12 rounded-[3rem] border-2 border-white/5 shadow-2xl relative animate-fade-in flex flex-col items-center">
                 <BackButton onClick={onBackToLanding} />
                 <div className="text-center mb-8">
@@ -242,9 +242,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     >
                         {t('login.enterButton')}
                     </button>
-                    <div className="flex flex-col gap-2 pt-4 border-t border-white/5 items-center">
-                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-1"><HelpCircle size={12} /> {t('login.resetAccess')}</button>
-                        <button onClick={() => setViewMode('SETUP_ADMIN')} className="text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em]">{t('login.signupPrompt')}</button>
+                    <div className="flex flex-col gap-4 pt-6 border-t border-white/5 w-full mt-4">
+                        <button onClick={() => setViewMode('SETUP_ADMIN')} className="w-full py-4 sm:py-5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-2xl font-black text-lg text-white shadow-xl shadow-emerald-900/20 transition-all border border-emerald-400/30 flex items-center justify-center gap-2">
+                            <ShieldCheck size={20} /> {t('login.signupPrompt')}
+                        </button>
+                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center justify-center gap-1 mt-2">
+                            <HelpCircle size={12} /> {t('login.resetAccess')}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -252,7 +256,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'SETUP_ADMIN') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] font-sans overflow-hidden">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] font-sans overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-8 sm:p-12 rounded-[3.5rem] border-2 border-white/5 shadow-2xl relative animate-fade-in flex flex-col items-center">
                 <BackButton onClick={onBackToLanding} />
                 <div className="text-center mb-8">
@@ -272,7 +276,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'VERIFY_ACCOUNT') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-sky-500/20 text-center shadow-2xl relative flex flex-col items-center">
                 <BackButton onClick={() => setViewMode('SETUP_ADMIN')} />
                 <div className="w-16 h-16 bg-sky-500/10 rounded-full flex items-center justify-center mb-6">
@@ -309,7 +313,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'RECOVERY_INFO') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[4rem] border-2 border-amber-500/30 text-center shadow-2xl relative">
                 <KeyRound size={72} className="mx-auto text-amber-400 mb-6 animate-bounce" />
                 <h2 className="text-4xl font-display text-white mb-4 italic tracking-tighter">{t('login.recoveryTitle')}</h2>
@@ -321,7 +325,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'SETUP_CHILD') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[4rem] border-2 border-pink-500/20 shadow-2xl relative">
                 <BackButton onClick={() => setViewMode('USER_GRID')} />
                 <div className="text-center mb-8">
@@ -344,7 +348,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'USER_GRID') return (
-        <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center p-6 animate-fade-in relative overflow-hidden">
+        <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-6 py-12 animate-fade-in relative overflow-y-auto custom-scrollbar">
             <BackButton onClick={() => setViewMode('SIGN_IN_ENTRY')} />
             <div className="text-center mb-12">
                 <h1 className="font-display text-7xl sm:text-8xl text-white mb-2 tracking-tighter italic drop-shadow-2xl">Tiwaton</h1>
@@ -367,7 +371,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     if (viewMode === 'FORGOT_FLOW') return (
-        <div className="h-screen w-screen flex items-center justify-center p-4 bg-[#050810] animate-fade-in overflow-hidden">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
             <div className="max-w-sm w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-amber-500/20 text-center shadow-2xl relative flex flex-col items-center">
                 <BackButton onClick={() => setViewMode('SIGN_IN_ENTRY')} />
                 <AlertTriangle size={64} className="mx-auto text-amber-500 mb-6 animate-pulse" />
@@ -429,7 +433,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     );
 
     return (
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white">
+        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white">
             <div className="relative">
                 <div className="w-24 h-24 border-t-4 border-indigo-500 rounded-full animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center font-display italic text-2xl">T</div>
