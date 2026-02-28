@@ -2,10 +2,10 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { StorageService } from '../services/storage';
 import { View, FamilyProfile } from '../types';
-import { 
-  Rocket, Palette, BookOpen, Gamepad2, Sparkles, 
-  ShieldCheck, ArrowRight, LogIn, RefreshCcw, 
-  UserCheck, BrainCircuit, Star, Zap, Trophy, 
+import {
+  Rocket, Palette, BookOpen, Gamepad2, Sparkles,
+  ShieldCheck, ArrowRight, LogIn, RefreshCcw,
+  UserCheck, BrainCircuit, Star, Zap, Trophy,
   Target, GraduationCap, Heart, Clock, ChevronDown,
   MousePointer2, Lightbulb, LayoutDashboard
 } from 'lucide-react';
@@ -44,7 +44,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
     };
     const container = containerRef.current;
     container?.addEventListener('scroll', handleScroll);
-    
+
     // Word Splash Interval
     const splashInterval = setInterval(() => {
       setIsSplashing(false);
@@ -103,42 +103,41 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
   ], [t]);
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="h-screen w-screen bg-[#050810] overflow-y-auto overflow-x-hidden relative font-sans custom-scrollbar scroll-smooth"
+      className="h-screen w-screen bg-[#02000a] overflow-y-auto overflow-x-hidden relative font-sans custom-scrollbar scroll-smooth"
     >
       {/* --- STUNNING FIXED HEADER --- */}
-      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 px-6 sm:px-12 py-4 flex items-center justify-between ${scrollY > 50 ? 'bg-slate-950/80 backdrop-blur-2xl border-b border-white/5 py-3' : 'bg-transparent'}`}>
-        <div 
-          onClick={() => activeProfile ? onAction('CONTINUE') : scrollToSection('hero')} 
-          className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
+      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 px-6 sm:px-12 py-3 flex items-center justify-between ${scrollY > 50 ? 'bg-[#02000a]/80 backdrop-blur-2xl border-b border-white/10' : 'bg-transparent'}`}>
+        <div
+          onClick={() => activeProfile ? onAction('CONTINUE') : scrollToSection('hero')}
+          className="flex items-center cursor-pointer group active:scale-95 transition-all"
           data-tooltip={activeProfile ? "Back to the Hub" : "Return to Top"}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)] border border-white/10 group-hover:rotate-12 transition-transform overflow-hidden">
+          <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
             {logoUrl ? (
-              <img src={logoUrl} alt="Tiwaton mark" className="w-full h-full object-cover" />
+              <img src={logoUrl} alt="Tiwaton mark" className="w-full h-full object-contain" />
             ) : (
-              <span className="font-display text-white font-bold text-xl">T</span>
+              <span className="font-display text-white font-bold text-3xl">T</span>
             )}
           </div>
-          <h1 className="font-display text-2xl text-white tracking-tighter drop-shadow-lg hidden sm:block">Tiwaton</h1>
         </div>
 
         <nav className="flex items-center gap-4 sm:gap-10">
           <button onClick={() => scrollToSection('vision')} data-tooltip="App Purpose & Vision" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">The Vision</button>
           <button onClick={() => scrollToSection('features')} data-tooltip="Explore Hub Features" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">Features</button>
           <button onClick={() => scrollToSection('events')} data-tooltip="Family Event Tracker" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">Events</button>
-          
+
           {activeProfile ? (
-            <button 
+            <button
               onClick={() => onAction('CONTINUE')}
               data-tooltip={`Resume session as ${activeProfile.childName}`}
               className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2"
             >
-              <LayoutDashboard size={14}/> Resume Hub
+              <LayoutDashboard size={14} /> Resume Hub
             </button>
           ) : (
-            <button 
+            <button
               onClick={() => onAction('LOGIN')}
               data-tooltip="Login to Explorer Account"
               className="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg"
@@ -151,18 +150,22 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
 
       {/* Immersive Persistent Galaxy Backdrop */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div 
-          className="absolute top-[-20%] left-[-10%] w-[150vw] h-[150vw] bg-indigo-600/10 rounded-full blur-[180px] animate-pulse-slow"
+        <div
+          className="absolute top-[-20%] left-[-10%] w-[150vw] h-[150vw] bg-fuchsia-600/20 rounded-full blur-[180px] animate-pulse-slow"
           style={{ transform: `translateY(${scrollY * -0.2}px)` }}
         ></div>
-        <div 
-          className="absolute bottom-[-20%] right-[-10%] w-[150vw] h-[150vw] bg-purple-600/10 rounded-full blur-[180px] animate-pulse-slow delay-1000"
+        <div
+          className="absolute bottom-[-20%] right-[-10%] w-[150vw] h-[150vw] bg-cyan-600/20 rounded-full blur-[180px] animate-pulse-slow delay-1000"
           style={{ transform: `translateY(${scrollY * -0.1}px)` }}
         ></div>
-        
+        <div
+          className="absolute top-[20%] right-[10%] w-[80vw] h-[80vw] bg-purple-600/15 rounded-full blur-[150px] animate-pulse-slow delay-500"
+          style={{ transform: `translateY(${scrollY * -0.15}px)` }}
+        ></div>
+
         {/* Star Particles */}
         {[...Array(60)].map((_, i) => (
-          <div 
+          <div
             key={i}
             className="absolute bg-white rounded-full animate-twinkle"
             style={{
@@ -179,34 +182,34 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
       </div>
 
       {/* --- HERO SECTION --- */}
-      <section id="hero" className="relative min-h-screen flex flex-col items-center justify-center px-6 py-20 z-10">
+      <section id="hero" className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-16 z-10">
         <div className="max-w-7xl w-full text-center space-y-12 mt-12">
-          
+
           {/* Top Status Capsule */}
           <div className="flex justify-center">
             {activeProfile ? (
               <div className="glass-capsule text-emerald-400 group cursor-pointer border-emerald-500/30" data-tooltip={`Welcome back, ${activeProfile.childName}! Click to resume.`} onClick={() => onAction('CONTINUE')}>
-                 <UserCheck size={16} className="animate-pulse"/> 
-                 <span>HI {activeProfile.childName.toUpperCase()}! READY TO GO BACK?</span>
-                 <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
+                <UserCheck size={16} className="animate-pulse" />
+                <span>HI {activeProfile.childName.toUpperCase()}! READY TO GO BACK?</span>
+                <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </div>
             ) : (
               <div className="glass-capsule text-indigo-300">
-                 <Sparkles size={16} className="text-yellow-400 animate-spin-slow"/> 
-                 <span>{t('landing.sparkleTag')}</span>
+                <Sparkles size={16} className="text-yellow-400 animate-spin-slow" />
+                <span>{t('landing.sparkleTag')}</span>
               </div>
             )}
           </div>
 
           {/* ADVENTURE HUB TITLE - FIXED CLIPPING WITH MAXIMAL CLEARANCE */}
-          <div className="relative inline-block py-28 sm:py-36 overflow-visible">
-            <h1 className="font-display text-[3.6rem] sm:text-[6rem] md:text-[8.5rem] tracking-tight leading-[1.8] drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-title-float relative z-10 overflow-visible">
-              <span className="bg-clip-text text-transparent bg-gradient-to-br from-indigo-400 via-purple-500 to-rose-400 bg-[length:200%_200%] animate-prismatic-flow block px-12 py-32">
+          <div className="relative inline-block py-10 sm:py-20 overflow-visible">
+            <h1 className="font-display text-[4rem] sm:text-[7rem] md:text-[9.5rem] tracking-tighter leading-[1.1] drop-shadow-[0_0_80px_rgba(192,132,252,0.6)] animate-title-float relative z-10 overflow-visible">
+              <span className="bg-clip-text text-transparent bg-gradient-to-br from-cyan-300 via-fuchsia-400 to-purple-600 bg-[length:200%_200%] animate-prismatic-flow block px-4 py-8 sm:py-16">
                 Adventure Hub
               </span>
             </h1>
             {/* Glossy Reflection Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-30deg] animate-shimmer pointer-events-none z-20"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-30deg] animate-shimmer pointer-events-none z-20"></div>
           </div>
 
           <div className="space-y-8 max-w-4xl mx-auto">
@@ -215,14 +218,14 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
               <div className="text-slate-300 text-xl sm:text-3xl font-medium tracking-tight leading-snug">
                 {heroBefore}
                 <span className="inline-block min-w-[200px] sm:min-w-[300px] px-4">
-                   <span className={`inline-block font-black italic text-white text-3xl sm:text-5xl transition-all duration-500 ${isSplashing ? 'opacity-100 scale-100 blur-0 translate-y-0' : 'opacity-0 scale-50 blur-xl translate-y-4'}`}>
-                      {heroWord}
-                   </span>
+                  <span className={`inline-block font-black italic text-white text-3xl sm:text-5xl transition-all duration-500 ${isSplashing ? 'opacity-100 scale-100 blur-0 translate-y-0' : 'opacity-0 scale-50 blur-xl translate-y-4'}`}>
+                    {heroWord}
+                  </span>
                 </span>
                 {heroAfter}
               </div>
             </div>
-            
+
             <p className="text-indigo-400 font-black text-xs sm:text-sm tracking-[0.6em] uppercase italic opacity-70">
               {heroFullSubtitle}
             </p>
@@ -230,7 +233,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
 
           {/* Central Call to Action */}
           <div className="flex flex-col items-center gap-8 w-full max-w-lg mx-auto pt-4">
-            <button 
+            <button
               onClick={() => {
                 if (activeProfile) onAction('CONTINUE');
                 else onAction(hasProfiles ? 'LOGIN' : 'SETUP');
@@ -246,24 +249,24 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
             </button>
 
             <div className="flex gap-4 w-full">
-              <button 
+              <button
                 onClick={() => onAction('LOGIN')}
                 data-tooltip="Enter Hub with Secret Key"
                 className="secondary-glass-button flex-1 group"
               >
                 <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2rem]"></div>
                 <div className="relative z-10 flex items-center justify-center gap-2">
-                  <LogIn size={18} className="text-indigo-400 group-hover:scale-110 transition-transform"/> {t('landing.ctaSecondary')}
+                  <LogIn size={18} className="text-indigo-400 group-hover:scale-110 transition-transform" /> {t('landing.ctaSecondary')}
                 </div>
               </button>
-              <button 
+              <button
                 onClick={() => onAction('RESET')}
                 data-tooltip="Reset Master Hub Settings"
                 className="secondary-glass-button flex-1 group"
               >
                 <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2rem]"></div>
                 <div className="relative z-10 flex items-center justify-center gap-2">
-                    <RefreshCcw size={18} className="text-amber-400 group-hover:rotate-180 transition-transform duration-700"/> {t('landing.resetButton')}
+                  <RefreshCcw size={18} className="text-amber-400 group-hover:rotate-180 transition-transform duration-700" /> {t('landing.resetButton')}
                 </div>
               </button>
             </div>
@@ -272,139 +275,139 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
 
         {/* Scroll Indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce opacity-40 cursor-pointer" onClick={() => scrollToSection('vision')}>
-           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{t('landing.discoverMore')}</span>
-           <ChevronDown size={20} className="text-slate-400"/>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{t('landing.discoverMore')}</span>
+          <ChevronDown size={20} className="text-slate-400" />
         </div>
       </section>
 
       {/* --- WHY TIWATON SECTION --- */}
       <section id="vision" className="relative px-6 py-32 z-10 bg-slate-950/40 backdrop-blur-3xl border-y border-white/5">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
-            <div className="space-y-8">
-                <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
-                   <Lightbulb size={14}/> THE VISION
-                </div>
-                <h2 className="font-display text-6xl text-white italic leading-tight">{t('landing.visionTitle')}</h2>
-                <p className="text-slate-400 text-lg leading-relaxed font-medium">
-                  {t('landing.visionSubtitle')}
-                </p>
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="p-6 bg-slate-900/50 rounded-3xl border border-white/5 group hover:border-indigo-500/30 transition-all" data-tooltip="Gamified Learning Logic">
-                        <Zap className="text-yellow-400 mb-3 group-hover:scale-125 transition-transform" size={24}/>
-                        <h4 className="text-white font-black text-sm uppercase mb-1">Instant Engagement</h4>
-                        <p className="text-slate-500 text-xs">Captivating visuals keep attention focused on learning.</p>
-                    </div>
-                    <div className="p-6 bg-slate-900/50 rounded-3xl border border-white/5 group hover:border-emerald-500/30 transition-all" data-tooltip="Safe Family Environment">
-                        <ShieldCheck className="text-emerald-400 mb-3 group-hover:scale-125 transition-transform" size={24}/>
-                        <h4 className="text-white font-black text-sm uppercase mb-1">Total Privacy</h4>
-                        <p className="text-slate-500 text-xs">A local-first family vault. Your data stays on your device.</p>
-                    </div>
-                </div>
+          <div className="space-y-8">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
+              <Lightbulb size={14} /> THE VISION
             </div>
-            <div className="relative">
-                <div className="aspect-square bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-[4rem] border-2 border-white/10 relative overflow-hidden flex items-center justify-center p-12">
-                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                   <div className="relative grid grid-cols-2 gap-4 animate-float">
-                      <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Character Quests">🦁</div>
-                      <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 translate-y-8 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Tech Mini-Games">🚀</div>
-                      <div className="w-24 h-24 bg-pink-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 -translate-y-4 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Creative Art Mode">🎨</div>
-                      <div className="w-24 h-24 bg-emerald-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 translate-y-4 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Puzzle Missions">🧩</div>
-                   </div>
-                </div>
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full animate-pulse"></div>
-                <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-pink-500/20 blur-[100px] rounded-full animate-pulse delay-700"></div>
+            <h2 className="font-display text-6xl text-white italic leading-tight">{t('landing.visionTitle')}</h2>
+            <p className="text-slate-400 text-lg leading-relaxed font-medium">
+              {t('landing.visionSubtitle')}
+            </p>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="p-6 bg-slate-900/50 rounded-3xl border border-white/5 group hover:border-indigo-500/30 transition-all" data-tooltip="Gamified Learning Logic">
+                <Zap className="text-yellow-400 mb-3 group-hover:scale-125 transition-transform" size={24} />
+                <h4 className="text-white font-black text-sm uppercase mb-1">Instant Engagement</h4>
+                <p className="text-slate-500 text-xs">Captivating visuals keep attention focused on learning.</p>
+              </div>
+              <div className="p-6 bg-slate-900/50 rounded-3xl border border-white/5 group hover:border-emerald-500/30 transition-all" data-tooltip="Safe Family Environment">
+                <ShieldCheck className="text-emerald-400 mb-3 group-hover:scale-125 transition-transform" size={24} />
+                <h4 className="text-white font-black text-sm uppercase mb-1">Total Privacy</h4>
+                <p className="text-slate-500 text-xs">A local-first family vault. Your data stays on your device.</p>
+              </div>
             </div>
+          </div>
+          <div className="relative">
+            <div className="aspect-square bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-[4rem] border-2 border-white/10 relative overflow-hidden flex items-center justify-center p-12">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+              <div className="relative grid grid-cols-2 gap-4 animate-float">
+                <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Character Quests">🦁</div>
+                <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 translate-y-8 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Tech Mini-Games">🚀</div>
+                <div className="w-24 h-24 bg-pink-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 -translate-y-4 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Creative Art Mode">🎨</div>
+                <div className="w-24 h-24 bg-emerald-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 translate-y-4 hover:scale-110 transition-transform cursor-pointer" data-tooltip="Puzzle Missions">🧩</div>
+              </div>
+            </div>
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full animate-pulse"></div>
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-pink-500/20 blur-[100px] rounded-full animate-pulse delay-700"></div>
+          </div>
         </div>
       </section>
 
       {/* --- FEATURE GRID SECTION --- */}
       <section id="features" className="relative px-6 py-32 z-10">
-         <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-24 space-y-12">
-                <h3 className="font-display text-7xl text-white italic tracking-tighter leading-relaxed pb-12 mb-16">The Galactic Features</h3>
-                <p className="text-slate-500 text-xl font-medium pt-8">Tools to grow, reason, and create every single day.</p>
-            </div>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-               {features.map((f, i) => (
-                  <div 
-                    key={i} 
-                    data-tooltip={f.tooltip}
-                    className="group bg-slate-900/40 border border-white/5 p-10 rounded-[3.5rem] hover:bg-slate-900/80 transition-all hover:-translate-y-3 hover:border-white/10 shadow-2xl relative overflow-hidden"
-                  >
-                     <div className={`absolute top-0 right-0 p-4 font-black text-[10px] tracking-widest bg-gradient-to-br ${f.color} text-white rounded-bl-3xl opacity-40 group-hover:opacity-100 transition-opacity`}>
-                        {f.tag}
-                     </div>
-                     <div className={`w-20 h-20 bg-gradient-to-br ${f.color} rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-xl group-hover:scale-110 transition-transform`}>
-                        {f.icon}
-                     </div>
-                     <h4 className="text-2xl font-black text-white italic mb-4 tracking-tighter uppercase leading-tight">{f.title}</h4>
-                     <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
-                  </div>
-               ))}
-            </div>
-         </div>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-24 space-y-12">
+            <h3 className="font-display text-7xl text-white italic tracking-tighter leading-relaxed pb-12 mb-16">The Galactic Features</h3>
+            <p className="text-slate-500 text-xl font-medium pt-8">Tools to grow, reason, and create every single day.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {features.map((f, i) => (
+              <div
+                key={i}
+                data-tooltip={f.tooltip}
+                className="group bg-slate-900/40 border border-white/5 p-10 rounded-[3.5rem] hover:bg-slate-900/80 transition-all hover:-translate-y-3 hover:border-white/10 shadow-2xl relative overflow-hidden"
+              >
+                <div className={`absolute top-0 right-0 p-4 font-black text-[10px] tracking-widest bg-gradient-to-br ${f.color} text-white rounded-bl-3xl opacity-40 group-hover:opacity-100 transition-opacity`}>
+                  {f.tag}
+                </div>
+                <div className={`w-20 h-20 bg-gradient-to-br ${f.color} rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-xl group-hover:scale-110 transition-transform`}>
+                  {f.icon}
+                </div>
+                <h4 className="text-2xl font-black text-white italic mb-4 tracking-tighter uppercase leading-tight">{f.title}</h4>
+                <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* --- FAMILY CONNECTION (COUNTDOWN) --- */}
       <section id="events" className="relative px-6 py-32 z-10 overflow-hidden">
-         <div className="max-w-4xl mx-auto bg-slate-900/60 backdrop-blur-3xl p-12 rounded-[4rem] border-2 border-white/5 relative shadow-[0_0_100px_rgba(99,102,241,0.1)] group">
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] group-hover:bg-indigo-500/20 transition-colors"></div>
-            <div className="flex flex-col md:flex-row items-center gap-12 text-center md:text-left">
-                <div className="relative shrink-0">
-                   <div className="w-40 h-40 bg-slate-800 rounded-full flex items-center justify-center border-4 border-indigo-400/20 shadow-2xl relative z-10 group-hover:border-indigo-400/40 transition-all">
-                      <Clock size={64} className="text-indigo-400 animate-pulse-slow"/>
-                   </div>
-                   <div className="absolute inset-0 bg-indigo-400 blur-3xl opacity-20 animate-pulse"></div>
-                </div>
-                <div className="space-y-6">
-                    <h3 className="font-display text-5xl text-white italic">Never Miss a Moment</h3>
-                    <p className="text-slate-400 text-lg leading-relaxed font-medium">
-                       Our <span className="text-indigo-400 font-bold">Event Radar</span> tracks family birthdays, holidays, and adventures. Set parent-notified countdowns that build anticipation and excitement for the next big family memory.
-                    </p>
-                    <div className="flex gap-4 justify-center md:justify-start">
-                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest" data-tooltip="Core Family Values">
-                           <Heart size={14} className="text-rose-500"/> FAMILY FIRST
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest" data-tooltip="Earn Rewards for Progress">
-                           <Star size={14} className="text-amber-500"/> STAR REWARDS
-                        </div>
-                    </div>
-                </div>
+        <div className="max-w-4xl mx-auto bg-slate-900/60 backdrop-blur-3xl p-12 rounded-[4rem] border-2 border-white/5 relative shadow-[0_0_100px_rgba(99,102,241,0.1)] group">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] group-hover:bg-indigo-500/20 transition-colors"></div>
+          <div className="flex flex-col md:flex-row items-center gap-12 text-center md:text-left">
+            <div className="relative shrink-0">
+              <div className="w-40 h-40 bg-slate-800 rounded-full flex items-center justify-center border-4 border-indigo-400/20 shadow-2xl relative z-10 group-hover:border-indigo-400/40 transition-all">
+                <Clock size={64} className="text-indigo-400 animate-pulse-slow" />
+              </div>
+              <div className="absolute inset-0 bg-indigo-400 blur-3xl opacity-20 animate-pulse"></div>
             </div>
-         </div>
+            <div className="space-y-6">
+              <h3 className="font-display text-5xl text-white italic">Never Miss a Moment</h3>
+              <p className="text-slate-400 text-lg leading-relaxed font-medium">
+                Our <span className="text-indigo-400 font-bold">Event Radar</span> tracks family birthdays, holidays, and adventures. Set parent-notified countdowns that build anticipation and excitement for the next big family memory.
+              </p>
+              <div className="flex gap-4 justify-center md:justify-start">
+                <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest" data-tooltip="Core Family Values">
+                  <Heart size={14} className="text-rose-500" /> FAMILY FIRST
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest" data-tooltip="Earn Rewards for Progress">
+                  <Star size={14} className="text-amber-500" /> STAR REWARDS
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* --- FINAL CTA --- */}
       <section className="relative px-6 py-40 z-10 text-center">
-          <div className="max-w-3xl mx-auto space-y-12">
-              <h3 className="font-display text-6xl sm:text-8xl text-white leading-none tracking-tighter">Your Next Adventure Starts Here.</h3>
-              <p className="text-slate-500 text-xl font-medium">Unlock the full potential of your family hub today.</p>
-              <button 
-                onClick={() => {
-                  if (activeProfile) onAction('CONTINUE');
-                  else onAction(hasProfiles ? 'LOGIN' : 'SETUP');
-                }}
-                data-tooltip={activeProfile ? "Resume your quest instantly" : "Launch Your Journey"}
-                className={`glossy-button max-w-md mx-auto relative group overflow-hidden ${activeProfile ? 'border-emerald-500' : ''}`}
-              >
-                <div className={`absolute inset-0 bg-gradient-to-r ${activeProfile ? 'from-emerald-500 to-teal-500' : 'from-emerald-500 to-teal-500'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}/><span className="relative z-10 flex items-center justify-center gap-4 py-8 group-hover:text-white transition-colors duration-500">
-                  {activeProfile ? t('landing.ctaResume') : t('landing.ctaPrimary')} <ArrowRight size={32} className="group-hover:translate-x-2 transition-transform duration-500" />
-                </span>
-              </button>
+        <div className="max-w-3xl mx-auto space-y-12">
+          <h3 className="font-display text-6xl sm:text-8xl text-white leading-none tracking-tighter">Your Next Adventure Starts Here.</h3>
+          <p className="text-slate-500 text-xl font-medium">Unlock the full potential of your family hub today.</p>
+          <button
+            onClick={() => {
+              if (activeProfile) onAction('CONTINUE');
+              else onAction(hasProfiles ? 'LOGIN' : 'SETUP');
+            }}
+            data-tooltip={activeProfile ? "Resume your quest instantly" : "Launch Your Journey"}
+            className={`glossy-button max-w-md mx-auto relative group overflow-hidden ${activeProfile ? 'border-emerald-500' : ''}`}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-r ${activeProfile ? 'from-emerald-500 to-teal-500' : 'from-emerald-500 to-teal-500'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} /><span className="relative z-10 flex items-center justify-center gap-4 py-8 group-hover:text-white transition-colors duration-500">
+              {activeProfile ? t('landing.ctaResume') : t('landing.ctaPrimary')} <ArrowRight size={32} className="group-hover:translate-x-2 transition-transform duration-500" />
+            </span>
+          </button>
+        </div>
+
+        <footer className="mt-40 border-t border-white/5 pt-10 pb-20">
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-display text-2xl text-white shadow-2xl">T</div>
+            <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.5em]">{t('landing.footerTag')}</p>
+            <div className="flex gap-8 opacity-40">
+              <Gamepad2 size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Spelling & Logic Games" />
+              <BookOpen size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Reading & Adventures" />
+              <Palette size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Creativity Studio" />
+            </div>
           </div>
-          
-          <footer className="mt-40 border-t border-white/5 pt-10 pb-20">
-             <div className="flex flex-col items-center gap-6">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-display text-2xl text-white shadow-2xl">T</div>
-                <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.5em]">{t('landing.footerTag')}</p>
-                <div className="flex gap-8 opacity-40">
-                   <Gamepad2 size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Spelling & Logic Games" />
-                   <BookOpen size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Reading & Adventures" />
-                   <Palette size={20} className="text-slate-400 hover:text-white transition-colors cursor-pointer" data-tooltip="Creativity Studio" />
-                </div>
-             </div>
-          </footer>
+        </footer>
       </section>
 
       <style>{`

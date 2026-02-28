@@ -63,18 +63,17 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
         <header className="shrink-0 z-50 bg-[#050810]/40 backdrop-blur-3xl border-b border-white/5 flex items-center justify-center pt-[calc(env(safe-area-inset-top)+1rem)] pb-4 px-6 sm:px-12">
           <div className="w-full flex justify-between items-center">
             <div
-              className="flex items-center gap-4 cursor-pointer group active:scale-95 transition-transform"
+              className="flex items-center cursor-pointer group active:scale-95 transition-transform"
               onClick={handleLogoClick}
               data-tooltip="Return to Tiwaton Hub"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[1rem] bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-white/10 group-hover:rotate-12 transition-transform">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center group-hover:scale-105 transition-transform drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
                 {getLogoUrl() ? (
                   <img src={getLogoUrl()!} alt="Tiwaton mark" className="w-full h-full object-contain" />
                 ) : (
-                  <span className="font-display text-white font-bold text-xl">T</span>
+                  <span className="font-display text-white font-bold text-3xl">T</span>
                 )}
               </div>
-              <h1 className="font-display text-2xl sm:text-3xl text-white tracking-tighter drop-shadow-lg">Tiwaton</h1>
             </div>
 
             <div className="flex items-center gap-4">
