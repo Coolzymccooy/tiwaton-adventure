@@ -40,7 +40,22 @@ export const AudioService = {
     queue: [] as { text: string; mood: string }[],
     isSpeaking: false,
     heartbeat: null as any,
-    locale: 'en'
+    locale: 'en',
+    ttsEnabled: false // explicitly requested to be default OFF
+  },
+
+  toggleTTS: (enabled?: boolean) => {
+    if (enabled !== undefined) {
+      AudioService.private.ttsEnabled = enabled;
+    } else {
+      AudioService.private.ttsEnabled = !AudioService.private.ttsEnabled;
+    }
+    if (!AudioService.private.ttsEnabled && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      AudioService.private.queue = [];
+      AudioService.private.isSpeaking = false;
+    }
+    return AudioService.private.ttsEnabled;
   },
 
   setLocale: (locale: 'en' | 'de') => {
@@ -52,7 +67,7 @@ export const AudioService = {
     mood: 'sarcastic' | 'excited' | 'neutral' = 'neutral',
     priority: 'high' | 'low' = 'low'
   ) => {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window) || !AudioService.private.ttsEnabled) return;
 
     if (priority === 'high') {
       window.speechSynthesis.cancel();
@@ -86,7 +101,7 @@ export const AudioService = {
     AudioService.private.isSpeaking = true;
     const { text, mood } = AudioService.private.queue.shift()!;
     const utterance = new SpeechSynthesisUtterance(text);
-    
+
     const voices = window.speechSynthesis.getVoices();
     const preferredVoices = ['Google US English', 'Samantha', 'en-US'];
     const normalizeName = (voice?: SpeechSynthesisVoice) => (voice?.name ?? '').toLowerCase();

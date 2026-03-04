@@ -133,6 +133,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         const p = StorageService.createParentProfile(adminName, adminEmail, adminPin);
         setRecoveryKey(p.recoveryKey || '');
         setProfiles(StorageService.getProfiles());
+        SyncService.sendSnapshot(StorageService.buildSnapshot(p.id));
         setViewMode('RECOVERY_INFO');
         setError('');
         setInputVerificationCode('');
@@ -143,8 +144,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             setError(t('login.errorChildFields'));
             return;
         }
-        StorageService.createChildProfile(childName, parseInt(childAge) || 6, childPass);
+        const newChild = StorageService.createChildProfile(childName, parseInt(childAge) || 6, childPass);
         setProfiles(StorageService.getProfiles());
+        SyncService.sendSnapshot(StorageService.buildSnapshot(newChild.id));
         setChildName(''); setChildAge(''); setChildPass('');
         if (finish) setViewMode('USER_GRID');
     };

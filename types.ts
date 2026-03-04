@@ -20,9 +20,9 @@ export interface FamilyProfile {
   mode: AppMode;
   age: number;
   email?: string; // New: Required for Admin setup/reset
-  pin?: string; 
-  password?: string; 
-  recoveryKey?: string; 
+  pin?: string;
+  password?: string;
+  recoveryKey?: string;
 }
 
 export interface Story {
@@ -31,10 +31,14 @@ export interface Story {
   content: string;
   isUserCreated: boolean;
   author?: string;
-  visualAssets?: string[]; 
+  visualAssets?: string[];
 }
 
-export type MathPlanet = 'Numbers' | 'Operations' | 'Fractions' | 'Time' | 'Money' | 'Data' | 'Logic';
+export type MathPlanet =
+  | 'Numbers' | 'Operations' | 'Fractions' | 'Time' | 'Money' | 'Data' | 'Logic'
+  | 'Geometry' | 'Measurements' | 'Patterns' | 'Multiplication' | 'Division'
+  | 'Probability' | 'Decimals' | 'Percentages' | 'Algebra' | 'WordProblems'
+  | 'RomanNumerals' | 'Ratios' | 'NumberBonds' | 'EvensOdds';
 
 export interface PlanetProgress {
   planet: MathPlanet;
@@ -52,7 +56,7 @@ export interface GameStat {
     category: string;
     level: number;
     unlocked: boolean;
-    bibleWorldLevel?: number; 
+    bibleWorldLevel?: number;
   }[];
   mathLevel: number;
   mathPlanetProgress: PlanetProgress[];

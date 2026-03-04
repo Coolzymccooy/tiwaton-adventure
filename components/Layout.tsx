@@ -1,8 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from '../types';
-import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home } from 'lucide-react';
+import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home, Volume2, VolumeX } from 'lucide-react';
 import { StorageService } from '../services/storage';
+import { AudioService } from '../services/audio';
 import { useI18n } from '../i18n/I18nProvider';
 import { SyncService } from '../services/sync';
 import { getLogoUrl } from './logo';
@@ -43,6 +44,17 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
   const isLoginMode = currentView === View.LOGIN;
   const showNav = !isLandingMode && !isLoginMode && !isDrawingMode;
   const { locale, setLocale, t } = useI18n();
+  const [isTTS, setIsTTS] = useState(false); // default off
+
+  useEffect(() => {
+    // Sync initial state with service (which defaults OFF)
+    setIsTTS((AudioService as any).private?.ttsEnabled || false);
+  }, []);
+
+  const handleToggleTTS = () => {
+    const newState = AudioService.toggleTTS();
+    setIsTTS(newState);
+  };
 
   const handleLogoClick = () => {
     onNavigate(View.HOME);
@@ -84,6 +96,18 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
                   <span className="sm:hidden">{childName}</span>
                 </div>
               )}
+
+              <button
+                onClick={handleToggleTTS}
+                data-tooltip={isTTS ? "Disable Voice" : "Enable Voice"}
+                className={`w-10 h-10 flex items-center justify-center rounded-full border transition-all ${isTTS
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                  }`}
+              >
+                {isTTS ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
+
               <button
                 onClick={() => setLocale(locale === 'en' ? 'de' : 'en')}
                 className="px-4 py-2 bg-white/10 rounded-full border border-white/10 text-[9px] font-black uppercase tracking-[0.3em] text-white hover:bg-white/20 transition-all"

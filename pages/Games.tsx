@@ -7,7 +7,9 @@ import {
   Hash, Utensils, Gamepad2, Sparkles, Flame,
   Brain, Languages, Search, GraduationCap,
   Globe, Trees, Waves, Ghost, Gift, Award,
-  Keyboard, Type, Grid, Wand2, MousePointer2
+  Keyboard, Type, Grid, Wand2, MousePointer2,
+  Shapes, Ruler, Infinity, X, Divide, CircleDot,
+  Percent, Variable, BookOpen, Shuffle, Link2, Scan
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
@@ -15,22 +17,54 @@ import { MathPlanet, GameStat } from '../types';
 
 // --- SHARED COMPONENTS ---
 
+const V_ANIM_CSS = `
+  @keyframes firework {
+    0% { transform: translate(var(--x), var(--initialY)); width: var(--initialSize); opacity: 1; }
+    50% { width: 0.5rem; opacity: 1; }
+    100% { width: var(--finalSize); opacity: 0; transform: translate(var(--x), var(--y)); }
+  }
+  .firework, .firework::before, .firework::after {
+    --initialSize: 0.5vmin;
+    --finalSize: 45vmin;
+    --particleSize: 0.2vmin;
+    --color1: yellow; --color2: khaki; --color3: white; --color4: palevioletred; --color5: RosyBrown; --color6: mediumseagreen;
+    --y: -30vmin; --x: -50%; --initialY: 60vmin;
+    content: ""; position: absolute; top: 50%; left: 50%; width: var(--initialSize); aspect-ratio: 1;
+    background: radial-gradient(circle, var(--color1) var(--particleSize), #0000 0) 50% 0%, radial-gradient(circle, var(--color2) var(--particleSize), #0000 0) 100% 50%, radial-gradient(circle, var(--color3) var(--particleSize), #0000 0) 50% 100%, radial-gradient(circle, var(--color4) var(--particleSize), #0000 0) 0% 50%, radial-gradient(circle, var(--color5) var(--particleSize), #0000 0) 80% 90%, radial-gradient(circle, var(--color6) var(--particleSize), #0000 0) 95% 90%, radial-gradient(circle, var(--color1) var(--particleSize), #0000 0) 90% 70%, radial-gradient(circle, var(--color2) var(--particleSize), #0000 0) 100% 60%, radial-gradient(circle, var(--color3) var(--particleSize), #0000 0) 55% 80%, radial-gradient(circle, var(--color4) var(--particleSize), #0000 0) 70% 77%, radial-gradient(circle, var(--color5) var(--particleSize), #0000 0) 22% 90%, radial-gradient(circle, var(--color6) var(--particleSize), #0000 0) 45% 90%, radial-gradient(circle, var(--color1) var(--particleSize), #0000 0) 33% 70%, radial-gradient(circle, var(--color2) var(--particleSize), #0000 0) 10% 60%, radial-gradient(circle, var(--color3) var(--particleSize), #0000 0) 31% 80%, radial-gradient(circle, var(--color4) var(--particleSize), #0000 0) 28% 77%, radial-gradient(circle, var(--color5) var(--particleSize), #0000 0) 13% 72%;
+    background-size: var(--initialSize) var(--initialSize); background-repeat: no-repeat;
+    transform: translate(-50%, -50%);
+    animation: firework 2s infinite;
+  }
+  .firework::before { --x: -20%; --y: -40%; --initialY: -50%; transform: translate(-50%, -50%) rotate(40deg) scale(1.3) rotateY(40deg); }
+  .firework::after { --x: -15%; --y: -50%; --initialY: -50%; transform: translate(-50%, -50%) rotate(170deg) scale(1.15) rotateY(-30deg); }
+  .firework:nth-child(2) { --x: 30vmin; }
+  .firework:nth-child(2), .firework:nth-child(2)::before, .firework:nth-child(2)::after { --color1: pink; --color2: violet; --color3: fuchsia; --color4: orchid; --color5: plum; --color6: lavender; --finalSize: 40vmin; left: 30%; top: 60%; animation-delay: -0.25s; }
+  .firework:nth-child(3) { --x: -30vmin; --y: -50vmin; }
+  .firework:nth-child(3), .firework:nth-child(3)::before, .firework:nth-child(3)::after { --color1: cyan; --color2: lightcyan; --color3: lightblue; --color4: PaleTurquoise; --color5: SkyBlue; --color6: lavender; --finalSize: 35vmin; left: 70%; top: 60%; animation-delay: -0.4s; }
+`;
+
 const VictoryOverlay: React.FC<{
   title: string;
   xp: number;
   coins: number;
   badge?: string;
   onNext: () => void;
-  onQuit: () => void
+  onQuit: () => void;
 }> = ({ title, xp, coins, badge, onNext, onQuit }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/98 backdrop-blur-3xl animate-fade-in p-4">
-    <div className="text-center max-w-sm w-full animate-float flex flex-col items-center">
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 backdrop-blur-3xl animate-fade-in p-4 overflow-hidden">
+    <style>{V_ANIM_CSS}</style>
+    <div className="absolute inset-0 pointer-events-none">
+      <div className="firework"></div>
+      <div className="firework"></div>
+      <div className="firework"></div>
+    </div>
+    <div className="text-center max-w-sm w-full animate-float flex flex-col items-center relative z-10">
       <div className="relative mb-4 sm:mb-6">
-        <div className="absolute inset-0 bg-indigo-500 blur-[80px] opacity-40 animate-pulse"></div>
-        <div className="text-7xl sm:text-8xl relative drop-shadow-2xl">🌟</div>
+        <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-60 animate-pulse scale-150"></div>
+        <div className="text-7xl sm:text-8xl relative drop-shadow-[0_0_40px_rgba(250,204,21,0.8)]">🏆</div>
       </div>
-      <h2 className="font-display text-4xl sm:text-5xl text-indigo-400 mb-1 italic tracking-tighter drop-shadow-md">{title}</h2>
-      <p className="text-white text-base font-black mb-6 uppercase tracking-[0.3em]">Mission AccomplISHED!</p>
+      <h2 className="font-display text-4xl sm:text-5xl text-yellow-400 mb-1 italic tracking-tighter drop-shadow-md">{title}</h2>
+      <p className="text-white text-base font-black mb-6 uppercase tracking-[0.3em] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-amber-500">Mission AccomplISHED!</p>
 
       {badge && (
         <div className="mb-6 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-500 font-black text-[10px] uppercase tracking-[0.3em] flex items-center gap-2">
@@ -56,7 +90,8 @@ const VictoryOverlay: React.FC<{
       <div className="flex flex-col gap-3 w-full">
         <button
           onClick={onNext}
-          className="w-full py-5 bg-white text-slate-950 font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(203,213,225)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter"
+          className="w-full py-5 text-white font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(161,98,7)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter
+                     bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 border border-yellow-300/30 object-contain ring-4 ring-yellow-500/20"
         >
           Next Mission
         </button>
@@ -207,7 +242,9 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const generateLevel = () => {
     setViewState('LOADING');
     const themes = Object.keys(CROSSWORD_PRO_BANK);
-    const theme = themes[(level - 1) % themes.length];
+
+    // Pick theme randomly instead of linearly
+    const theme = themes[Math.floor(Math.random() * themes.length)];
     const pool = (CROSSWORD_PRO_BANK as any)[theme];
 
     let candidates = pool.filter((w: any) => !usedWords.has(w.answer));
@@ -215,7 +252,9 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const gridSize = Math.min(8 + Math.floor(level / 5), 12);
     const wordCount = Math.min(3 + Math.floor(level / 3), 6);
-    const selected = candidates.sort(() => Math.random() - 0.5).slice(0, wordCount);
+
+    // Truly shuffle candidates
+    const selected = [...candidates].sort(() => Math.random() - 0.5).slice(0, wordCount);
 
     const { grid: g, placed } = generateProCrossword(selected, pool, gridSize);
     setGrid(g);
@@ -358,7 +397,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       </header>
 
 
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-6 sm:gap-10 min-h-0 pb-20 overflow-y-auto custom-scrollbar w-full">
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-6 sm:gap-10 pb-20 w-full">
         {/* Active Clue Panel */}
         <div className="w-full lg:w-72 flex flex-col gap-4 bg-slate-900/40 p-5 rounded-3xl border border-white/5 shadow-2xl shrink-0">
           <div className="space-y-1">
@@ -383,9 +422,9 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   key={opt}
                   onClick={() => handleOptionSelect(opt)}
                   className={`w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest transition-all border-b-4 active:translate-y-1 active:border-b-0 ${userGrid[activeClue.r][activeClue.c] === opt[0] &&
-                      opt === activeClue.answer
-                      ? "bg-emerald-500 border-emerald-700 text-white pointer-events-none opacity-50"
-                      : "bg-slate-800 border-slate-950 text-slate-200 hover:bg-indigo-600 hover:border-indigo-800"
+                    opt === activeClue.answer
+                    ? "bg-emerald-500 border-emerald-700 text-white pointer-events-none opacity-50"
+                    : "bg-slate-800 border-slate-950 text-slate-200 hover:bg-indigo-600 hover:border-indigo-800"
                     }`}
                 >
                   {opt}
@@ -419,10 +458,10 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     key={`${r}-${c}`}
                     onClick={() => handleCellClick(r, c)}
                     className={`relative flex items-center justify-center rounded-lg text-xs sm:text-lg font-black transition-all border-b-4 ${cell === ""
-                        ? "bg-transparent border-transparent"
-                        : isSelected
-                          ? "bg-emerald-500 border-emerald-700 text-white scale-105 z-10"
-                          : "bg-slate-800 border-slate-950 text-white hover:bg-slate-700"
+                      ? "bg-transparent border-transparent"
+                      : isSelected
+                        ? "bg-emerald-500 border-emerald-700 text-white scale-105 z-10"
+                        : "bg-slate-800 border-slate-950 text-white hover:bg-slate-700"
                       }`}
                   >
                     {userGrid[r][c]}
@@ -455,12 +494,12 @@ type ScreenProps = {
 
 function Screen({ children, maxWidth = "max-w-6xl", center = false, className = "" }: ScreenProps) {
   return (
-    <div className="h-full w-full bg-[#050810] animate-fade-in relative overflow-y-auto custom-scrollbar">
+    <div className="min-h-full w-full bg-[#050810] animate-fade-in flex flex-col">
       <div
         className={[
-          "h-full w-full mx-auto px-4 sm:px-6 pt-6 pb-28",
+          "w-full mx-auto px-4 sm:px-6 pt-6 pb-28 flex-1",
           maxWidth,
-          center ? "flex items-center justify-center" : "flex flex-col",
+          center ? "flex flex-col justify-center items-center" : "flex flex-col",
           className,
         ].join(" ")}
       >
@@ -541,8 +580,12 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const startNewLevel = () => {
     setViewState('LOADING');
     const themes = Object.keys(WORD_SEARCH_BANK);
-    const theme = themes[(level - 1) % themes.length];
+
+    // Randomize category selection
+    const theme = themes[Math.floor(Math.random() * themes.length)];
     const wordPool = (WORD_SEARCH_BANK as any)[theme];
+
+    // Increase word count dynamically but randomize selection
     const count = Math.min(3 + Math.floor(level / 3), 8);
     const size = Math.min(6 + Math.floor(level / 2), 12);
     setGridSize(size);
@@ -643,7 +686,7 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 
       {/* ✅ PLAY AREA (real content) */}
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 pt-6 gap-6 sm:gap-10 w-full overflow-y-auto custom-scrollbar pb-20">
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 pt-6 gap-6 sm:gap-10 w-full pb-20">
         {viewState === "LOADING" ? (
           <div className="text-white/70 font-black text-sm">Loading Word Search…</div>
         ) : (
@@ -656,8 +699,8 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <div
                     key={word}
                     className={`relative px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black tracking-tighter transition-all flex items-center justify-between ${done
-                        ? "bg-emerald-500/20 text-emerald-400 opacity-60"
-                        : "bg-slate-800 text-white border border-white/5"
+                      ? "bg-emerald-500/20 text-emerald-400 opacity-60"
+                      : "bg-slate-800 text-white border border-white/5"
                       }`}
                   >
                     {word}
@@ -682,10 +725,10 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         key={`${r}-${c}`}
                         onClick={() => handleCellClick(r, c)}
                         className={`relative flex items-center justify-center rounded-lg font-black transition-all border-b-4 active:translate-y-1 active:border-b-0 ${cell.found
-                            ? "bg-emerald-500 border-emerald-700 text-white"
-                            : isSelected
-                              ? "bg-indigo-600 border-indigo-800 text-white"
-                              : "bg-slate-800 border-slate-950 text-white hover:bg-slate-700"
+                          ? "bg-emerald-500 border-emerald-700 text-white"
+                          : isSelected
+                            ? "bg-indigo-600 border-indigo-800 text-white"
+                            : "bg-slate-800 border-slate-950 text-white hover:bg-slate-700"
                           }`}
                       >
                         <span className="text-xs sm:text-lg">{cell.char}</span>
@@ -739,7 +782,22 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     { id: 'Fractions' as MathPlanet, label: 'Fraction Field', icon: Utensils, color: 'from-emerald-600 to-teal-900', desc: 'Bakery Fractions' },
     { id: 'Time' as MathPlanet, label: 'Clockwork Comet', icon: Clock, color: 'from-amber-600 to-orange-900', desc: 'Time Mastery' },
     { id: 'Money' as MathPlanet, label: 'Cash Star', icon: Landmark, color: 'from-yellow-600 to-amber-900', desc: 'Shopping Math' },
-    { id: 'Data' as MathPlanet, label: 'Data Depot', icon: BarChart3, color: 'from-purple-600 to-violet-900', desc: 'Graph Safari' }
+    { id: 'Data' as MathPlanet, label: 'Data Depot', icon: BarChart3, color: 'from-purple-600 to-violet-900', desc: 'Graph Safari' },
+    { id: 'Logic' as MathPlanet, label: 'Logic Labyrinth', icon: Brain, color: 'from-pink-600 to-rose-900', desc: 'Puzzle Grid' },
+    { id: 'Geometry' as MathPlanet, label: 'Shape Sector', icon: Shapes, color: 'from-cyan-500 to-blue-800', desc: 'Area & Angles' },
+    { id: 'Measurements' as MathPlanet, label: 'Measure Moon', icon: Ruler, color: 'from-lime-500 to-green-800', desc: 'Lengths & Weight' },
+    { id: 'Patterns' as MathPlanet, label: 'Pattern Planet', icon: Infinity, color: 'from-sky-400 to-indigo-800', desc: 'Sequences' },
+    { id: 'Multiplication' as MathPlanet, label: 'Times Trench', icon: X, color: 'from-orange-500 to-red-800', desc: 'Multiples' },
+    { id: 'Division' as MathPlanet, label: 'Divide Dome', icon: Divide, color: 'from-violet-500 to-fuchsia-800', desc: 'Sharing' },
+    { id: 'Probability' as MathPlanet, label: 'Chance Core', icon: CircleDot, color: 'from-rose-400 to-pink-800', desc: 'Odds & Ends' },
+    { id: 'Decimals' as MathPlanet, label: 'Decimal Dust', icon: Scan, color: 'from-teal-400 to-emerald-800', desc: 'Dot Math' },
+    { id: 'Percentages' as MathPlanet, label: 'Percent Peak', icon: Percent, color: 'from-fuchsia-500 to-purple-800', desc: '100 Parts' },
+    { id: 'Algebra' as MathPlanet, label: 'Algebra Asteroid', icon: Variable, color: 'from-blue-400 to-cyan-800', desc: 'Find X' },
+    { id: 'WordProblems' as MathPlanet, label: 'Story Star', icon: BookOpen, color: 'from-green-400 to-lime-800', desc: 'Read & Solve' },
+    { id: 'RomanNumerals' as MathPlanet, label: 'Roman Ring', icon: Landmark, color: 'from-yellow-500 to-amber-800', desc: 'V, X, L' },
+    { id: 'Ratios' as MathPlanet, label: 'Ratio Rift', icon: Link2, color: 'from-indigo-400 to-blue-800', desc: 'Comparisons' },
+    { id: 'NumberBonds' as MathPlanet, label: 'Bond Base', icon: Shuffle, color: 'from-red-400 to-rose-800', desc: 'Number Pairs' },
+    { id: 'EvensOdds' as MathPlanet, label: 'Evens & Odds', icon: Hash, color: 'from-amber-400 to-orange-800', desc: 'Skip Logic' }
   ];
 
   const generateMissionQuestion = (planet: MathPlanet, currentLevel: number) => {
@@ -837,6 +895,103 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         Math.max(0, statTotal - 2),
         statTotal + 5,
       ];
+    } else if (planet === 'Logic') {
+      const isTrue = Math.random() > 0.5;
+      const num1 = Math.floor(Math.random() * 10) + currentLevel;
+      const num2 = Math.floor(Math.random() * 10) + currentLevel;
+      const op = Math.random() > 0.5 ? '>' : '<';
+      const statement = op === '>' ? `${num1} is greater than ${num2}` : `${num1} is less than ${num2}`;
+      const actualTruth = op === '>' ? num1 > num2 : num1 < num2;
+      const ans = actualTruth ? 1 : 0;
+      q = { text: `Is it true: ${statement}? (1=Yes, 0=No)`, ans, speak: statement + '. Is this true? 1 for yes, 0 for no.', visual: null };
+      opts = [1, 0];
+    } else if (planet === 'Geometry') {
+      const shapes = [
+        { name: 'Triangle', sides: 3 }, { name: 'Square', sides: 4 },
+        { name: 'Pentagon', sides: 5 }, { name: 'Hexagon', sides: 6 },
+        { name: 'Octagon', sides: 8 }, { name: 'Decagon', sides: 10 }
+      ];
+      const target = shapes[Math.floor(Math.random() * Math.min(shapes.length, currentLevel + 2))];
+      q = { text: `How many sides does a ${target.name} have?`, ans: target.sides, speak: `How many sides does a ${target.name} have?`, visual: null };
+      opts = [target.sides, target.sides + 1, Math.max(0, target.sides - 1), target.sides + 2];
+    } else if (planet === 'Measurements') {
+      const baseLen = (Math.floor(Math.random() * 20) + 10) * currentLevel;
+      const cut = Math.floor(Math.random() * (baseLen - 5)) + 1;
+      const left = baseLen - cut;
+      q = { text: `A string is ${baseLen}cm. You cut ${cut}cm. Left?`, ans: left, speak: `A string is ${baseLen} centimeters. You cut ${cut} centimeters off. What is left?`, visual: null };
+      opts = [left, left + 2, Math.max(0, left - 5), left + 10];
+    } else if (planet === 'Patterns') {
+      const start = Math.floor(Math.random() * 10) + 1;
+      const step = Math.floor(Math.random() * Math.min(5, currentLevel)) + 1;
+      const t1 = start, t2 = start + step, t3 = start + step * 2, t4 = start + step * 3;
+      q = { text: `${t1}, ${t2}, ${t3}, ?`, ans: t4, speak: `What comes next in the pattern? ${t1}, ${t2}, ${t3}?`, visual: null };
+      opts = [t4, t4 + 1, t4 - 1, t4 + step];
+    } else if (planet === 'Multiplication') {
+      const maxTable = age <= 6 ? 5 : (currentLevel * 3 + 5);
+      const a = Math.floor(Math.random() * maxTable) + 1;
+      const b = Math.floor(Math.random() * Math.min(10, currentLevel + 2)) + 1;
+      const ans = a * b;
+      q = { text: `${a} × ${b}`, ans, speak: `What is ${a} times ${b}?`, visual: null };
+      opts = [ans, ans + a, Math.max(0, ans - b), ans + 2];
+    } else if (planet === 'Division') {
+      const divisor = Math.floor(Math.random() * Math.min(10, currentLevel + 2)) + 1;
+      const quotient = Math.floor(Math.random() * 10) + 1;
+      const dividend = divisor * quotient;
+      q = { text: `${dividend} ÷ ${divisor}`, ans: quotient, speak: `What is ${dividend} divided by ${divisor}?`, visual: null };
+      opts = [quotient, quotient + 1, Math.max(0, quotient - 1), quotient + 2];
+    } else if (planet === 'Probability') {
+      const red = Math.floor(Math.random() * 5) + 1;
+      const blue = Math.floor(Math.random() * 5) + 1;
+      const total = red + blue;
+      q = { text: `${red} red balls, ${blue} blue. Total balls?`, ans: total, speak: `If you have ${red} red balls and ${blue} blue balls, how many in total?`, visual: null };
+      opts = [total, total + 1, Math.max(0, total - 1), total + 2];
+    } else if (planet === 'Decimals') {
+      const a = Number((Math.random() * 10).toFixed(1));
+      const b = Number((Math.random() * 5).toFixed(1));
+      const isAdd = Math.random() > 0.5;
+      const ans = isAdd ? Number((a + b).toFixed(1)) : Number(Math.max(0.1, a - b).toFixed(1));
+      q = { text: `${a} ${isAdd ? '+' : '-'} ${b}`, ans, speak: `What is ${a} ${isAdd ? 'plus' : 'minus'} ${b}?`, visual: null };
+      opts = [ans, Number((ans + 0.5).toFixed(1)), Number(Math.max(0, ans - 0.2).toFixed(1)), Number((ans + 1.1).toFixed(1))];
+    } else if (planet === 'Percentages') {
+      const bases = [10, 20, 50, 100, 200];
+      const base = bases[Math.floor(Math.random() * bases.length)];
+      const perc = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
+      const ans = (perc / 100) * base;
+      q = { text: `What is ${perc}% of ${base}?`, ans, speak: `What is ${perc} percent of ${base}?`, visual: null };
+      opts = [ans, ans + 5, Math.max(0, ans - 2), ans + 10];
+    } else if (planet === 'Algebra') {
+      const x = Math.floor(Math.random() * 10 * currentLevel) + 1;
+      const a = Math.floor(Math.random() * 15) + 1;
+      const b = x + a;
+      q = { text: `X + ${a} = ${b}. What is X?`, ans: x, speak: `If X plus ${a} equals ${b}. What is X?`, visual: null };
+      opts = [x, x + 1, Math.max(0, x - 2), x + 5];
+    } else if (planet === 'WordProblems') {
+      const initial = Math.floor(Math.random() * 20) + 10;
+      const lost = Math.floor(Math.random() * 9) + 1;
+      const ans = initial - lost;
+      q = { text: `Had ${initial} apples. Lost ${lost}. Left?`, ans, speak: `You had ${initial} apples and lost ${lost}. How many are left?`, visual: null };
+      opts = [ans, ans + 2, Math.max(0, ans - 1), ans + 3];
+    } else if (planet === 'RomanNumerals') {
+      const roms = [{ r: 'I', v: 1 }, { r: 'V', v: 5 }, { r: 'X', v: 10 }, { r: 'L', v: 50 }, { r: 'C', v: 100 }];
+      const maxIdx = Math.min(roms.length, currentLevel + 1);
+      const target = roms[Math.floor(Math.random() * maxIdx)];
+      q = { text: `Value of Roman Numeral '${target.r}'?`, ans: target.v, speak: `What is the value of the Roman numeral ${target.r}?`, visual: null };
+      opts = [target.v, target.v + 5, target.v + 10, target.v === 1 ? 2 : target.v - 1];
+    } else if (planet === 'Ratios') {
+      const m = Math.floor(Math.random() * 5) + 2;
+      q = { text: `If ratio is 1:${m}, and you have 2. The other is?`, ans: 2 * m, speak: `If the ratio is 1 to ${m}, and you have 2 of the first, how much of the second?`, visual: null };
+      opts = [2 * m, 2 * m + 1, m, 2 * m + 2];
+    } else if (planet === 'NumberBonds') {
+      const total = Math.floor(Math.random() * 10 * currentLevel) + 10;
+      const part1 = Math.floor(Math.random() * (total - 2)) + 1;
+      const part2 = total - part1;
+      q = { text: `${part1} + ? = ${total}`, ans: part2, speak: `What number plus ${part1} equals ${total}?`, visual: null };
+      opts = [part2, part2 + 1, Math.max(0, part2 - 2), part2 + 5];
+    } else if (planet === 'EvensOdds') {
+      const num = Math.floor(Math.random() * 100) + 1;
+      const isEven = num % 2 === 0;
+      q = { text: `Is ${num} Even or Odd? (2=Even, 1=Odd)`, ans: isEven ? 2 : 1, speak: `Is ${num} even or odd? Press 2 for Even, 1 for Odd.`, visual: null };
+      opts = [2, 1];
     } else {
       q = { text: `${currentLevel} + ${currentLevel}`, ans: currentLevel * 2, speak: `What is ${currentLevel} plus ${currentLevel}?`, visual: null };
       opts = [currentLevel * 2, currentLevel + 1, currentLevel - 1, currentLevel + 5];
@@ -1013,8 +1168,8 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   disabled={false}
                   onClick={() => startPlanet(planet.id)}
                   className={`group relative p-4 sm:p-5 rounded-[2.25rem] border transition-all flex flex-col items-center text-center overflow-hidden shadow-2xl ${isUnlocked
-                      ? "bg-slate-900 border-white/10 hover:border-indigo-500 hover:-translate-y-1"
-                      : "bg-slate-950 border-slate-900 opacity-40 grayscale"
+                    ? "bg-slate-900 border-white/10 hover:border-indigo-500 hover:-translate-y-1"
+                    : "bg-slate-950 border-slate-900 opacity-40 grayscale"
                     }`}
                 >
                   <div
