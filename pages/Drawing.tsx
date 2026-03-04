@@ -198,7 +198,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         const newDrawing: Drawing = {
             id: Date.now().toString(),
             dataUrl,
-            author: profile.childName,
+            author: profile.name,
             timestamp: Date.now(),
             isMagic
         };

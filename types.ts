@@ -8,22 +8,32 @@ export enum View {
   ACTIVITIES = 'ACTIVITIES',
   GAMES = 'GAMES',
   COUNTDOWN = 'COUNTDOWN',
-  PARENT_DASHBOARD = 'PARENT_DASHBOARD'
+  PARENT_DASHBOARD = 'PARENT_DASHBOARD',
+  TEACHER_DASHBOARD = 'TEACHER_DASHBOARD'
 }
 
-export type AppMode = 'KIDS' | 'STUDIO' | 'PARENT';
+export type AppMode = 'KIDS' | 'STUDIO' | 'PARENT' | 'TEACHER';
 
-export interface FamilyProfile {
+export type UserRole = 'SUPERADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+
+export interface UserProfile {
   id: string;
-  childName: string;
+  name: string; // Used to be childName
+  role: UserRole;
+  schoolId?: string; // Tenant Identifier
+  classId?: string;  // Classroom Sub-Tenant
+
   avatar: string;
   mode: AppMode;
   age: number;
-  email?: string; // New: Required for Admin setup/reset
+  email?: string; // For Admin/Teacher login
   pin?: string;
   password?: string;
   recoveryKey?: string;
 }
+
+// Keep the old exported interface locally mapped in case of legacy local storage
+export type FamilyProfile = UserProfile;
 
 export interface Story {
   id: string;

@@ -131,7 +131,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
           {activeProfile ? (
             <button
               onClick={() => onAction('CONTINUE')}
-              data-tooltip={`Resume session as ${activeProfile.childName}`}
+              data-tooltip={`Resume session as ${activeProfile.name}`}
               className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2"
             >
               <LayoutDashboard size={14} /> Resume Hub
@@ -188,9 +188,9 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
           {/* Top Status Capsule */}
           <div className="flex justify-center">
             {activeProfile ? (
-              <div className="glass-capsule text-emerald-400 group cursor-pointer border-emerald-500/30" data-tooltip={`Welcome back, ${activeProfile.childName}! Click to resume.`} onClick={() => onAction('CONTINUE')}>
+              <div className="glass-capsule text-emerald-400 group cursor-pointer border-emerald-500/30" data-tooltip={`Welcome back, ${activeProfile.name}! Click to resume.`} onClick={() => onAction('CONTINUE')}>
                 <UserCheck size={16} className="animate-pulse" />
-                <span>HI {activeProfile.childName.toUpperCase()}! READY TO GO BACK?</span>
+                <span>HI {activeProfile.name.toUpperCase()}! READY TO GO BACK?</span>
                 <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </div>
             ) : (

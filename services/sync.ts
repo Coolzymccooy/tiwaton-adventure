@@ -47,9 +47,10 @@ export const SyncService = {
     }
   },
 
-  async loginGlobal(identity: string, secret: string): Promise<SnapshotPayload | null> {
+  async loginGlobal(identity: string, secret: string, classCode?: string): Promise<SnapshotPayload | null> {
     try {
-      const res = await postSnapshot('/api/sync/login', { identity, secret });
+      const payload = classCode ? { identity, secret, classCode } : { identity, secret };
+      const res = await postSnapshot('/api/sync/login', payload);
       // The API returns { ok: true, snapshot: ... } or an error.
       if (!res.ok) return null;
       return (res as any).snapshot ?? null;

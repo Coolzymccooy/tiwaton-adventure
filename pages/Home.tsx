@@ -31,18 +31,22 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
   const handleLogoutClick = () => onLogout();
 
   const handleHqClick = () => {
-    if (isAdminMode) onNavigate(View.PARENT_DASHBOARD);
+    if (isAdminMode) {
+      if (profile.role === 'TEACHER' || profile.mode === 'TEACHER') onNavigate(View.TEACHER_DASHBOARD);
+      else onNavigate(View.PARENT_DASHBOARD);
+    }
     else setShowPinPad(true);
   };
 
   const verifyPinForHQ = () => {
     // Re-fetch profiles directly to ensure we have the latest data
     const allProfiles = StorageService.getProfiles();
-    const parent = allProfiles.find(p => p.mode === 'PARENT' || p.id === 'admin');
+    const parent = allProfiles.find(p => p.mode === 'PARENT' || p.mode === 'TEACHER' || p.role === 'TEACHER' || p.id === 'admin');
 
     if (parent && pinInput === parent.pin) {
       setIsAdminMode(true);
-      onNavigate(View.PARENT_DASHBOARD);
+      if (parent.role === 'TEACHER' || parent.mode === 'TEACHER') onNavigate(View.TEACHER_DASHBOARD);
+      else onNavigate(View.PARENT_DASHBOARD);
       setShowPinPad(false);
       setPinInput('');
     } else {
@@ -58,7 +62,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
   // Mock leaderboard data (in a real app, this would be computed from storage for each user)
   const leaderboardData = familyProfiles.map(p => ({
-    name: p.childName,
+    name: p.name,
     avatar: p.avatar,
     xp: p.id === profile.id ? stats.xp : Math.floor(Math.random() * 500) + 100,
     id: p.id
@@ -138,7 +142,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
         </div>
 
         <div className="flex-1 text-center md:text-left">
-          <h2 className="font-display text-6xl text-white mb-2 italic tracking-tighter">Hey, {profile.childName}!</h2>
+          <h2 className="font-display text-6xl text-white mb-2 italic tracking-tighter">Hey, {profile.name}!</h2>
           <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
             <span className="px-5 py-2 bg-indigo-500/10 text-indigo-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-indigo-500/20 flex items-center gap-2">
               <TrendingUp size={14} /> Level {stats.level}
@@ -199,7 +203,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
             <div className="space-y-4">
               {leaderboardData.map((user, idx) => (
-                <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.name === profile.childName ? 'bg-indigo-600 border-indigo-400 shadow-lg' : 'bg-slate-800/40 border-white/5'}`}>
+                <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.name === profile.name ? 'bg-indigo-600 border-indigo-400 shadow-lg' : 'bg-slate-800/40 border-white/5'}`}>
                   <div className="flex items-center gap-3">
                     <span className="text-xl font-black text-slate-600 w-5 italic">{idx + 1}</span>
                     <span className="text-4xl">{user.avatar}</span>

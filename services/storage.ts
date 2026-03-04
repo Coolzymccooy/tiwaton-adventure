@@ -6,7 +6,7 @@ const KEYS = {
   CURRENT_PROFILE_ID: 'tiwaton_current_profile',
   STORIES: 'tiwaton_stories',
   DRAWINGS: 'tiwaton_drawings',
-  GAME_STATS: 'tiwaton_stats', 
+  GAME_STATS: 'tiwaton_stats',
   COMMENTS: 'tiwaton_comments',
   EVENTS: 'tiwaton_events',
   USAGE: 'tiwaton_usage'
@@ -32,7 +32,7 @@ export const StorageService = {
     const stored = localStorage.getItem(KEYS.PROFILES);
     return stored ? JSON.parse(stored) : [];
   },
-  
+
   hasProfiles: (): boolean => {
     const profiles = StorageService.getProfiles();
     return profiles.length > 0;
@@ -58,31 +58,57 @@ export const StorageService = {
   },
 
   createParentProfile: (name: string, email: string, pin: string) => {
-      const profiles = StorageService.getProfiles();
-      const parent: FamilyProfile = { 
-          id: 'admin', 
-          childName: name, 
-          avatar: '🛡️', 
-          mode: 'PARENT', 
-          age: 99, 
-          email,
-          pin,
-          recoveryKey: `TIWA-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
-      };
-      profiles.unshift(parent);
-      localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
-      return parent;
+    const profiles = StorageService.getProfiles();
+    const parent: FamilyProfile = {
+      id: 'admin-' + Date.now(),
+      name: name,
+      role: 'PARENT',
+      avatar: '🛡️',
+      mode: 'PARENT',
+      age: 99,
+      email,
+      pin,
+      recoveryKey: `TIWA-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+    };
+    profiles.unshift(parent);
+    localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+    return parent;
   },
 
-  createChildProfile: (name: string, age: number, password?: string) => {
+  createTeacherProfile: (name: string, email: string, pin: string) => {
+    const profiles = StorageService.getProfiles();
+    const schoolId = 'SCH-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const classId = 'CLS-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const teacher: FamilyProfile = {
+      id: 'admin-' + Date.now(),
+      name: name,
+      role: 'TEACHER',
+      schoolId,
+      classId,
+      avatar: '👨‍🏫',
+      mode: 'TEACHER', // Map mode directly
+      age: 99,
+      email,
+      pin,
+      recoveryKey: `TIWA-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+    };
+    profiles.unshift(teacher);
+    localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+    return teacher;
+  },
+
+  createChildProfile: (name: string, age: number, password?: string, classId?: string, schoolId?: string) => {
     const profiles = StorageService.getProfiles();
     const newProfile: FamilyProfile = {
-        id: Date.now().toString(),
-        childName: name,
-        age: age,
-        mode: age >= 9 ? 'STUDIO' : 'KIDS',
-        avatar: ['🦁','🦄','🚀','🦖','🐼','🐨', '🐵', '🦊'][Math.floor(Math.random()*8)],
-        password: password || '123' 
+      id: Date.now().toString(),
+      name: name,
+      role: 'STUDENT',
+      schoolId,
+      classId,
+      age: age,
+      mode: age >= 9 ? 'STUDIO' : 'KIDS',
+      avatar: ['🦁', '🦄', '🚀', '🦖', '🐼', '🐨', '🐵', '🦊'][Math.floor(Math.random() * 8)],
+      password: password || '123'
     };
     profiles.push(newProfile);
     localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
@@ -99,7 +125,7 @@ export const StorageService = {
       highScore: 0
     }));
 
-    const defaultStats: GameStat = { 
+    const defaultStats: GameStat = {
       xp: 0, level: 1, badges: [], coins: 0,
       quizProgress: [
         { category: 'Bible', level: 1, unlocked: true },
@@ -110,12 +136,12 @@ export const StorageService = {
       mathPlanetProgress: defaultPlanetProgress,
       wordQuestProgress: { level: 1, unlocked: true }
     };
-    
+
     if (!stored) return defaultStats;
     const parsed = JSON.parse(stored);
     return { ...defaultStats, ...parsed };
   },
-  
+
   saveGameStats: (stats: GameStat) => {
     localStorage.setItem(KEYS.GAME_STATS, JSON.stringify(stats));
   },
@@ -162,7 +188,7 @@ export const StorageService = {
     localStorage.setItem(KEYS.EVENTS, JSON.stringify(list));
     return list;
   }
-,
+  ,
   setLastView: (view: string) => {
     if (!view) return;
     localStorage.setItem(LAST_VIEW_KEY, view);

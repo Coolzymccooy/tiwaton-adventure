@@ -55,7 +55,7 @@ module.exports = {
     saveTelemetry(list.slice(-5000));
   },
   loadTelemetry,
-  findSnapshotByCredentials(identity, secret) {
+  findSnapshotByCredentials(identity, secret, classCode) {
     const data = loadSnapshots();
     const normalizedIdentity = identity.trim().toLowerCase();
 
@@ -63,11 +63,21 @@ module.exports = {
       if (!snapshot.profiles) continue;
 
       const match = snapshot.profiles.find(p => {
-        if (p.mode === 'PARENT') {
+        // Teacher / Admin login (no classCode needed)
+        if (p.mode === 'PARENT' || p.role === 'TEACHER') {
           return p.email && p.email.toLowerCase() === normalizedIdentity && p.pin === secret;
-        } else {
-          return p.childName.toLowerCase() === normalizedIdentity && (p.password || '').toLowerCase() === secret.trim().toLowerCase();
         }
+
+        // Student login
+        const nameMatches = p.name.toLowerCase() === normalizedIdentity;
+        const secretMatches = (p.password || '').toLowerCase() === secret.trim().toLowerCase();
+
+        // If a class code was provided, we require it to match the profile's classId
+        if (classCode) {
+          return nameMatches && secretMatches && (p.classId === classCode || snapshot.classId === classCode);
+        }
+
+        return nameMatches && secretMatches;
       });
 
       if (match) return snapshot;

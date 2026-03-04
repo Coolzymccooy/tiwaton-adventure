@@ -31,13 +31,13 @@ router.post("/telemetry", (req, res) => {
 });
 
 router.post("/login", (req, res) => {
-  const { identity, secret } = req.body;
+  const { identity, secret, classCode } = req.body;
 
   if (!identity || !secret) {
     return res.status(400).json({ error: "Missing identity or secret" });
   }
 
-  const snapshot = store.findSnapshotByCredentials(identity, secret);
+  const snapshot = store.findSnapshotByCredentials(identity, secret, classCode);
 
   if (snapshot) {
     res.json({ ok: true, snapshot });

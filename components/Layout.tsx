@@ -12,15 +12,15 @@ interface LayoutProps {
   currentView: View;
   onNavigate: (view: View) => void;
   children: React.ReactNode;
-  childName: string;
+  name: string;
   onLogout?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, childName, onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name, onLogout }) => {
   // Usage Tracking Effect
   useEffect(() => {
     const profile = StorageService.getCurrentProfile();
-    if (!profile || currentView === View.PARENT_DASHBOARD || currentView === View.LOGIN || currentView === View.LANDING) return;
+    if (!profile || currentView === View.PARENT_DASHBOARD || currentView === View.TEACHER_DASHBOARD || currentView === View.LOGIN || currentView === View.LANDING) return;
 
     const interval = setInterval(() => {
       StorageService.trackUsage(profile.id, currentView, 10);
@@ -89,11 +89,11 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
             </div>
 
             <div className="flex items-center gap-4">
-              {childName && (
+              {name && (
                 <div className="flex items-center gap-3 bg-slate-900/60 px-4 py-2 rounded-full border border-white/5 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 shadow-inner">
                   <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
-                  <span className="hidden sm:inline">{childName}'S ADVENTURE</span>
-                  <span className="sm:hidden">{childName}</span>
+                  <span className="hidden sm:inline">{name}'S ADVENTURE</span>
+                  <span className="sm:hidden">{name}</span>
                 </div>
               )}
 
@@ -101,8 +101,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, chil
                 onClick={handleToggleTTS}
                 data-tooltip={isTTS ? "Disable Voice" : "Enable Voice"}
                 className={`w-10 h-10 flex items-center justify-center rounded-full border transition-all ${isTTS
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  : "bg-rose-500/10 text-rose-400 border-rose-500/20"
                   }`}
               >
                 {isTTS ? <Volume2 size={18} /> : <VolumeX size={18} />}

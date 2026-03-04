@@ -24,6 +24,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [selectedProfile, setSelectedProfile] = useState<FamilyProfile | null>(null);
     const [authInput, setAuthInput] = useState('');
     const [loginIdentifier, setLoginIdentifier] = useState('');
+    const [classCode, setClassCode] = useState('');
     const [error, setError] = useState('');
 
     // Setup Form State
@@ -32,7 +33,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [adminPin, setAdminPin] = useState('');
     const [recoveryKey, setRecoveryKey] = useState('');
 
-    const [childName, setChildName] = useState('');
+    const [name, setChildName] = useState('');
     const [childAge, setChildAge] = useState('');
     const [childPass, setChildPass] = useState('');
 
@@ -43,6 +44,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     // Email Verification State
     const [verificationCode, setVerificationCode] = useState('');
     const [inputVerificationCode, setInputVerificationCode] = useState('');
+
+    // Role Setup State
+    const [setupRole, setSetupRole] = useState<'PARENT' | 'TEACHER'>('PARENT');
 
     useEffect(() => {
         const stored = StorageService.getProfiles();
@@ -59,42 +63,45 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             setError(t('login.errorMissingCredentials'));
             return;
         }
-
         const match = profiles.find(p =>
-            (p.childName.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
+            (p.name.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
         );
 
         if (match) {
-            const isAuthorized = match.mode === 'PARENT'
-                ? authInput === match.pin
-                : authInput.toLowerCase() === (match.password || '').toLowerCase();
-
-            if (isAuthorized) {
-                setError('');
-                if (match.mode === 'PARENT') {
-                    setViewMode('USER_GRID');
-                } else {
-                    onLogin(match);
-                }
+            // Check local matches first... if they belong to a classCode we should technically verify it,
+            // but for safety we can just rely on the sync network check if a classCode is present.
+            if (classCode && classCode !== match.classId && match.role !== 'TEACHER' && match.mode !== 'PARENT') {
+                // Force network verify if local match doesn't have the right classCode
             } else {
-                setError(t('login.errorIncorrect'));
+                const isAuthorized = match.mode === 'PARENT' || match.role === 'TEACHER'
+                    ? authInput === match.pin
+                    : authInput.toLowerCase() === (match.password || '').toLowerCase();
+
+                if (isAuthorized) {
+                    setError('');
+                    if (match.mode === 'PARENT' || match.role === 'TEACHER') {
+                        setViewMode('USER_GRID');
+                    } else {
+                        onLogin(match);
+                    }
+                    return;
+                }
             }
-            return;
         }
 
-        // Global check if no local profile found
-        const snapshot = await SyncService.loginGlobal(loginIdentifier, authInput);
+        // Global check if no local profile found OR classCode mismatch forced a network pass
+        const snapshot = await SyncService.loginGlobal(loginIdentifier, authInput, classCode);
         if (snapshot && snapshot.profiles) {
             StorageService.applySnapshot(snapshot);
             setProfiles(snapshot.profiles);
             setError('');
 
             const globalMatch = snapshot.profiles.find(p =>
-                (p.childName.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
+                (p.name.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
             );
 
             if (globalMatch) {
-                if (globalMatch.mode === 'PARENT') {
+                if (globalMatch.mode === 'PARENT' || globalMatch.role === 'TEACHER') {
                     setViewMode('USER_GRID');
                 } else {
                     onLogin(globalMatch);
@@ -130,7 +137,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             return;
         }
 
-        const p = StorageService.createParentProfile(adminName, adminEmail, adminPin);
+        const p = setupRole === 'TEACHER'
+            ? StorageService.createTeacherProfile(adminName, adminEmail, adminPin)
+            : StorageService.createParentProfile(adminName, adminEmail, adminPin);
+
         setRecoveryKey(p.recoveryKey || '');
         setProfiles(StorageService.getProfiles());
         SyncService.sendSnapshot(StorageService.buildSnapshot(p.id));
@@ -140,11 +150,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     };
 
     const handleChildSetup = (finish = false) => {
-        if (!childName || !childPass) {
+        if (!name || !childPass) {
             setError(t('login.errorChildFields'));
             return;
         }
-        const newChild = StorageService.createChildProfile(childName, parseInt(childAge) || 6, childPass);
+        const newChild = StorageService.createChildProfile(name, parseInt(childAge) || 6, childPass);
         setProfiles(StorageService.getProfiles());
         SyncService.sendSnapshot(StorageService.buildSnapshot(newChild.id));
         setChildName(''); setChildAge(''); setChildPass('');
@@ -212,28 +222,44 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 </div>
                 <div className="w-full space-y-5">
                     <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">{t('login.identityLabel')}</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">Identity (Teacher Email or Student Name)</label>
                         <div className="relative">
                             <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
                             <input
                                 value={loginIdentifier}
                                 onChange={e => setLoginIdentifier(e.target.value)}
                                 className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
-                                placeholder={t('login.placeholderIdentity')}
+                                placeholder="e.g. jsmith@school.edu OR Tommy"
                             />
                         </div>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">{t('login.secretLabel')}</label>
-                        <div className="relative">
-                            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
-                            <input
-                                type="password"
-                                value={authInput}
-                                onChange={e => setAuthInput(e.target.value)}
-                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
-                                placeholder={t('login.placeholderSecret')}
-                            />
+
+                    <div className="space-y-1 flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">Secret (PIN or Pass)</label>
+                            <div className="relative">
+                                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                                <input
+                                    type="password"
+                                    value={authInput}
+                                    onChange={e => setAuthInput(e.target.value)}
+                                    className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
+                                    placeholder="Secret..."
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-1">
+                            <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-4 opacity-80">Class Code (Optional)</label>
+                            <div className="relative">
+                                <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 text-yellow-600" size={18} />
+                                <input
+                                    value={classCode}
+                                    onChange={e => setClassCode(e.target.value)}
+                                    className="w-full bg-yellow-900/10 border-2 border-yellow-800/50 rounded-[1.5rem] p-4 pl-12 text-yellow-100 text-lg focus:border-yellow-500 outline-none transition-all"
+                                    placeholder="e.g. MAT101"
+                                />
+                            </div>
                         </div>
                     </div>
                     {error && <p className="text-rose-500 text-[10px] font-black text-center animate-pulse uppercase tracking-wider">{error}</p>}
@@ -266,6 +292,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     <h1 className="text-4xl sm:text-5xl font-display text-white mb-1 italic tracking-tighter">{t('login.setupTitle')}</h1>
                     <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.setupSubtitle')}</p>
                 </div>
+
+                <div className="w-full flex bg-[#050810] rounded-xl p-1 mb-6 border border-white/5">
+                    <button
+                        onClick={() => { setSetupRole('PARENT'); }}
+                        className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-lg transition-all ${setupRole === 'PARENT' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                        Family
+                    </button>
+                    <button
+                        onClick={() => { setSetupRole('TEACHER'); }}
+                        className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-lg transition-all ${setupRole === 'TEACHER' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                        School
+                    </button>
+                </div>
+
                 <div className="w-full space-y-4">
                     <input value={adminName} onChange={e => setAdminName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg outline-none focus:border-indigo-500" placeholder={t('login.setupNamePlaceholder')} />
                     <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg outline-none focus:border-indigo-500" placeholder={t('login.setupEmailPlaceholder')} />
@@ -336,7 +376,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.childSubtitle')}</p>
                 </div>
                 <div className="space-y-4">
-                    <input value={childName} onChange={e => setChildName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg focus:border-pink-500 outline-none" placeholder={t('login.childNamePlaceholder')} />
+                    <input value={name} onChange={e => setChildName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg focus:border-pink-500 outline-none" placeholder={t('login.namePlaceholder')} />
                     <input type="number" value={childAge} onChange={e => setChildAge(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white focus:border-pink-500 outline-none" placeholder={t('login.childAgePlaceholder')} />
                     <input value={childPass} onChange={e => setChildPass(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white focus:border-pink-500 outline-none" placeholder={t('login.childPassPlaceholder')} />
                     {error && <p className="text-red-500 text-[10px] font-black text-center">{error}</p>}
@@ -360,7 +400,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 {profiles.map(p => (
                     <button key={p.id} onClick={() => onLogin(p)} className="group bg-slate-900/50 backdrop-blur-xl p-8 rounded-[3rem] border-2 border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 flex flex-col items-center">
                         <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">{p.avatar}</div>
-                        <span className="font-black text-white text-xl uppercase italic tracking-tighter">{p.childName}</span>
+                        <span className="font-black text-white text-xl uppercase italic tracking-tighter">{p.name}</span>
                         {p.mode === 'PARENT' && <span className="text-[7px] text-indigo-400 font-black uppercase tracking-widest mt-1">HOST</span>}
                     </button>
                 ))}

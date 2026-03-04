@@ -16,6 +16,7 @@ import GamesPage from './pages/Games';
 import CountdownPage from './pages/Countdown';
 import Login, { ViewMode } from './pages/Login';
 import Landing from './pages/Landing';
+import TeacherDashboard from './pages/TeacherDashboard';
 import ParentDashboard from './pages/ParentDashboard';
 
 const App: React.FC = () => {
@@ -36,15 +37,15 @@ const App: React.FC = () => {
     if (!hasProfiles) {
       setCurrentView(View.LANDING);
     } else {
-        const active = StorageService.getCurrentProfile();
-        if (active) {
-            setProfile(active);
-            const maybeView = StorageService.getLastView();
-            setCurrentView(resolveView(maybeView));
-            if (active.mode === 'PARENT') setIsAdminMode(true);
-        } else {
-            setCurrentView(View.LANDING);
-        }
+      const active = StorageService.getCurrentProfile();
+      if (active) {
+        setProfile(active);
+        const maybeView = StorageService.getLastView();
+        setCurrentView(resolveView(maybeView));
+        if (active.mode === 'PARENT') setIsAdminMode(true);
+      } else {
+        setCurrentView(View.LANDING);
+      }
     }
   }, []);
 
@@ -56,65 +57,67 @@ const App: React.FC = () => {
   }, [profile, currentView]);
 
   const handleLogin = async (p: FamilyProfile) => {
-      StorageService.setCurrentProfile(p.id);
-      const snapshot = await SyncService.fetchSnapshot(p.id);
-      if (snapshot) {
-        StorageService.applySnapshot(snapshot);
-      }
-      const active = StorageService.getCurrentProfile() || p;
-      setProfile(active);
-      setIsAdminMode(active.mode === 'PARENT');
-      setCurrentView(resolveView(snapshot?.lastView));
+    StorageService.setCurrentProfile(p.id);
+    const snapshot = await SyncService.fetchSnapshot(p.id);
+    if (snapshot) {
+      StorageService.applySnapshot(snapshot);
+    }
+    const active = StorageService.getCurrentProfile() || p;
+    setProfile(active);
+    setIsAdminMode(active.mode === 'PARENT');
+    setCurrentView(resolveView(snapshot?.lastView));
   };
 
   const handleLogout = () => {
-      setProfile(null);
-      setIsAdminMode(false);
-      StorageService.setCurrentProfile('');
-      setCurrentView(View.LANDING);
+    setProfile(null);
+    setIsAdminMode(false);
+    StorageService.setCurrentProfile('');
+    setCurrentView(View.LANDING);
   };
 
   const handleLandingAction = (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => {
-      if (action === 'CONTINUE' && profile) {
-          setCurrentView(View.HOME);
-          return;
-      }
+    if (action === 'CONTINUE' && profile) {
+      setCurrentView(View.HOME);
+      return;
+    }
 
-      if (action === 'LOGIN') {
-          setLoginInitialView('SIGN_IN_ENTRY');
-      } else if (action === 'SETUP') {
-          setLoginInitialView('SETUP_ADMIN');
-      } else if (action === 'RESET') {
-          setLoginInitialView('FORGOT_FLOW');
-      }
-      setCurrentView(View.LOGIN);
+    if (action === 'LOGIN') {
+      setLoginInitialView('SIGN_IN_ENTRY');
+    } else if (action === 'SETUP') {
+      setLoginInitialView('SETUP_ADMIN');
+    } else if (action === 'RESET') {
+      setLoginInitialView('FORGOT_FLOW');
+    }
+    setCurrentView(View.LOGIN);
   };
 
   const renderView = () => {
     if (currentView === View.LANDING) {
-        return <Landing onAction={handleLandingAction} activeProfile={profile} />;
+      return <Landing onAction={handleLandingAction} activeProfile={profile} />;
     }
 
     if (currentView === View.LOGIN) {
-        return <Login 
-          onLogin={handleLogin} 
-          initialViewMode={loginInitialView} 
-          onBackToLanding={() => setCurrentView(View.LANDING)}
-        />;
+      return <Login
+        onLogin={handleLogin}
+        initialViewMode={loginInitialView}
+        onBackToLanding={() => setCurrentView(View.LANDING)}
+      />;
     }
 
-    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} />; 
+    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} />;
 
     switch (currentView) {
       case View.HOME:
-        return <Home 
-          onNavigate={setCurrentView} 
-          profile={profile} 
-          setProfile={setProfile} 
-          onLogout={handleLogout} 
+        return <Home
+          onNavigate={setCurrentView}
+          profile={profile}
+          setProfile={setProfile}
+          onLogout={handleLogout}
           isAdminMode={isAdminMode}
           setIsAdminMode={setIsAdminMode}
         />;
+      case View.TEACHER_DASHBOARD:
+        return <TeacherDashboard onBack={() => setCurrentView(View.HOME)} />;
       case View.PARENT_DASHBOARD:
         return <ParentDashboard onBack={() => setCurrentView(View.HOME)} />;
       case View.STORIES:
@@ -128,11 +131,11 @@ const App: React.FC = () => {
       case View.COUNTDOWN:
         return <CountdownPage />;
       default:
-        return <Home 
-          onNavigate={setCurrentView} 
-          profile={profile} 
-          setProfile={setProfile} 
-          onLogout={handleLogout} 
+        return <Home
+          onNavigate={setCurrentView}
+          profile={profile}
+          setProfile={setProfile}
+          onLogout={handleLogout}
           isAdminMode={isAdminMode}
           setIsAdminMode={setIsAdminMode}
         />;
@@ -144,7 +147,7 @@ const App: React.FC = () => {
       <Layout
         currentView={currentView}
         onNavigate={setCurrentView}
-        childName={profile?.childName || ''}
+        name={profile?.name || ''}
         onLogout={handleLogout}
       >
         {renderView()}
