@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import { SyncService } from '../services/sync';
 import { FamilyProfile } from '../types';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '../services/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import {
     ShieldCheck, Plus, ArrowRight, Smile, KeyRound,
     AlertTriangle, ChevronLeft, LogIn, HelpCircle, User, Lock
@@ -58,59 +61,57 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
     }, [initialViewMode]);
 
+    // ... (in component implementation below ...)
+
     const handleGlobalSignIn = async () => {
         if (!loginIdentifier || !authInput) {
             setError(t('login.errorMissingCredentials'));
             return;
         }
-        const match = profiles.find(p =>
-            (p.name.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
-        );
 
-        if (match) {
-            // Check local matches first... if they belong to a classCode we should technically verify it,
-            // but for safety we can just rely on the sync network check if a classCode is present.
-            if (classCode && classCode !== match.classId && match.role !== 'TEACHER' && match.mode !== 'PARENT') {
-                // Force network verify if local match doesn't have the right classCode
+        try {
+            // Assume it's an email/password Teacher/Parent login first
+            if (loginIdentifier.includes('@')) {
+                const userCredential = await signInWithEmailAndPassword(auth, loginIdentifier, authInput);
+                const uid = userCredential.user.uid;
+
+                StorageService.setTenantContext(uid);
+
+                // Fetch members for this tenant (admin/teacher)
+                const membersSnap = await getDocs(collection(db, `tenants/${uid}/members`));
+                const childrenSnap = await getDocs(collection(db, `tenants/${uid}/children`));
+
+                const loadedProfiles: FamilyProfile[] = [
+                    ...membersSnap.docs.map(d => d.data() as FamilyProfile),
+                    ...childrenSnap.docs.map(d => d.data() as FamilyProfile)
+                ];
+
+                StorageService.setCachedProfiles(loadedProfiles);
+                setProfiles(loadedProfiles);
+                setViewMode('USER_GRID');
+                setError('');
             } else {
-                const isAuthorized = match.mode === 'PARENT' || match.role === 'TEACHER'
-                    ? authInput === match.pin
-                    : authInput.toLowerCase() === (match.password || '').toLowerCase();
+                // It's a student login. They don't have emails, they just pick their profile from USER_GRID
+                // For a real production app we'd need a specific class-code sign-in flow here
+                // that doesn't rely entirely on email. But based on the existing UI, kids select their
+                // profile from the grid AFTER the teacher/parent logs in.
 
-                if (isAuthorized) {
-                    setError('');
-                    if (match.mode === 'PARENT' || match.role === 'TEACHER') {
-                        setViewMode('USER_GRID');
-                    } else {
+                // If they are trying to log in directly via the prompt without an email, 
+                // we'll check if we currently have loaded profiles (e.g., from an active session).
+                const match = profiles.find(p => p.name.toLowerCase() === loginIdentifier.toLowerCase());
+                if (match) {
+                    if ((match.password || '').toLowerCase() === authInput.toLowerCase()) {
                         onLogin(match);
+                    } else {
+                        setError('Incorrect password');
                     }
-                    return;
-                }
-            }
-        }
-
-        // Global check if no local profile found OR classCode mismatch forced a network pass
-        const snapshot = await SyncService.loginGlobal(loginIdentifier, authInput, classCode);
-        if (snapshot && snapshot.profiles) {
-            StorageService.applySnapshot(snapshot);
-            setProfiles(snapshot.profiles);
-            setError('');
-
-            const globalMatch = snapshot.profiles.find(p =>
-                (p.name.toLowerCase() === loginIdentifier.toLowerCase() || (p.email && p.email.toLowerCase() === loginIdentifier.toLowerCase()))
-            );
-
-            if (globalMatch) {
-                if (globalMatch.mode === 'PARENT' || globalMatch.role === 'TEACHER') {
-                    setViewMode('USER_GRID');
                 } else {
-                    onLogin(globalMatch);
+                    setError('Child profile not found. Parent/Teacher must log in first.');
                 }
-            } else {
-                setError(t('login.errorAccountNotFound'));
             }
-        } else {
-            setError(t('login.errorAccountNotFound'));
+        } catch (err: any) {
+            console.error("Login err", err);
+            setError(err.message || t('login.errorAccountNotFound'));
         }
     };
 
@@ -131,34 +132,54 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         setError('');
     };
 
-    const handleVerifyEmail = () => {
+    const handleVerifyEmail = async () => {
         if (inputVerificationCode !== verificationCode && inputVerificationCode !== '0000') {
             setError('Incorrect verification code. (Hint: check console or use 0000)');
             return;
         }
 
-        const p = setupRole === 'TEACHER'
-            ? StorageService.createTeacherProfile(adminName, adminEmail, adminPin)
-            : StorageService.createParentProfile(adminName, adminEmail, adminPin);
+        try {
+            // 1. Create the Auth User
+            // Note: We are using `adminPin` as the actual Firebase password for the parent/teacher account 
+            // since Firebase requires min 6 chars, let's pad it strictly or assume they enter 6.
+            // Actually, the UI restricts to 4 chars for PIN. Let's pad it to 6 for Firebase Auth compatibility:
+            const paddedPass = adminPin.padEnd(6, '0');
+            const userCreds = await createUserWithEmailAndPassword(auth, adminEmail, paddedPass);
+            const uid = userCreds.user.uid;
 
-        setRecoveryKey(p.recoveryKey || '');
-        setProfiles(StorageService.getProfiles());
-        SyncService.sendSnapshot(StorageService.buildSnapshot(p.id));
-        setViewMode('RECOVERY_INFO');
-        setError('');
-        setInputVerificationCode('');
+            // 2. Create Profile Document
+            const p = setupRole === 'TEACHER'
+                ? await StorageService.createTeacherProfile(uid, adminName, adminEmail, adminPin)
+                : await StorageService.createParentProfile(uid, adminName, adminEmail, adminPin);
+
+            setRecoveryKey(p.recoveryKey || '');
+            setProfiles(StorageService.getProfiles());
+
+            // SyncService is deprecated for Firebase
+            // SyncService.sendSnapshot(StorageService.buildSnapshot(p.id));
+
+            setViewMode('RECOVERY_INFO');
+            setError('');
+            setInputVerificationCode('');
+        } catch (err: any) {
+            console.error("Signup err", err);
+            setError(err.message || "Failed to create account");
+        }
     };
 
-    const handleChildSetup = (finish = false) => {
+    const handleChildSetup = async (finish = false) => {
         if (!name || !childPass) {
             setError(t('login.errorChildFields'));
             return;
         }
-        const newChild = StorageService.createChildProfile(name, parseInt(childAge) || 6, childPass);
-        setProfiles(StorageService.getProfiles());
-        SyncService.sendSnapshot(StorageService.buildSnapshot(newChild.id));
-        setChildName(''); setChildAge(''); setChildPass('');
-        if (finish) setViewMode('USER_GRID');
+        try {
+            const newChild = await StorageService.createChildProfile(name, parseInt(childAge) || 6, childPass);
+            setProfiles(StorageService.getProfiles());
+            setChildName(''); setChildAge(''); setChildPass('');
+            if (finish) setViewMode('USER_GRID');
+        } catch (err: any) {
+            setError(err.message || 'Failed to create child');
+        }
     };
 
     const handleResetVerify = () => {
@@ -211,71 +232,71 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     if (viewMode === 'SIGN_IN_ENTRY') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] font-sans overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-8 sm:p-12 rounded-[3rem] border-2 border-white/5 shadow-2xl relative animate-fade-in flex flex-col items-center">
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-white/5 shadow-xl relative animate-fade-in flex flex-col items-center">
                 <BackButton onClick={onBackToLanding} />
-                <div className="text-center mb-8">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-600 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-2xl border-2 border-white/10">
-                        <LogIn size={40} className="text-white" />
+                <div className="text-center mb-6">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg border-2 border-white/10">
+                        <LogIn size={28} className="text-white" />
                     </div>
-                    <h1 className="text-4xl sm:text-5xl font-display text-white mb-2 italic tracking-tighter">{t('login.signInTitle')}</h1>
-                    <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.signInSubtitle')}</p>
+                    <h1 className="text-3xl sm:text-4xl font-display text-white mb-1 italic tracking-tight">{t('login.signInTitle')}</h1>
+                    <p className="text-slate-500 font-bold uppercase text-[8px] tracking-[0.3em] opacity-80">{t('login.signInSubtitle')}</p>
                 </div>
-                <div className="w-full space-y-5">
+                <div className="w-full space-y-4">
                     <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">Identity (Teacher Email or Student Name)</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-3 opacity-80">Identity (Teacher Email or Student Name)</label>
                         <div className="relative">
-                            <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
                             <input
                                 value={loginIdentifier}
                                 onChange={e => setLoginIdentifier(e.target.value)}
-                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
+                                className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 pl-10 text-white text-base focus:border-indigo-500 outline-none transition-all"
                                 placeholder="e.g. jsmith@school.edu OR Tommy"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-1 flex flex-col sm:flex-row gap-4">
+                    <div className="space-y-1 flex flex-col sm:flex-row gap-3">
                         <div className="flex-1 space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 opacity-60">Secret (PIN or Pass)</label>
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-3 opacity-80">Secret (PIN or Pass)</label>
                             <div className="relative">
-                                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
                                 <input
                                     type="password"
                                     value={authInput}
                                     onChange={e => setAuthInput(e.target.value)}
-                                    className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 pl-12 text-white text-lg focus:border-indigo-500 outline-none transition-all"
+                                    className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 pl-10 text-white text-base focus:border-indigo-500 outline-none transition-all"
                                     placeholder="Secret..."
                                 />
                             </div>
                         </div>
 
                         <div className="flex-1 space-y-1">
-                            <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-4 opacity-80">Class Code (Optional)</label>
+                            <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-3 opacity-90">Class Code (Optional)</label>
                             <div className="relative">
-                                <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 text-yellow-600" size={18} />
+                                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-600" size={16} />
                                 <input
                                     value={classCode}
                                     onChange={e => setClassCode(e.target.value)}
-                                    className="w-full bg-yellow-900/10 border-2 border-yellow-800/50 rounded-[1.5rem] p-4 pl-12 text-yellow-100 text-lg focus:border-yellow-500 outline-none transition-all"
+                                    className="w-full bg-yellow-900/10 border-2 border-yellow-800/50 rounded-xl p-3 pl-10 text-yellow-100 text-base focus:border-yellow-500 outline-none transition-all"
                                     placeholder="e.g. MAT101"
                                 />
                             </div>
                         </div>
                     </div>
-                    {error && <p className="text-rose-500 text-[10px] font-black text-center animate-pulse uppercase tracking-wider">{error}</p>}
+                    {error && <p className="text-rose-500 text-[9px] font-bold text-center animate-pulse uppercase tracking-widest">{error}</p>}
                     <button
                         onClick={handleGlobalSignIn}
                         disabled={!loginIdentifier || !authInput}
-                        className="w-full py-5 sm:py-7 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-indigo-900 active:border-b-0 active:translate-y-1 transition-all"
+                        className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-black text-lg sm:text-xl text-white shadow-lg border-b-4 border-indigo-900 active:border-b-0 active:translate-y-[2px] transition-all"
                     >
                         {t('login.enterButton')}
                     </button>
-                    <div className="flex flex-col gap-4 pt-6 border-t border-white/5 w-full mt-4">
-                        <button onClick={() => setViewMode('SETUP_ADMIN')} className="w-full py-4 sm:py-5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-2xl font-black text-lg text-white shadow-xl shadow-emerald-900/20 transition-all border border-emerald-400/30 flex items-center justify-center gap-2">
-                            <ShieldCheck size={20} /> {t('login.signupPrompt')}
+                    <div className="flex flex-col gap-3 pt-5 border-t border-white/5 w-full mt-3">
+                        <button onClick={() => setViewMode('SETUP_ADMIN')} className="w-full py-3 sm:py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-xl font-bold text-base text-white shadow-md shadow-emerald-900/20 transition-all border border-emerald-400/30 flex items-center justify-center gap-1.5">
+                            <ShieldCheck size={18} /> {t('login.signupPrompt')}
                         </button>
-                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center justify-center gap-1 mt-2">
-                            <HelpCircle size={12} /> {t('login.resetAccess')}
+                        <button onClick={() => { setResetStep('CHOICE'); setViewMode('FORGOT_FLOW'); setError(''); setResetInput(''); }} className="text-slate-500 hover:text-indigo-400 font-bold text-[9px] uppercase tracking-[0.2em] flex items-center justify-center gap-1 mt-1">
+                            <HelpCircle size={10} /> {t('login.resetAccess')}
                         </button>
                     </div>
                 </div>
@@ -285,33 +306,33 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     if (viewMode === 'SETUP_ADMIN') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] font-sans overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-8 sm:p-12 rounded-[3.5rem] border-2 border-white/5 shadow-2xl relative animate-fade-in flex flex-col items-center">
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-white/5 shadow-xl relative animate-fade-in flex flex-col items-center">
                 <BackButton onClick={onBackToLanding} />
-                <div className="text-center mb-8">
-                    <ShieldCheck size={64} className="mx-auto text-indigo-500 mb-4 animate-float" />
-                    <h1 className="text-4xl sm:text-5xl font-display text-white mb-1 italic tracking-tighter">{t('login.setupTitle')}</h1>
-                    <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.setupSubtitle')}</p>
+                <div className="text-center mb-6">
+                    <ShieldCheck size={48} className="mx-auto text-indigo-500 mb-3 animate-float" />
+                    <h1 className="text-3xl sm:text-4xl font-display text-white mb-1 italic tracking-tight">{t('login.setupTitle')}</h1>
+                    <p className="text-slate-500 font-bold uppercase text-[8px] tracking-[0.3em] opacity-80">{t('login.setupSubtitle')}</p>
                 </div>
 
-                <div className="w-full flex bg-[#050810] rounded-xl p-1 mb-6 border border-white/5">
+                <div className="w-full flex bg-[#050810] rounded-xl p-1 mb-5 border border-white/5">
                     <button
                         onClick={() => { setSetupRole('PARENT'); }}
-                        className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-lg transition-all ${setupRole === 'PARENT' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${setupRole === 'PARENT' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>
                         Family
                     </button>
                     <button
                         onClick={() => { setSetupRole('TEACHER'); }}
-                        className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-lg transition-all ${setupRole === 'TEACHER' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${setupRole === 'TEACHER' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>
                         School
                     </button>
                 </div>
 
-                <div className="w-full space-y-4">
-                    <input value={adminName} onChange={e => setAdminName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg outline-none focus:border-indigo-500" placeholder={t('login.setupNamePlaceholder')} />
-                    <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg outline-none focus:border-indigo-500" placeholder={t('login.setupEmailPlaceholder')} />
-                    <input type="password" maxLength={4} value={adminPin} onChange={e => setAdminPin(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-center text-4xl tracking-[0.6em] outline-none" placeholder={t('login.setupPinPlaceholder')} />
-                    {error && <p className="text-red-500 text-[10px] font-black text-center animate-pulse">{error}</p>}
-                    <button onClick={handleAdminSetup} className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-indigo-900 active:border-b-0 transition-all">{t('login.createButton')}</button>
+                <div className="w-full space-y-3">
+                    <input value={adminName} onChange={e => setAdminName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white text-base outline-none focus:border-indigo-500" placeholder={t('login.setupNamePlaceholder')} />
+                    <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white text-base outline-none focus:border-indigo-500" placeholder={t('login.setupEmailPlaceholder')} />
+                    <input type="password" maxLength={4} value={adminPin} onChange={e => setAdminPin(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white text-center text-3xl tracking-[0.4em] outline-none focus:border-indigo-500" placeholder={t('login.setupPinPlaceholder')} />
+                    {error && <p className="text-red-500 text-[10px] font-bold text-center animate-pulse">{error}</p>}
+                    <button onClick={handleAdminSetup} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg text-white shadow-lg border-b-4 border-indigo-900 active:border-b-0 transition-all">{t('login.createButton')}</button>
                 </div>
             </div>
         </div>
@@ -319,33 +340,28 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     if (viewMode === 'VERIFY_ACCOUNT') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-sky-500/20 text-center shadow-2xl relative flex flex-col items-center">
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-sky-500/20 text-center shadow-xl relative flex flex-col items-center">
                 <BackButton onClick={() => setViewMode('SETUP_ADMIN')} />
-                <div className="w-16 h-16 bg-sky-500/10 rounded-full flex items-center justify-center mb-6">
-                    <ShieldCheck size={32} className="text-sky-400" />
+                <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center mb-4">
+                    <ShieldCheck size={24} className="text-sky-400" />
                 </div>
-                <h2 className="text-3xl font-display text-white mb-2 italic tracking-tighter">Verify Email</h2>
-                <p className="text-slate-400 text-sm mb-2">We sent a 4-digit code to <br /><span className="text-white font-bold">{adminEmail}</span></p>
+                <h2 className="text-2xl font-display text-white mb-2 italic tracking-tight">Verify Email</h2>
+                <p className="text-slate-400 text-xs mb-2">We sent a 4-digit code to <br /><span className="text-white font-bold">{adminEmail}</span></p>
 
-                {/* Simulated Email Notice */}
-                <div className="bg-sky-900/40 border border-sky-500/30 text-sky-200 text-xs p-3 rounded-xl mb-6 flex animate-pulse items-center justify-center gap-2">
-                    <span>Mock Mode: Your code is <b className="text-white">{verificationCode}</b></span>
-                </div>
-
-                <div className="space-y-6 w-full mt-4">
+                <div className="space-y-4 w-full mt-2">
                     <input
                         type="text"
                         maxLength={4}
                         value={inputVerificationCode}
                         onChange={e => setInputVerificationCode(e.target.value)}
                         placeholder="••••"
-                        className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-6 text-white text-center text-3xl tracking-widest outline-none focus:border-sky-500 transition-all"
+                        className="w-full bg-[#050810] border-2 border-slate-800 rounded-xl p-4 text-white text-center text-2xl tracking-[0.4em] outline-none focus:border-sky-500 transition-all"
                     />
-                    {error && <p className="text-red-500 text-[10px] font-black uppercase">{error}</p>}
+                    {error && <p className="text-red-500 text-[9px] font-bold uppercase">{error}</p>}
                     <button
                         onClick={handleVerifyEmail}
                         disabled={inputVerificationCode.length < 4}
-                        className="w-full py-6 bg-sky-600 disabled:opacity-50 hover:bg-sky-500 rounded-2xl text-white font-black text-xl italic uppercase shadow-xl transition-all"
+                        className="w-full py-4 bg-sky-600 disabled:opacity-50 hover:bg-sky-500 rounded-xl text-white font-bold text-lg italic uppercase shadow-lg transition-all"
                     >
                         Verify & Continue
                     </button>
@@ -356,33 +372,33 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     if (viewMode === 'RECOVERY_INFO') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[4rem] border-2 border-amber-500/30 text-center shadow-2xl relative">
-                <KeyRound size={72} className="mx-auto text-amber-400 mb-6 animate-bounce" />
-                <h2 className="text-4xl font-display text-white mb-4 italic tracking-tighter">{t('login.recoveryTitle')}</h2>
-                <p className="text-slate-400 text-sm mb-8">{t('login.recoverySubtitle')}</p>
-                <div className="bg-black/40 p-6 rounded-[2rem] border border-white/5 mb-10"><code className="text-2xl font-mono text-amber-300 tracking-widest break-all select-all">{recoveryKey}</code></div>
-                <button onClick={() => setViewMode('SETUP_CHILD')} className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 rounded-[2rem] font-black text-2xl text-white border-b-8 border-indigo-900 active:border-b-0">{t('login.recoveryButton')}</button>
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-amber-500/30 text-center shadow-xl relative">
+                <KeyRound size={48} className="mx-auto text-amber-400 mb-4 animate-bounce" />
+                <h2 className="text-3xl font-display text-white mb-2 italic tracking-tight">{t('login.recoveryTitle')}</h2>
+                <p className="text-slate-400 text-xs mb-6">{t('login.recoverySubtitle')}</p>
+                <div className="bg-black/40 p-4 rounded-xl border border-white/5 mb-8"><code className="text-xl font-mono text-amber-300 tracking-widest break-all select-all">{recoveryKey}</code></div>
+                <button onClick={() => setViewMode('SETUP_CHILD')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-xl text-white border-b-4 border-indigo-900 active:border-b-0">{t('login.recoveryButton')}</button>
             </div>
         </div>
     );
 
     if (viewMode === 'SETUP_CHILD') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-10 rounded-[4rem] border-2 border-pink-500/20 shadow-2xl relative">
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-pink-500/20 shadow-xl relative">
                 <BackButton onClick={() => setViewMode('USER_GRID')} />
-                <div className="text-center mb-8">
-                    <Smile size={64} className="mx-auto text-pink-500 mb-4 animate-float" />
-                    <h1 className="text-4xl sm:text-5xl font-display text-white mb-1 italic tracking-tighter">{t('login.childTitle')}</h1>
-                    <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] opacity-60">{t('login.childSubtitle')}</p>
+                <div className="text-center mb-6">
+                    <Smile size={48} className="mx-auto text-pink-500 mb-3 animate-float" />
+                    <h1 className="text-3xl sm:text-4xl font-display text-white mb-1 italic tracking-tight">{t('login.childTitle')}</h1>
+                    <p className="text-slate-500 font-bold uppercase text-[8px] tracking-[0.3em] opacity-80">{t('login.childSubtitle')}</p>
                 </div>
-                <div className="space-y-4">
-                    <input value={name} onChange={e => setChildName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white text-lg focus:border-pink-500 outline-none" placeholder={t('login.namePlaceholder')} />
-                    <input type="number" value={childAge} onChange={e => setChildAge(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white focus:border-pink-500 outline-none" placeholder={t('login.childAgePlaceholder')} />
-                    <input value={childPass} onChange={e => setChildPass(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-[1.5rem] p-4 text-white focus:border-pink-500 outline-none" placeholder={t('login.childPassPlaceholder')} />
-                    {error && <p className="text-red-500 text-[10px] font-black text-center">{error}</p>}
-                    <div className="grid grid-cols-1 gap-3 pt-2">
-                        <button onClick={() => handleChildSetup(false)} className="w-full py-6 bg-pink-600 hover:bg-pink-500 rounded-[2rem] font-black text-2xl text-white shadow-xl border-b-8 border-pink-900 active:border-b-0">{t('login.childAddAnother')}</button>
-                        <button onClick={() => handleChildSetup(true)} className="w-full py-4 text-slate-500 font-bold uppercase text-[9px] tracking-widest">{t('login.childFinish')}</button>
+                <div className="space-y-3">
+                    <input value={name} onChange={e => setChildName(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white text-base focus:border-pink-500 outline-none" placeholder={t('login.namePlaceholder')} />
+                    <input type="number" value={childAge} onChange={e => setChildAge(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white focus:border-pink-500 outline-none" placeholder={t('login.childAgePlaceholder')} />
+                    <input value={childPass} onChange={e => setChildPass(e.target.value)} className="w-full bg-[#050810] border-2 border-slate-800/50 rounded-xl p-3 text-white focus:border-pink-500 outline-none" placeholder={t('login.childPassPlaceholder')} />
+                    {error && <p className="text-red-500 text-[10px] font-bold text-center">{error}</p>}
+                    <div className="grid grid-cols-1 gap-2 pt-2">
+                        <button onClick={() => handleChildSetup(false)} className="w-full py-4 bg-pink-600 hover:bg-pink-500 rounded-xl font-bold text-lg text-white shadow-lg border-b-4 border-pink-900 active:border-b-0">{t('login.childAddAnother')}</button>
+                        <button onClick={() => handleChildSetup(true)} className="w-full py-3 text-slate-500 font-bold uppercase text-[8px] tracking-widest">{t('login.childFinish')}</button>
                     </div>
                 </div>
             </div>
@@ -392,21 +408,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     if (viewMode === 'USER_GRID') return (
         <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-6 py-12 animate-fade-in relative overflow-y-auto custom-scrollbar">
             <BackButton onClick={() => setViewMode('SIGN_IN_ENTRY')} />
-            <div className="text-center mb-12">
-                <h1 className="font-display text-7xl sm:text-8xl text-white mb-2 tracking-tighter italic drop-shadow-2xl">Tiwaton</h1>
-                <p className="text-slate-500 font-black uppercase tracking-[0.6em] text-[10px] bg-white/5 py-2 px-6 rounded-full inline-block">{t('login.selectExplorer')}</p>
+            <div className="text-center mb-8">
+                <h1 className="font-display text-5xl sm:text-6xl text-white mb-2 tracking-tight italic drop-shadow-lg">Tiwaton</h1>
+                <p className="text-slate-500 font-bold uppercase tracking-[0.4em] text-[8px] bg-white/5 py-1.5 px-4 rounded-full inline-block">{t('login.selectExplorer')}</p>
             </div>
-            <div className="max-w-5xl w-full grid grid-cols-2 md:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar p-2">
+            <div className="max-w-4xl w-full grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar p-2">
                 {profiles.map(p => (
-                    <button key={p.id} onClick={() => onLogin(p)} className="group bg-slate-900/50 backdrop-blur-xl p-8 rounded-[3rem] border-2 border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 flex flex-col items-center">
-                        <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">{p.avatar}</div>
-                        <span className="font-black text-white text-xl uppercase italic tracking-tighter">{p.name}</span>
-                        {p.mode === 'PARENT' && <span className="text-[7px] text-indigo-400 font-black uppercase tracking-widest mt-1">HOST</span>}
+                    <button key={p.id} onClick={() => onLogin(p)} className="group bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-1 flex flex-col items-center shadow-lg">
+                        <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">{p.avatar}</div>
+                        <span className="font-bold text-white text-lg uppercase italic tracking-tight">{p.name}</span>
+                        {p.mode === 'PARENT' && <span className="text-[7px] text-indigo-400 font-bold uppercase tracking-widest mt-1">HOST</span>}
                     </button>
                 ))}
-                <button onClick={() => setViewMode('SETUP_CHILD')} className="p-8 rounded-[3rem] border-2 border-dashed border-slate-800 hover:border-slate-500 transition-all flex flex-col items-center justify-center text-slate-600 hover:text-slate-300 min-h-[160px]">
-                    <Plus size={40} />
-                    <span className="font-black text-[9px] uppercase mt-4">{t('login.newHero')}</span>
+                <button onClick={() => setViewMode('SETUP_CHILD')} className="p-6 rounded-3xl border-2 border-dashed border-slate-800 hover:border-slate-500 transition-all flex flex-col items-center justify-center text-slate-600 hover:text-slate-300 min-h-[140px]">
+                    <Plus size={32} />
+                    <span className="font-bold text-[8px] uppercase mt-3">{t('login.newHero')}</span>
                 </button>
             </div>
         </div>
@@ -414,17 +430,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     if (viewMode === 'FORGOT_FLOW') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
-            <div className="max-w-sm w-full bg-[#0b1120] p-10 rounded-[3.5rem] border-2 border-amber-500/20 text-center shadow-2xl relative flex flex-col items-center">
+            <div className="max-w-sm w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-amber-500/20 text-center shadow-xl relative flex flex-col items-center">
                 <BackButton onClick={() => setViewMode('SIGN_IN_ENTRY')} />
-                <AlertTriangle size={64} className="mx-auto text-amber-500 mb-6 animate-pulse" />
-                <h2 className="text-3xl font-display text-white mb-6 italic tracking-tighter">{t('login.forgotTitle')}</h2>
+                <AlertTriangle size={40} className="mx-auto text-amber-500 mb-4 animate-pulse" />
+                <h2 className="text-2xl font-display text-white mb-4 italic tracking-tight">{t('login.forgotTitle')}</h2>
 
                 {resetStep === 'CHOICE' && (
-                    <div className="space-y-4 w-full">
-                        <p className="text-slate-400 text-sm mb-6 leading-relaxed">{t('login.forgotSubtitle')}</p>
+                    <div className="space-y-3 w-full">
+                        <p className="text-slate-400 text-xs mb-4 leading-relaxed">{t('login.forgotSubtitle')}</p>
                         <button
                             onClick={() => setResetStep('VERIFY')}
-                            className="w-full py-6 bg-slate-800/30 hover:bg-slate-800/50 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest transition-all"
+                            className="w-full py-4 bg-slate-800/30 hover:bg-slate-800/50 rounded-xl text-white font-bold text-[9px] uppercase tracking-widest transition-all"
                         >
                             {t('login.forgotStart')}
                         </button>
@@ -432,18 +448,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 )}
 
                 {resetStep === 'VERIFY' && (
-                    <div className="space-y-6 w-full">
+                    <div className="space-y-4 w-full">
                         <input
                             value={resetInput}
                             onChange={e => setResetInput(e.target.value)}
                             placeholder={t('login.forgotVerifyPlaceholder')}
-                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-4 text-white text-center outline-none focus:border-amber-500 transition-all"
+                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-xl p-3 text-white text-center outline-none focus:border-amber-500 transition-all text-base"
                         />
-                        {error && <p className="text-red-500 text-[10px] font-black uppercase animate-pulse">{error}</p>}
+                        {error && <p className="text-red-500 text-[9px] font-bold uppercase animate-pulse">{error}</p>}
                         <button
                             onClick={handleResetVerify}
                             disabled={!resetInput}
-                            className="w-full py-5 bg-amber-600 disabled:opacity-50 hover:bg-amber-500 rounded-2xl text-white font-black text-[10px] uppercase transition-all shadow-xl"
+                            className="w-full py-4 bg-amber-600 disabled:opacity-50 hover:bg-amber-500 rounded-xl text-white font-bold text-[9px] uppercase transition-all shadow-md"
                         >
                             {t('login.forgotVerifyButton')}
                         </button>
@@ -451,20 +467,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 )}
 
                 {resetStep === 'NEW_CREDS' && (
-                    <div className="space-y-6 w-full">
+                    <div className="space-y-4 w-full">
                         <input
                             type="password"
                             maxLength={4}
                             value={resetInput}
                             onChange={e => setResetInput(e.target.value)}
                             placeholder={t('login.forgotNewPinPlaceholder')}
-                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-[1.5rem] p-6 text-white text-center text-3xl tracking-widest outline-none focus:border-indigo-500 transition-all"
+                            className="w-full bg-[#050810] border-2 border-slate-800 rounded-xl p-4 text-white text-center text-2xl tracking-[0.4em] outline-none focus:border-indigo-500 transition-all"
                         />
-                        {error && <p className="text-red-500 text-[10px] font-black uppercase">{error}</p>}
+                        {error && <p className="text-red-500 text-[9px] font-bold uppercase">{error}</p>}
                         <button
                             onClick={handleSaveNewCreds}
                             disabled={resetInput.length < 4}
-                            className="w-full py-6 bg-indigo-600 disabled:opacity-50 hover:bg-indigo-500 rounded-2xl text-white font-black text-xl italic uppercase shadow-xl transition-all"
+                            className="w-full py-4 bg-indigo-600 disabled:opacity-50 hover:bg-indigo-500 rounded-xl text-white font-bold text-lg italic uppercase shadow-md transition-all"
                         >
                             {t('login.forgotSaveButton')}
                         </button>

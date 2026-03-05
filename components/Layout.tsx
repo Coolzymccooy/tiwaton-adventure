@@ -5,7 +5,6 @@ import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home, Volume2
 import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
 import { useI18n } from '../i18n/I18nProvider';
-import { SyncService } from '../services/sync';
 import { getLogoUrl } from './logo';
 
 interface LayoutProps {
@@ -24,7 +23,6 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
 
     const interval = setInterval(() => {
       StorageService.trackUsage(profile.id, currentView, 10);
-      SyncService.logTelemetry({ profileId: profile.id, view: currentView, event: 'view-heartbeat', durationSeconds: 10 });
     }, 10000);
 
     return () => clearInterval(interval);
@@ -72,18 +70,18 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
 
       {/* Dynamic Top Header - Adapts to safe areas */}
       {showNav && (
-        <header className="shrink-0 z-50 bg-[#050810]/40 backdrop-blur-3xl border-b border-white/5 flex items-center justify-center pt-[calc(env(safe-area-inset-top)+1rem)] pb-4 px-6 sm:px-12">
-          <div className="w-full flex justify-between items-center">
+        <header className="shrink-0 z-50 bg-[#050810]/40 backdrop-blur-3xl border-b border-white/5 flex items-center justify-center pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-3 px-4 sm:px-8">
+          <div className="w-full max-w-7xl flex justify-between items-center">
             <div
               className="flex items-center cursor-pointer group active:scale-95 transition-transform"
               onClick={handleLogoClick}
               data-tooltip="Return to Tiwaton Hub"
             >
-              <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center group-hover:scale-105 transition-transform drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center group-hover:scale-105 transition-transform drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
                 {getLogoUrl() ? (
                   <img src={getLogoUrl()!} alt="Tiwaton mark" className="w-full h-full object-contain" />
                 ) : (
-                  <span className="font-display text-white font-bold text-3xl">T</span>
+                  <span className="font-display text-white font-bold text-2xl">T</span>
                 )}
               </div>
             </div>
@@ -128,8 +126,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
 
       {/* Smart Nav - Floats professionally across all device widths */}
       {showNav && (
-        <nav className="fixed bottom-6 left-6 right-6 lg:left-1/2 lg:-translate-x-1/2 lg:w-fit lg:min-w-[40rem] bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] sm:rounded-[3rem] shadow-[0_30px_80px_rgba(0,0,0,0.8)] p-2 sm:p-3 z-50 animate-slide-up mb-[env(safe-area-inset-bottom)]">
-          <div className="flex justify-around items-center h-14 sm:h-20 gap-1">
+        <nav className="fixed bottom-4 left-4 right-4 lg:left-1/2 lg:-translate-x-1/2 lg:w-fit lg:min-w-[36rem] bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_30px_80px_rgba(0,0,0,0.8)] p-2 z-50 animate-slide-up mb-[env(safe-area-inset-bottom)]">
+          <div className="flex justify-around items-center h-14 sm:h-16 gap-1">
             {navItems.map((item) => {
               const isActive = currentView === item.view;
               return (
@@ -137,18 +135,18 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
                   key={item.view}
                   onClick={() => onNavigate(item.view)}
                   data-tooltip={item.tooltip}
-                  className={`flex flex-col items-center justify-center px-4 sm:px-8 h-full rounded-[2rem] transition-all duration-500 relative group active:scale-90 ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+                  className={`flex flex-col items-center justify-center px-3 sm:px-6 h-full rounded-[1.5rem] transition-all duration-500 relative group active:scale-90 ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300'
                     }`}
                 >
                   {isActive && (
-                    <div className="absolute -top-1 w-8 sm:w-10 h-1 bg-indigo-400 rounded-full shadow-[0_0_20px_rgba(129,140,248,0.8)] animate-pulse"></div>
+                    <div className="absolute -top-1 w-6 sm:w-8 h-1 bg-indigo-400 rounded-full shadow-[0_0_20px_rgba(129,140,248,0.8)] animate-pulse"></div>
                   )}
-                  <item.icon size={isActive ? 28 : 22} strokeWidth={isActive ? 3 : 2} className={`transition-all duration-500 ${isActive ? '-translate-y-1 scale-110 text-white' : ''}`} />
+                  <item.icon size={isActive ? 24 : 20} strokeWidth={isActive ? 3 : 2} className={`transition-all duration-500 ${isActive ? '-translate-y-1 scale-110 text-white' : ''}`} />
                   <span className={`hidden sm:block text-[8px] font-black uppercase tracking-[0.15em] mt-1.5 transition-all duration-300 ${isActive ? 'text-white opacity-100' : 'text-slate-600 opacity-60'}`}>
                     {item.label}
                   </span>
 
-                  <div className="absolute inset-0 bg-white/5 rounded-[2rem] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-white/5 rounded-[1.5rem] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                 </button>
               );
             })}

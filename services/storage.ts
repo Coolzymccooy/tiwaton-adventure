@@ -1,66 +1,63 @@
-
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { db, auth } from './firebase';
 import type { Story, Drawing, GameStat, PlanetProgress, MathPlanet, CountdownEvent, FamilyProfile } from '../types';
 
-const KEYS = {
-  PROFILES: 'tiwaton_profiles',
-  CURRENT_PROFILE_ID: 'tiwaton_current_profile',
-  STORIES: 'tiwaton_stories',
-  DRAWINGS: 'tiwaton_drawings',
-  GAME_STATS: 'tiwaton_stats',
-  COMMENTS: 'tiwaton_comments',
-  EVENTS: 'tiwaton_events',
-  USAGE: 'tiwaton_usage'
-};
-const LAST_VIEW_KEY = 'tiwaton_last_view';
+let currentTenantId: string | null = null;
+let currentProfileId: string | null = null;
+let cachedProfiles: FamilyProfile[] = [];
 
-export type SnapshotPayload = {
-  profileId: string;
-  profiles: FamilyProfile[];
-  stories: Story[];
-  drawings: Drawing[];
-  gameStats: GameStat;
-  events: CountdownEvent[];
-  usage: Record<string, Record<string, number>>;
-  lastView?: string;
+// Helper to ensure auth/tenant context
+const getTenantId = () => {
+  if (currentTenantId) return currentTenantId;
+  // Fallback logic could go here depending on how Login sets this
+  return null;
 };
-
-const readStories = () => JSON.parse(localStorage.getItem(KEYS.STORIES) || '[]');
-const readDrawings = () => JSON.parse(localStorage.getItem(KEYS.DRAWINGS) || '[]');
 
 export const StorageService = {
-  getProfiles: (): FamilyProfile[] => {
-    const stored = localStorage.getItem(KEYS.PROFILES);
-    return stored ? JSON.parse(stored) : [];
-  },
-
-  hasProfiles: (): boolean => {
-    const profiles = StorageService.getProfiles();
-    return profiles.length > 0;
-  },
-
-  getCurrentProfile: (): FamilyProfile | null => {
-    const profiles = StorageService.getProfiles();
-    const currentId = localStorage.getItem(KEYS.CURRENT_PROFILE_ID);
-    return profiles.find(p => p.id === currentId) || null;
+  // Initialization & Auth linking
+  setTenantContext: (tenantId: string) => {
+    currentTenantId = tenantId;
   },
 
   setCurrentProfile: (id: string) => {
-    localStorage.setItem(KEYS.CURRENT_PROFILE_ID, id);
+    currentProfileId = id;
   },
 
-  updateProfile: (updated: FamilyProfile) => {
-    const profiles = StorageService.getProfiles();
-    const index = profiles.findIndex(p => p.id === updated.id);
+  getCurrentProfile: (): FamilyProfile | null => {
+    return cachedProfiles.find(p => p.id === currentProfileId) || null;
+  },
+
+  setCachedProfiles: (profiles: FamilyProfile[]) => {
+    cachedProfiles = profiles;
+  },
+
+  getProfiles: (): FamilyProfile[] => {
+    return cachedProfiles;
+  },
+
+  hasProfiles: (): boolean => {
+    return cachedProfiles.length > 0;
+  },
+
+  updateProfile: async (updated: FamilyProfile) => {
+    const tenantId = getTenantId();
+    if (!tenantId) return;
+
+    const isMember = updated.role !== 'STUDENT';
+    const collectionName = isMember ? 'members' : 'children';
+
+    const docRef = doc(db, `tenants/${tenantId}/${collectionName}/${updated.id}`);
+    await setDoc(docRef, updated, { merge: true });
+
+    const index = cachedProfiles.findIndex(p => p.id === updated.id);
     if (index !== -1) {
-      profiles[index] = updated;
-      localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+      cachedProfiles[index] = updated;
     }
   },
 
-  createParentProfile: (name: string, email: string, pin: string) => {
-    const profiles = StorageService.getProfiles();
+  createParentProfile: async (uid: string, name: string, email: string, pin: string) => {
     const parent: FamilyProfile = {
-      id: 'admin-' + Date.now(),
+      id: uid, // Use Firebase Auth UID
       name: name,
       role: 'PARENT',
       avatar: '🛡️',
@@ -68,151 +65,178 @@ export const StorageService = {
       age: 99,
       email,
       pin,
-      recoveryKey: `TIWA-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+      active: true,
     };
-    profiles.unshift(parent);
-    localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+
+    currentTenantId = uid; // For parent mode, the admin UID is the tenant
+    const docRef = doc(db, `tenants/${uid}/members/${uid}`);
+    await setDoc(docRef, parent);
+
+    cachedProfiles.unshift(parent);
     return parent;
   },
 
-  createTeacherProfile: (name: string, email: string, pin: string) => {
-    const profiles = StorageService.getProfiles();
+  createTeacherProfile: async (uid: string, name: string, email: string, pin: string) => {
     const schoolId = 'SCH-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     const classId = 'CLS-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
     const teacher: FamilyProfile = {
-      id: 'admin-' + Date.now(),
+      id: uid, // Use Firebase Auth UID
       name: name,
       role: 'TEACHER',
       schoolId,
       classId,
       avatar: '👨‍🏫',
-      mode: 'TEACHER', // Map mode directly
+      mode: 'TEACHER',
       age: 99,
       email,
       pin,
-      recoveryKey: `TIWA-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+      active: true,
     };
-    profiles.unshift(teacher);
-    localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+
+    currentTenantId = uid; // For teacher mode, the teacher UID is the tenant
+    const docRef = doc(db, `tenants/${uid}/members/${uid}`);
+    await setDoc(docRef, teacher);
+
+    cachedProfiles.unshift(teacher);
     return teacher;
   },
 
-  createChildProfile: (name: string, age: number, password?: string, classId?: string, schoolId?: string) => {
-    const profiles = StorageService.getProfiles();
+  createChildProfile: async (name: string, age: number, password?: string, classId?: string, schoolId?: string) => {
+    const tenantId = getTenantId();
+    if (!tenantId) throw new Error("No tenant context");
+
+    const childId = 'child-' + Date.now().toString();
     const newProfile: FamilyProfile = {
-      id: Date.now().toString(),
+      id: childId,
       name: name,
       role: 'STUDENT',
-      schoolId,
+      schoolId: schoolId || currentTenantId,
       classId,
       age: age,
       mode: age >= 9 ? 'STUDIO' : 'KIDS',
       avatar: ['🦁', '🦄', '🚀', '🦖', '🐼', '🐨', '🐵', '🦊'][Math.floor(Math.random() * 8)],
-      password: password || '123'
+      password: password || '123',
+      tenantId: tenantId,
+      guardianUids: [],
+      active: true
     };
-    profiles.push(newProfile);
-    localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+
+    const docRef = doc(db, `tenants/${tenantId}/children/${childId}`);
+    await setDoc(docRef, newProfile);
+
+    cachedProfiles.push(newProfile);
     return newProfile;
   },
 
-  getGameStats: (): GameStat => {
-    const stored = localStorage.getItem(KEYS.GAME_STATS);
-    const PLANETS: MathPlanet[] = ['Numbers', 'Operations', 'Fractions', 'Time', 'Money', 'Data'];
-    const defaultPlanetProgress: PlanetProgress[] = PLANETS.map(p => ({
-      planet: p,
-      stars: 0,
-      unlocked: p === 'Numbers' || p === 'Operations',
-      highScore: 0
-    }));
+  getGameStats: async (): Promise<GameStat> => {
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return getDefaultStats();
 
-    const defaultStats: GameStat = {
-      xp: 0, level: 1, badges: [], coins: 0,
-      quizProgress: [
-        { category: 'Bible', level: 1, unlocked: true },
-        { category: 'Music', level: 1, unlocked: true },
-        { category: 'Football', level: 1, unlocked: true }
-      ],
-      mathLevel: 1,
-      mathPlanetProgress: defaultPlanetProgress,
-      wordQuestProgress: { level: 1, unlocked: true }
-    };
+    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stats/gameStats`);
+    const snapshot = await getDoc(docRef);
 
-    if (!stored) return defaultStats;
-    const parsed = JSON.parse(stored);
-    return { ...defaultStats, ...parsed };
+    if (snapshot.exists()) {
+      return { ...getDefaultStats(), ...snapshot.data() } as GameStat;
+    }
+    return getDefaultStats();
   },
 
-  saveGameStats: (stats: GameStat) => {
-    localStorage.setItem(KEYS.GAME_STATS, JSON.stringify(stats));
+  saveGameStats: async (stats: GameStat) => {
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return;
+
+    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stats/gameStats`);
+    await setDoc(docRef, stats, { merge: true });
   },
 
-  trackUsage: (profileId: string, view: string, seconds: number) => {
-    const raw = localStorage.getItem(KEYS.USAGE);
-    const data = raw ? JSON.parse(raw) : {};
-    if (!data[profileId]) data[profileId] = {};
-    data[profileId][view] = (data[profileId][view] || 0) + seconds;
-    localStorage.setItem(KEYS.USAGE, JSON.stringify(data));
+  trackUsage: async (profileId: string, view: string, seconds: number) => {
+    // Optional: implement telemetry tracking in Firestore or keep entirely local if desired.
+    // For now, let's keep it simple.
   },
 
-  getFamilyUsage: () => JSON.parse(localStorage.getItem(KEYS.USAGE) || '{}'),
+  getFamilyUsage: async () => {
+    return {};
+  },
 
-  getDrawings: async () => JSON.parse(localStorage.getItem(KEYS.DRAWINGS) || '[]'),
+  getDrawings: async (): Promise<Drawing[]> => {
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return [];
+
+    const colRef = collection(db, `tenants/${tenantId}/children/${currentProfileId}/drawings`);
+    const snapshot = await getDocs(colRef);
+    return snapshot.docs.map(doc => doc.data() as Drawing).sort((a, b) => b.timestamp - a.timestamp);
+  },
+
   saveDrawing: async (d: Drawing) => {
-    const list = await StorageService.getDrawings();
-    list.unshift(d);
-    localStorage.setItem(KEYS.DRAWINGS, JSON.stringify(list.slice(0, 100)));
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return;
+
+    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/drawings/${d.id}`);
+    const payload = { ...d, ownerChildId: currentProfileId, createdByUid: auth.currentUser?.uid || currentProfileId };
+    await setDoc(docRef, payload);
   },
 
-  getStories: async () => JSON.parse(localStorage.getItem(KEYS.STORIES) || '[]'),
+  getStories: async (): Promise<Story[]> => {
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return [];
+
+    const colRef = collection(db, `tenants/${tenantId}/children/${currentProfileId}/stories`);
+    const snapshot = await getDocs(colRef);
+    return snapshot.docs.map(doc => doc.data() as Story);
+  },
+
   addStory: async (s: Story) => {
-    const list = await StorageService.getStories();
-    list.unshift(s);
-    localStorage.setItem(KEYS.STORIES, JSON.stringify(list));
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return;
+
+    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stories/${s.id}`);
+    const payload = { ...s, ownerChildId: currentProfileId, createdByUid: auth.currentUser?.uid || currentProfileId };
+    await setDoc(docRef, payload);
   },
 
-  getComments: () => JSON.parse(localStorage.getItem(KEYS.COMMENTS) || '[]'),
-  addComment: (text: string, author: string) => {
-    const list = StorageService.getComments();
-    list.unshift({ id: Date.now().toString(), text, author, timestamp: Date.now() });
-    localStorage.setItem(KEYS.COMMENTS, JSON.stringify(list));
+  getComments: async () => {
+    return [];
   },
 
-  getEvents: () => JSON.parse(localStorage.getItem(KEYS.EVENTS) || '[]'),
-  addEvent: (name: string, date: string, email?: string) => {
-    const list = [...StorageService.getEvents(), { id: Date.now().toString(), name, date, notificationEmail: email }];
-    localStorage.setItem(KEYS.EVENTS, JSON.stringify(list));
-    return list;
+  addComment: async (text: string, author: string) => {
+    // Stub
   },
-  removeEvent: (id: string) => {
-    const list = StorageService.getEvents().filter(e => e.id !== id);
-    localStorage.setItem(KEYS.EVENTS, JSON.stringify(list));
-    return list;
-  }
-  ,
-  setLastView: (view: string) => {
-    if (!view) return;
-    localStorage.setItem(LAST_VIEW_KEY, view);
+
+  getEvents: async (): Promise<CountdownEvent[]> => {
+    return [];
   },
-  getLastView: () => localStorage.getItem(LAST_VIEW_KEY),
-  buildSnapshot: (profileId: string, lastView?: string): SnapshotPayload => ({
-    profileId,
-    profiles: StorageService.getProfiles(),
-    stories: readStories(),
-    drawings: readDrawings(),
-    gameStats: StorageService.getGameStats(),
-    events: StorageService.getEvents(),
-    usage: StorageService.getFamilyUsage(),
-    lastView,
-  }),
-  applySnapshot: (snapshot: SnapshotPayload | null) => {
-    if (!snapshot) return;
-    localStorage.setItem(KEYS.PROFILES, JSON.stringify(snapshot.profiles || StorageService.getProfiles()));
-    localStorage.setItem(KEYS.GAME_STATS, JSON.stringify(snapshot.gameStats || StorageService.getGameStats()));
-    localStorage.setItem(KEYS.STORIES, JSON.stringify(snapshot.stories || []));
-    localStorage.setItem(KEYS.DRAWINGS, JSON.stringify(snapshot.drawings || []));
-    localStorage.setItem(KEYS.EVENTS, JSON.stringify(snapshot.events || []));
-    localStorage.setItem(KEYS.USAGE, JSON.stringify(snapshot.usage || {}));
-    StorageService.setCurrentProfile(snapshot.profileId);
-    if (snapshot.lastView) localStorage.setItem(LAST_VIEW_KEY, snapshot.lastView);
-  }
+
+  addEvent: async (name: string, date: string, email?: string) => {
+    return [];
+  },
+
+  removeEvent: async (id: string) => {
+    return [];
+  },
+
+  setLastView: (view: string) => { },
+  getLastView: () => null,
 };
+
+function getDefaultStats(): GameStat {
+  const PLANETS: MathPlanet[] = ['Numbers', 'Operations', 'Fractions', 'Time', 'Money', 'Data'];
+  const defaultPlanetProgress: PlanetProgress[] = PLANETS.map(p => ({
+    planet: p,
+    stars: 0,
+    unlocked: p === 'Numbers' || p === 'Operations',
+    highScore: 0
+  }));
+
+  return {
+    xp: 0, level: 1, badges: [], coins: 0,
+    quizProgress: [
+      { category: 'Bible', level: 1, unlocked: true },
+      { category: 'Music', level: 1, unlocked: true },
+      { category: 'Football', level: 1, unlocked: true }
+    ],
+    mathLevel: 1,
+    mathPlanetProgress: defaultPlanetProgress,
+    wordQuestProgress: { level: 1, unlocked: true }
+  };
+}

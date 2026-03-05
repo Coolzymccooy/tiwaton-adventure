@@ -30,6 +30,11 @@ export interface UserProfile {
   pin?: string;
   password?: string;
   recoveryKey?: string;
+
+  // Firebase specific fields
+  active?: boolean;
+  tenantId?: string;
+  guardianUids?: string[];
 }
 
 // Keep the old exported interface locally mapped in case of legacy local storage

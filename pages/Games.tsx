@@ -59,45 +59,45 @@ const VictoryOverlay: React.FC<{
       <div className="firework"></div>
     </div>
     <div className="text-center max-w-sm w-full animate-float flex flex-col items-center relative z-10">
-      <div className="relative mb-4 sm:mb-6">
-        <div className="absolute inset-0 bg-yellow-500 blur-[80px] opacity-60 animate-pulse scale-150"></div>
-        <div className="text-7xl sm:text-8xl relative drop-shadow-[0_0_40px_rgba(250,204,21,0.8)]">🏆</div>
+      <div className="relative mb-4">
+        <div className="absolute inset-0 bg-yellow-500 blur-[60px] opacity-60 animate-pulse scale-150"></div>
+        <div className="text-6xl relative drop-shadow-[0_0_30px_rgba(250,204,21,0.8)]">🏆</div>
       </div>
-      <h2 className="font-display text-4xl sm:text-5xl text-yellow-400 mb-1 italic tracking-tighter drop-shadow-md">{title}</h2>
-      <p className="text-white text-base font-black mb-6 uppercase tracking-[0.3em] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-amber-500">Mission AccomplISHED!</p>
+      <h2 className="font-display text-3xl sm:text-4xl text-yellow-400 mb-1 italic tracking-tighter drop-shadow-md">{title}</h2>
+      <p className="text-white text-xs font-black mb-5 uppercase tracking-[0.2em] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-amber-500">Mission AccomplISHED!</p>
 
       {badge && (
-        <div className="mb-6 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-500 font-black text-[10px] uppercase tracking-[0.3em] flex items-center gap-2">
-          <Award size={14} className="text-yellow-400" /> Badge Unlocked: {badge}
+        <div className="mb-5 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-500 font-black text-[9px] uppercase tracking-[0.2em] flex items-center gap-1.5">
+          <Award size={12} className="text-yellow-400" /> Badge Unlocked: {badge}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 w-full mb-8">
-        <div className="bg-indigo-600/20 p-4 rounded-3xl border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-center gap-2 text-white font-black text-xl">
-            <Zap className="text-yellow-300" size={20} /> +{xp}
+      <div className="grid grid-cols-2 gap-2 w-full mb-6">
+        <div className="bg-indigo-600/20 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+          <div className="flex items-center justify-center gap-1.5 text-white font-black text-lg">
+            <Zap className="text-yellow-300" size={16} /> +{xp}
           </div>
-          <div className="text-[8px] text-indigo-400 font-black uppercase tracking-widest mt-1">XP Points</div>
+          <div className="text-[7px] text-indigo-400 font-black uppercase tracking-widest mt-1">XP Points</div>
         </div>
-        <div className="bg-amber-600/20 p-4 rounded-3xl border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-center gap-2 text-white font-black text-xl">
-            <Coins className="text-yellow-400" size={20} /> +{coins}
+        <div className="bg-amber-600/20 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+          <div className="flex items-center justify-center gap-1.5 text-white font-black text-lg">
+            <Coins className="text-yellow-400" size={16} /> +{coins}
           </div>
-          <div className="text-[8px] text-amber-400 font-black uppercase tracking-widest mt-1">Star Coins</div>
+          <div className="text-[7px] text-amber-400 font-black uppercase tracking-widest mt-1">Star Coins</div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 w-full">
+      <div className="flex flex-col gap-2 w-full">
         <button
           onClick={onNext}
-          className="w-full py-5 text-white font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(161,98,7)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter
+          className="w-full py-4 text-white font-black text-lg rounded-xl shadow-[0_4px_0_rgb(161,98,7)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter
                      bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 border border-yellow-300/30 object-contain ring-4 ring-yellow-500/20"
         >
           Next Mission
         </button>
         <button
           onClick={onQuit}
-          className="w-full py-3 text-slate-500 font-black text-[10px] uppercase tracking-[0.4em] hover:text-white transition-colors"
+          className="w-full py-2.5 text-slate-500 font-black text-[9px] uppercase tracking-[0.3em] hover:text-white transition-colors"
         >
           Return to Hub
         </button>
@@ -397,31 +397,31 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       </header>
 
 
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-6 sm:gap-10 pb-20 w-full">
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 gap-4 sm:gap-6 pb-20 w-full">
         {/* Active Clue Panel */}
-        <div className="w-full lg:w-72 flex flex-col gap-4 bg-slate-900/40 p-5 rounded-3xl border border-white/5 shadow-2xl shrink-0">
+        <div className="w-full lg:w-64 flex flex-col gap-3 bg-slate-900/40 p-4 rounded-2xl border border-white/5 shadow-2xl shrink-0">
           <div className="space-y-1">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
               Current Clue
             </p>
-            <h4 className="text-xl font-black text-white italic leading-tight tracking-tight">
+            <h4 className="text-lg font-black text-white italic leading-tight tracking-tight">
               {activeClue?.clue || "Select a cell..."}
             </h4>
           </div>
 
           <div className="h-px bg-white/5 w-full"></div>
 
-          <div className="space-y-3">
-            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-2 animate-pulse">
-              <MousePointer2 size={12} /> Pick the Correct Word
+          <div className="space-y-2">
+            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.1em] flex items-center gap-1.5 animate-pulse">
+              <MousePointer2 size={10} /> Pick Correct Word
             </p>
 
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 gap-1.5">
               {activeClue?.options.map((opt: string) => (
                 <button
                   key={opt}
                   onClick={() => handleOptionSelect(opt)}
-                  className={`w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest transition-all border-b-4 active:translate-y-1 active:border-b-0 ${userGrid[activeClue.r][activeClue.c] === opt[0] &&
+                  className={`w-full py-3 rounded-lg font-black text-xs uppercase tracking-widest transition-all border-b-2 active:translate-y-[1px] active:border-b-0 ${userGrid[activeClue.r][activeClue.c] === opt[0] &&
                     opt === activeClue.answer
                     ? "bg-emerald-500 border-emerald-700 text-white pointer-events-none opacity-50"
                     : "bg-slate-800 border-slate-950 text-slate-200 hover:bg-indigo-600 hover:border-indigo-800"
@@ -435,9 +435,9 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
 
         {/* Grid Area */}
-        <div className="relative w-full max-w-[min(85vw,500px)] aspect-square bg-slate-900/60 backdrop-blur-3xl border-2 border-white/5 p-2 rounded-[2.5rem] shadow-2xl overflow-hidden">
+        <div className="relative w-full max-w-[min(85vw,400px)] aspect-square bg-slate-900/60 backdrop-blur-3xl border border-white/5 p-1.5 rounded-2xl shadow-2xl overflow-hidden">
           <div
-            className="grid h-full gap-1"
+            className="grid h-full gap-0.5"
             style={{ gridTemplateColumns: `repeat(${grid.length}, 1fr)` }}
           >
             {grid.map((row, r) =>
@@ -457,7 +457,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <button
                     key={`${r}-${c}`}
                     onClick={() => handleCellClick(r, c)}
-                    className={`relative flex items-center justify-center rounded-lg text-xs sm:text-lg font-black transition-all border-b-4 ${cell === ""
+                    className={`relative flex items-center justify-center rounded text-xs sm:text-sm font-black transition-all border-b-2 ${cell === ""
                       ? "bg-transparent border-transparent"
                       : isSelected
                         ? "bg-emerald-500 border-emerald-700 text-white scale-105 z-10"
@@ -686,34 +686,34 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 
       {/* ✅ PLAY AREA (real content) */}
-      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 pt-6 gap-6 sm:gap-10 w-full pb-20">
+      <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 pt-6 gap-4 sm:gap-6 w-full pb-20">
         {viewState === "LOADING" ? (
           <div className="text-white/70 font-black text-sm">Loading Word Search…</div>
         ) : (
           <>
             {/* LEFT: Words list */}
-            <div className="w-full lg:w-56 bg-slate-900/50 backdrop-blur-md rounded-[1.5rem] lg:rounded-[2rem] border border-white/5 p-3 sm:p-4 flex flex-wrap lg:flex-col gap-1.5 justify-center shrink-0">
+            <div className="w-full lg:w-48 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/5 p-3 flex flex-wrap lg:flex-col gap-1.5 justify-center shrink-0">
               {targetWords.map((word) => {
                 const done = foundWords.includes(word);
                 return (
                   <div
                     key={word}
-                    className={`relative px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black tracking-tighter transition-all flex items-center justify-between ${done
+                    className={`relative px-2.5 py-1.5 rounded-md text-[9px] sm:text-[10px] font-black tracking-tighter transition-all flex items-center justify-between ${done
                       ? "bg-emerald-500/20 text-emerald-400 opacity-60"
                       : "bg-slate-800 text-white border border-white/5"
                       }`}
                   >
                     {word}
-                    {done && <CheckCircle2 size={12} className="text-emerald-400 ml-2" />}
+                    {done && <CheckCircle2 size={10} className="text-emerald-400 ml-1.5" />}
                   </div>
                 );
               })}
             </div>
 
             {/* CENTER: Grid */}
-            <div className="relative w-full max-w-[min(90vw,520px)] aspect-square bg-slate-900/60 backdrop-blur-3xl border-2 border-white/5 p-2 rounded-[2.5rem] shadow-2xl overflow-hidden">
+            <div className="relative w-full max-w-[min(90vw,420px)] aspect-square bg-slate-900/60 backdrop-blur-3xl border border-white/5 p-1.5 rounded-2xl shadow-xl overflow-hidden">
               <div
-                className="grid h-full gap-1"
+                className="grid h-full gap-0.5"
                 style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
               >
                 {grid.map((row, r) =>
@@ -724,14 +724,14 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       <button
                         key={`${r}-${c}`}
                         onClick={() => handleCellClick(r, c)}
-                        className={`relative flex items-center justify-center rounded-lg font-black transition-all border-b-4 active:translate-y-1 active:border-b-0 ${cell.found
+                        className={`relative flex items-center justify-center rounded font-black transition-all border-b-2 active:translate-y-[1px] active:border-b-0 ${cell.found
                           ? "bg-emerald-500 border-emerald-700 text-white"
                           : isSelected
                             ? "bg-indigo-600 border-indigo-800 text-white"
                             : "bg-slate-800 border-slate-950 text-white hover:bg-slate-700"
                           }`}
                       >
-                        <span className="text-xs sm:text-lg">{cell.char}</span>
+                        <span className="text-xs sm:text-sm">{cell.char}</span>
                       </button>
                     );
                   })
@@ -740,14 +740,14 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
 
             {/* RIGHT: Small status/help panel (optional but useful) */}
-            <div className="w-full lg:w-56 bg-slate-900/40 p-4 rounded-3xl border border-white/5 shadow-2xl shrink-0">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">
+            <div className="w-full lg:w-48 bg-slate-900/40 p-3 rounded-2xl border border-white/5 shadow-xl shrink-0">
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">
                 Progress
               </p>
-              <div className="text-white font-black text-lg">
+              <div className="text-white font-black text-base">
                 {foundWords.length}/{targetWords.length}
               </div>
-              <p className="text-slate-400 text-[10px] font-bold mt-3">
+              <p className="text-slate-400 text-[9px] font-bold mt-2 leading-tight">
                 Tap letters to select. Find the hidden words.
               </p>
             </div>
@@ -1136,27 +1136,27 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <header className="flex justify-between items-center mb-4 shrink-0">
             <button
               onClick={onBack}
-              className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-white shadow-xl active:scale-90"
+              className="p-2 sm:p-3 bg-slate-900 border border-white/10 rounded-xl sm:rounded-2xl text-white shadow-xl active:scale-90"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={16} className="sm:w-5 sm:h-5" />
             </button>
 
             <div className="text-center">
-              <h2 className="font-display text-3xl sm:text-4xl text-white italic tracking-tighter leading-none drop-shadow-2xl">
+              <h2 className="font-display text-2xl sm:text-3xl text-white italic tracking-tight leading-none drop-shadow-md">
                 Math Galaxy
               </h2>
             </div>
 
-            <div className="bg-slate-900 px-3 py-2 rounded-2xl border border-white/10 shadow-xl flex items-center gap-2">
-              <Rocket size={18} className="text-indigo-400" />
-              <span className="text-sm font-black text-white uppercase tracking-tighter">
+            <div className="bg-slate-900 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-white/10 shadow-xl flex items-center gap-1.5">
+              <Rocket size={14} className="text-indigo-400 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-tighter">
                 Level {stats.mathPlanetProgress?.find(p => p.planet === selectedPlanet)?.level ?? 1}
               </span>
             </div>
           </header>
 
           {/* Compact grid: no forced scroll */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-6xl mx-auto w-full">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto w-full mb-10">
             {PLANET_DATA.map((planet) => {
               const isUnlocked =
                 stats.mathPlanetProgress?.find((p) => p.planet === planet.id)?.unlocked ?? false;
@@ -1167,28 +1167,28 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   // keep clickable even if locked (as you were doing)
                   disabled={false}
                   onClick={() => startPlanet(planet.id)}
-                  className={`group relative p-4 sm:p-5 rounded-[2.25rem] border transition-all flex flex-col items-center text-center overflow-hidden shadow-2xl ${isUnlocked
+                  className={`group relative p-3 sm:p-4 rounded-[1.5rem] border transition-all flex flex-col items-center text-center overflow-hidden shadow-lg ${isUnlocked
                     ? "bg-slate-900 border-white/10 hover:border-indigo-500 hover:-translate-y-1"
                     : "bg-slate-950 border-slate-900 opacity-40 grayscale"
                     }`}
                 >
                   <div
-                    className={`text-4xl sm:text-5xl mb-2 group-hover:scale-110 transition-transform duration-500 ${isUnlocked ? "drop-shadow-[0_0_20px_rgba(99,102,241,0.25)]" : ""
+                    className={`text-3xl sm:text-4xl mb-2 group-hover:scale-110 transition-transform duration-500 ${isUnlocked ? "drop-shadow-[0_0_15px_rgba(99,102,241,0.25)]" : ""
                       }`}
                   >
-                    <planet.icon size={36} className={isUnlocked ? "text-indigo-400" : "text-slate-700"} />
+                    <planet.icon size={28} className={isUnlocked ? "text-indigo-400" : "text-slate-700"} />
                   </div>
 
-                  <h3 className="text-sm sm:text-base font-black text-white uppercase italic tracking-tighter leading-none mb-1">
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase italic tracking-tight leading-none mb-1">
                     {planet.label}
                   </h3>
 
-                  <p className="text-slate-500 font-bold text-[9px] uppercase tracking-widest">
+                  <p className="text-slate-500 font-bold text-[8px] uppercase tracking-widest leading-tight">
                     {planet.desc}
                   </p>
 
                   {!isUnlocked && (
-                    <Lock className="absolute top-4 right-4 text-slate-700" size={16} />
+                    <Lock className="absolute top-3 right-3 text-slate-700" size={14} />
                   )}
                 </button>
               );
@@ -1273,23 +1273,23 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 setFeedback(null);
                 setShowVictory(false);
               }}
-              className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-white shadow-xl active:scale-90"
+              className="p-2 sm:p-3 bg-slate-900 border border-white/10 rounded-xl sm:rounded-2xl text-white shadow-xl active:scale-90"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={16} className="sm:w-5 sm:h-5" />
             </button>
 
             <div className="text-center">
-              <h2 className="font-display text-2xl sm:text-3xl text-white italic tracking-tighter leading-none drop-shadow-2xl">
+              <h2 className="font-display text-xl sm:text-2xl text-white italic tracking-tight leading-none drop-shadow-md">
                 {planetMeta?.label || "Math Galaxy"}
               </h2>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">
+              <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">
                 Score {score}/{missionTarget}
               </p>
             </div>
 
-            <div className="bg-slate-900 px-3 py-2 rounded-2xl border border-white/10 shadow-xl flex items-center gap-2">
-              <Rocket size={18} className="text-indigo-400" />
-              <span className="text-sm font-black text-white uppercase tracking-tighter">
+            <div className="bg-slate-900 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-white/10 shadow-xl flex items-center gap-1.5">
+              <Rocket size={14} className="text-indigo-400 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-tighter">
                 Level {stats.mathPlanetProgress?.find(p => p.planet === selectedPlanet)?.level ?? 1}
 
               </span>
@@ -1298,18 +1298,18 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
           {/* Question panel */}
           <div className="flex-1 flex flex-col items-center justify-center gap-4 pb-10">
-            <div className="w-full max-w-2xl bg-slate-900/50 border border-white/10 rounded-[2rem] p-5 sm:p-6 text-center shadow-2xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">
+            <div className="w-full max-w-xl bg-slate-900/50 border border-white/10 rounded-[1.5rem] p-4 text-center shadow-xl">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
                 Solve this
               </p>
 
-              <div className="text-4xl sm:text-5xl font-black text-white italic tracking-tighter drop-shadow-2xl">
+              <div className="text-3xl sm:text-4xl font-black text-white italic tracking-tight drop-shadow-lg">
                 {question.text}
               </div>
 
               {feedback && (
                 <div
-                  className={`mt-3 text-xs font-black uppercase tracking-[0.3em] ${feedback.type === "CORRECT" ? "text-emerald-400" : "text-rose-400"
+                  className={`mt-2 text-[10px] font-black uppercase tracking-[0.2em] ${feedback.type === "CORRECT" ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
                   {feedback.msg}
@@ -1318,12 +1318,12 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
 
             {/* Options */}
-            <div className="w-full max-w-2xl grid grid-cols-2 gap-3">
+            <div className="w-full max-w-xl grid grid-cols-2 gap-2">
               {options.map((opt: number) => (
                 <button
                   key={opt}
                   onClick={() => handleAnswer(opt)}
-                  className="bg-slate-900/70 border-b-4 border-slate-950 hover:bg-indigo-600 hover:border-indigo-800 transition-all active:translate-y-1 active:border-b-0 rounded-2xl py-4 text-white font-black text-lg"
+                  className="bg-slate-900/70 border-b-2 border-slate-950 hover:bg-indigo-600 hover:border-indigo-800 transition-all active:translate-y-[1px] active:border-b-0 rounded-xl py-3 text-white font-black text-base sm:text-lg"
                 >
                   {opt}
                 </button>
@@ -1377,12 +1377,12 @@ const GamesPage: React.FC = () => {
   if (activeGame === 'SEARCH') return <WordSearchGame onBack={() => setActiveGame(null)} />;
   if (activeGame === 'CROSSWORD') return <CrosswordPro onBack={() => setActiveGame(null)} />;
   return (
-    <div className="h-full flex flex-col px-4 sm:px-6 pt-6 pb-10 animate-fade-in">
-      <div className="text-center mb-6 sm:mb-8">
-        <h2 className="font-display text-5xl sm:text-6xl text-white italic tracking-tighter drop-shadow-2xl mb-2">Arcade Zone</h2>
-        <p className="text-slate-400 text-sm sm:text-base font-medium tracking-tight">Level up and earn Star Treasures!</p>
+    <div className="h-full flex flex-col px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
+      <div className="text-center mb-6">
+        <h2 className="font-display text-4xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
+        <p className="text-slate-400 text-sm font-medium tracking-tight">Level up and earn Star Treasures!</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 max-w-6xl mx-auto w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
         <GameCard onClick={() => setActiveGame('MATH')} icon="🌌" title="Math Galaxy" tag="Logic" color="from-indigo-600 to-blue-700" />
         <GameCard onClick={() => setActiveGame('SEARCH')} icon="🧩" title="Word Search" tag="Reading" color="from-emerald-600 to-teal-700" />
         <GameCard onClick={() => setActiveGame('CROSSWORD')} icon="⌨️" title="Crossword Pro" tag="Spelling" color="from-purple-600 to-violet-700" />
@@ -1404,19 +1404,19 @@ type GameCardProps = {
 const GameCard: React.FC<GameCardProps> = ({ icon, title, tag, color, onClick }) => (
   <button
     onClick={onClick}
-    className="group relative bg-slate-900/70 backdrop-blur-xl p-6 sm:p-7 rounded-[2.25rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-hidden flex flex-col items-center shadow-2xl"
+    className="group relative bg-slate-900/70 backdrop-blur-xl p-5 sm:p-6 rounded-[1.5rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-hidden flex flex-col items-center shadow-lg"
   >
     <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`} />
 
-    <div className="relative text-5xl sm:text-6xl mb-5 sm:mb-6 group-hover:scale-105 transition-transform duration-500 group-hover:rotate-3">
+    <div className="relative text-4xl sm:text-5xl mb-4 group-hover:scale-105 transition-transform duration-500 group-hover:rotate-3">
       {icon}
     </div>
 
-    <h3 className="relative text-xl sm:text-2xl font-black text-white uppercase italic tracking-tighter mb-2">
+    <h3 className="relative text-lg sm:text-xl font-black text-white uppercase italic tracking-tight mb-1">
       {title}
     </h3>
 
-    <p className="relative text-indigo-300 font-black text-[10px] uppercase tracking-widest bg-indigo-400/10 px-3 py-1 rounded-full border border-indigo-400/20">
+    <p className="relative text-indigo-300 font-bold text-[9px] uppercase tracking-widest bg-indigo-400/10 px-2 py-0.5 rounded-full border border-indigo-400/20">
       {tag} Challenge
     </p>
   </button>

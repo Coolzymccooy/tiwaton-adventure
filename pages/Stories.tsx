@@ -224,32 +224,32 @@ const StoriesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
       {/* Create Story Section */}
-      <div className="bg-slate-800/80 p-5 sm:p-6 rounded-2xl border border-slate-700 shadow-xl">
-        <h3 className="font-display text-2xl text-pink-400 mb-2 flex items-center gap-2">
-          <Sparkles /> {t('stories.createTitle')}
+      <div className="bg-slate-800/80 p-4 sm:p-5 rounded-2xl border border-slate-700 shadow-md">
+        <h3 className="font-display text-xl text-pink-400 mb-2 flex items-center gap-2">
+          <Sparkles size={20} /> {t('stories.createTitle')}
         </h3>
-        <p className="text-slate-400 text-sm">{t('stories.createSubtitle')}</p>
-        <div className="space-y-4">
+        <p className="text-slate-400 text-xs mb-3">{t('stories.createSubtitle')}</p>
+        <div className="space-y-3">
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none"
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-pink-500 outline-none"
             placeholder="Title (e.g. The Magic Sofa)"
             title="Story Title"
           />
           <textarea
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
-            className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-3 focus:border-pink-500 outline-none resize-none"
+            className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-pink-500 outline-none resize-none"
             placeholder="Once upon a time..."
             title="Story Content"
           />
           <button
             onClick={handleSaveStory}
             title="Save your new story"
-            className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform"
+            className="w-full py-2.5 bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl font-bold text-sm shadow hover:scale-[1.02] transition-transform"
           >
             {t('stories.saveButton')}
           </button>
@@ -257,29 +257,29 @@ const StoriesPage: React.FC = () => {
       </div>
 
       {/* Library Section (Collapsible) */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <button
           onClick={() => setIsLibraryOpen(!isLibraryOpen)}
           title={isLibraryOpen ? t('stories.libraryToggleCollapse') : t('stories.libraryToggleExpand')}
-          className="w-full flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 hover:bg-slate-700 transition-colors"
+          className="w-full flex justify-between items-center bg-slate-800 p-3 sm:p-4 rounded-xl border border-slate-700 hover:bg-slate-700 transition-colors"
         >
-          <h3 className="font-display text-2xl text-amber-400 flex items-center gap-2">
-            <BookOpen /> {t('stories.libraryTitle')} ({stories.length})
+          <h3 className="font-display text-xl text-amber-400 flex items-center gap-2">
+            <BookOpen size={20} /> {t('stories.libraryTitle')} ({stories.length})
           </h3>
           {isLibraryOpen ? <ChevronUp /> : <ChevronDown />}
         </button>
 
         {isLibraryOpen && (
-          <div className="grid gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+          <div className="grid gap-3 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
             {stories.map((story) => {
               const isPlaying = speakingStoryId === story.id;
               return (
-                <div key={story.id} className={`bg-slate-800/50 border ${isPlaying ? 'border-amber-500 bg-slate-800' : 'border-slate-700'} rounded-xl p-5 hover:bg-slate-800 transition-colors`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-lg text-slate-100">{story.title}</h4>
-                    {story.isUserCreated && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full uppercase">{t('stories.familyMadeTag')}</span>}
+                <div key={story.id} className={`bg-slate-800/50 border ${isPlaying ? 'border-amber-500 bg-slate-800' : 'border-slate-700'} rounded-xl p-4 hover:bg-slate-800 transition-colors`}>
+                  <div className="flex justify-between items-start mb-1.5">
+                    <h4 className="font-bold text-base text-slate-100">{story.title}</h4>
+                    {story.isUserCreated && <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase">{t('stories.familyMadeTag')}</span>}
                   </div>
-                  <p className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 mb-4">
+                  <p className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 mb-3">
                     {story.content}
                   </p>
                   <div className="flex flex-wrap gap-2">

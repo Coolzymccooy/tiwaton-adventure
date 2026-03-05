@@ -1,0 +1,98 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid));
+    }
+
+    function isActiveMember(tenantId) {
+      return signedIn()
+        && memberDoc(tenantId).exists()
+        && memberDoc(tenantId).data.active == true;
+    }
+
+    function role(tenantId) {
+      return memberDoc(tenantId).data.role;
+    }
+
+    function isAdmin(tenantId) {
+      return isActiveMember(tenantId) && role(tenantId) == "ADMIN";
+    }
+
+    function isStaff(tenantId) {
+      return isActiveMember(tenantId) && (role(tenantId) == "STAFF" || role(tenantId) == "ADMIN");
+    }
+
+    // Child can access if:
+    // - they are the child's loginUid
+    // OR - requester is in guardianUids
+    // OR - requester is STAFF/ADMIN
+    function canAccessChild(tenantId, childId) {
+      return isActiveMember(tenantId) && (
+        isStaff(tenantId)
+        || request.auth.uid == get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.loginUid
+        || request.auth.uid in get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.guardianUids
+      );
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Tenants root (optional metadata)
+    match /tenants/{tenantId} {
+      allow read: if isActiveMember(tenantId);
+      allow write: if isAdmin(tenantId);
+    }
+
+    // Membership management
+    match /tenants/{tenantId}/members/{uid} {
+      // Users can read their own membership (helps UI decide role)
+      allow read: if signedIn() && request.auth.uid == uid && isActiveMember(tenantId);
+
+      // Admin can read/manage all memberships
+      allow read, create, update, delete: if isAdmin(tenantId);
+    }
+
+    // Child profiles
+    match /tenants/{tenantId}/children/{childId} {
+      allow read: if canAccessChild(tenantId, childId);
+
+      // Create child: STAFF/ADMIN only
+      allow create: if isStaff(tenantId)
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.guardianUids is list
+        && request.resource.data.active == true;
+
+      // Update child: STAFF/ADMIN OR guardian (limited)
+      allow update: if canAccessChild(tenantId, childId)
+        && request.resource.data.tenantId == tenantId;
+
+      // Delete child: ADMIN only
+      allow delete: if isAdmin(tenantId);
+    }
+
+    // Everything under a child (paints/stories/games/etc)
+    match /tenants/{tenantId}/children/{childId}/{subcol}/{docId} {
+      allow read: if canAccessChild(tenantId, childId);
+
+      // Writes: child/guardian/staff can create
+      allow create: if canAccessChild(tenantId, childId)
+        && request.resource.data.ownerChildId == childId
+        && request.resource.data.createdByUid == request.auth.uid;
+
+      // Updates: allow same access (you can tighten later to “createdByUid only”)
+      allow update: if canAccessChild(tenantId, childId);
+
+      // Deletes: STAFF/ADMIN only (safer)
+      allow delete: if isStaff(tenantId);
+    }
+  }
+}

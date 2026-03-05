@@ -663,18 +663,18 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
     return (
       <div className="min-h-full flex flex-col relative animate-fade-in bg-[#050810] pb-24">
         {showVictory && (
-          <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 p-8 backdrop-blur-3xl animate-fade-in fixed">
+          <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 p-6 backdrop-blur-3xl animate-fade-in fixed">
             <div className="text-center max-w-sm animate-float">
-              <div className="text-8xl mb-8 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{world?.icon}</div>
-              <h2 className="text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">{t('activities.victoryTitle')}</h2>
-              <p className="text-white text-lg font-bold mb-6">{t('activities.victorySubtitle')}</p>
-              <div className="bg-indigo-600/30 p-6 rounded-[2rem] border border-white/10 mb-6">
-                <div className="flex items-center justify-center gap-3 text-white font-black text-3xl mb-1">
-                  <Zap className="text-yellow-300" /> +150
+              <div className="text-6xl sm:text-7xl mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{world?.icon}</div>
+              <h2 className="text-4xl sm:text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">{t('activities.victoryTitle')}</h2>
+              <p className="text-white text-base font-bold mb-4">{t('activities.victorySubtitle')}</p>
+              <div className="bg-indigo-600/30 p-5 rounded-3xl border border-white/10 mb-6">
+                <div className="flex items-center justify-center gap-2 text-white font-black text-2xl mb-1">
+                  <Zap className="text-yellow-300" size={24} /> +150
                 </div>
-                <p className="text-indigo-300 font-black uppercase text-[9px] tracking-widest">{t('activities.victoryXpLabel')}</p>
+                <p className="text-indigo-300 font-black uppercase text-[8px] sm:text-[9px] tracking-widest">{t('activities.victoryXpLabel')}</p>
               </div>
-              <button onClick={() => setMode('MENU')} className="w-full py-5 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(161,98,7)] transition-all active:scale-95">{t('activities.retryButton')}</button>
+              <button onClick={() => setMode('MENU')} className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-lg rounded-xl shadow-[0_4px_0_rgb(161,98,7)] transition-all active:scale-95">{t('activities.retryButton')}</button>
             </div>
           </div>
         )}
@@ -706,18 +706,18 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Question Area - True to View */}
-        <div className="flex-1 px-4 pb-6 flex flex-col justify-center items-center gap-4 sm:gap-6 max-w-xl mx-auto w-full overflow-hidden">
+        <div className="flex-1 px-4 pb-6 flex flex-col justify-center items-center gap-4 max-w-xl mx-auto w-full overflow-hidden">
           <div className="relative shrink-0">
-            <div className={`text-7xl sm:text-8xl transition-all duration-500 drop-shadow-2xl ${selectedOption !== null ? (selectedOption === q.correctIndex ? 'animate-bounce scale-110' : 'animate-shake opacity-40') : 'animate-float'}`}>
+            <div className={`text-5xl sm:text-6xl transition-all duration-500 drop-shadow-xl ${selectedOption !== null ? (selectedOption === q.correctIndex ? 'animate-bounce scale-110' : 'animate-shake opacity-40') : 'animate-float'}`}>
               {selectedOption === null ? (['📜', '🗺️', '🔭', '🎒'][currentIndex % 4]) : (selectedOption === q.correctIndex ? '✨' : '🤕')}
             </div>
           </div>
 
-          <div className="bg-slate-900/60 backdrop-blur-3xl p-6 sm:p-8 rounded-[2.5rem] border-2 border-white/5 shadow-2xl relative text-center w-full shrink-0">
-            <p className="text-2xl sm:text-3xl font-black text-white leading-tight italic tracking-tighter drop-shadow-lg">{q.question}</p>
+          <div className="bg-slate-900/60 backdrop-blur-3xl p-5 sm:p-6 rounded-[2rem] border border-white/5 shadow-xl relative text-center w-full shrink-0">
+            <p className="text-xl sm:text-2xl font-black text-white leading-tight italic tracking-tight drop-shadow-md">{q.question}</p>
           </div>
 
-          <div className="grid gap-2.5 w-full pr-1">
+          <div className="grid gap-2 outline-none w-full pr-1">
             {q.options.map((opt, idx) => {
               const isSelected = selectedOption === idx;
               const isCorrect = idx === q.correctIndex;
@@ -726,8 +726,8 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
                   key={idx}
                   disabled={selectedOption !== null}
                   onClick={() => handleAnswer(idx)}
-                  className={`group relative p-4 sm:p-5 rounded-2xl border-2 text-left font-black text-lg sm:text-xl transition-all flex items-center gap-4 shadow-lg active:scale-95 ${selectedOption === null
-                    ? 'bg-slate-900/40 border-slate-800 hover:border-indigo-500'
+                  className={`group relative p-3 sm:p-4 rounded-xl border text-left font-bold text-base sm:text-lg transition-all flex items-center gap-3 shadow-md active:scale-95 ${selectedOption === null
+                    ? 'bg-slate-900/40 border-slate-700 hover:border-indigo-500'
                     : (isSelected
                       ? (isCorrect ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-rose-600 border-rose-400 text-white')
                       : (isCorrect ? 'bg-emerald-600 border-emerald-400 text-white' : 'opacity-40 bg-slate-900 border-slate-800'))
@@ -747,25 +747,25 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
   return (
     <div className="h-full flex flex-col p-4 animate-fade-in custom-scrollbar overflow-y-auto bg-[#050810]">
       {/* Top Controls */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <button
           onClick={() => onNavigate && onNavigate(View.HOME)}
-          className="flex items-center gap-2 bg-slate-900/60 border border-white/10 px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest"
+          className="flex items-center gap-1.5 bg-slate-900/60 border border-white/10 px-3 py-1.5 rounded-xl text-slate-400 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
         >
-          <Home size={16} /> EXIT TO HUB
+          <Home size={14} /> EXIT TO HUB
         </button>
-        <div className="bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full text-indigo-400 text-[9px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
-          <BrainCircuit size={12} /> {t('activities.header')}
+        <div className="bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full text-indigo-400 text-[8px] font-black uppercase tracking-[0.3em] flex items-center gap-1.5">
+          <BrainCircuit size={10} /> {t('activities.header')}
         </div>
       </div>
 
-      <header className="text-center mb-8">
-        <h1 className="font-display text-6xl text-white italic tracking-tighter drop-shadow-2xl mb-2">{t('activities.header')}</h1>
-        <p className="text-slate-500 text-lg font-medium tracking-tight px-4">{t('activities.description')}</p>
+      <header className="text-center mb-6">
+        <h1 className="font-display text-3xl sm:text-4xl text-white italic tracking-tight drop-shadow-md mb-1">{t('activities.header')}</h1>
+        <p className="text-slate-500 text-sm font-medium tracking-tight px-4">{t('activities.description')}</p>
       </header>
 
       {/* World Selection Grid - Optimized */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-20 max-w-6xl mx-auto w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-20 max-w-5xl mx-auto w-full">
         {BIBLE_WORLDS.map((world, idx) => {
           const isUnlocked = idx <= bibleProgress;
           const isCurrent = idx === bibleProgress;
@@ -774,21 +774,21 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
               key={world.id}
               disabled={!isUnlocked}
               onClick={() => startLevel(world.id)}
-              className={`group relative p-8 rounded-[3rem] border-2 transition-all flex flex-col items-center text-center overflow-hidden shadow-2xl ${isUnlocked
-                ? (isCurrent ? 'bg-indigo-600 border-indigo-400 hover:scale-105' : 'bg-slate-900 border-slate-800 hover:border-indigo-500 hover:-translate-y-2')
-                : 'bg-slate-950/50 border-slate-900 opacity-40 grayscale pointer-events-none'
+              className={`group relative p-3 sm:p-4 rounded-[1.5rem] border transition-all flex flex-col items-center text-center overflow-hidden shadow-lg ${isUnlocked
+                ? (isCurrent ? 'bg-indigo-600 border-indigo-400 hover:scale-[1.03]' : 'bg-slate-900 border-white/10 hover:border-indigo-500 hover:-translate-y-1')
+                : 'bg-slate-950/50 border-slate-900/50 opacity-50 grayscale pointer-events-none'
                 }`}
             >
-              {!isUnlocked && <Lock className="absolute top-6 right-6 text-slate-700" size={20} />}
-              {isUnlocked && isCurrent && <Sparkles className="absolute top-6 right-6 text-yellow-300 animate-pulse" size={20} />}
+              {!isUnlocked && <Lock className="absolute top-3 right-3 text-slate-700" size={14} />}
+              {isUnlocked && isCurrent && <Sparkles className="absolute top-3 right-3 text-yellow-300 animate-pulse" size={14} />}
 
-              <div className="text-7xl mb-4 group-hover:scale-110 transition-transform duration-500 group-hover:rotate-6 drop-shadow-xl">{world.icon}</div>
-              <h3 className="text-2xl font-black text-white italic tracking-tighter mb-1 uppercase leading-tight">{world.label}</h3>
-              <p className="text-indigo-400 font-black text-[9px] uppercase tracking-widest opacity-60 group-hover:opacity-100">{world.desc}</p>
+              <div className="text-3xl sm:text-4xl mb-2 group-hover:scale-110 transition-transform duration-500 group-hover:rotate-3 drop-shadow-md">{world.icon}</div>
+              <h3 className="text-xs sm:text-sm font-black text-white italic tracking-tight mb-1 uppercase leading-tight">{world.label}</h3>
+              <p className="text-indigo-400 font-bold text-[7px] sm:text-[8px] uppercase tracking-widest opacity-70 group-hover:opacity-100 leading-tight">{world.desc}</p>
 
               {isUnlocked && stats.badges.includes(world.badge) && (
-                <div className="mt-6 px-3 py-1 bg-yellow-400/20 text-yellow-400 rounded-full text-[8px] font-black uppercase tracking-[0.2em] border border-yellow-400/30 flex items-center gap-1.5">
-                  <Crown size={10} /> {world.badge}
+                <div className="mt-2 px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded-full text-[7px] font-black uppercase tracking-[0.2em] border border-yellow-400/30 flex items-center gap-1">
+                  <Crown size={8} /> {world.badge}
                 </div>
               )}
             </button>

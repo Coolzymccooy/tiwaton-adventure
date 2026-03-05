@@ -5,7 +5,6 @@ import { View } from './types';
 import type { FamilyProfile } from './types';
 import { StorageService } from './services/storage';
 import { I18nProvider } from './i18n/I18nProvider';
-import { SyncService } from './services/sync';
 
 // Pages
 import Home from './pages/Home';
@@ -52,20 +51,14 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!profile) return;
     StorageService.setLastView(currentView);
-    const snapshot = StorageService.buildSnapshot(profile.id, currentView);
-    SyncService.sendSnapshot(snapshot);
   }, [profile, currentView]);
 
   const handleLogin = async (p: FamilyProfile) => {
     StorageService.setCurrentProfile(p.id);
-    const snapshot = await SyncService.fetchSnapshot(p.id);
-    if (snapshot) {
-      StorageService.applySnapshot(snapshot);
-    }
     const active = StorageService.getCurrentProfile() || p;
     setProfile(active);
     setIsAdminMode(active.mode === 'PARENT');
-    setCurrentView(resolveView(snapshot?.lastView));
+    setCurrentView(resolveView(StorageService.getLastView()));
   };
 
   const handleLogout = () => {

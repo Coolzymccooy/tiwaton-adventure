@@ -69,7 +69,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
   })).sort((a, b) => b.xp - a.xp);
 
   return (
-    <div className="space-y-8 animate-fade-in pb-32 max-w-5xl mx-auto px-4">
+    <div className="space-y-6 animate-fade-in pb-24 max-w-5xl mx-auto px-4 sm:px-6">
 
       {/* PIN PAD MODAL */}
       {showPinPad && (
@@ -131,53 +131,53 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
       )}
 
       {/* Profile Header */}
-      <div className="relative overflow-hidden rounded-[3.5rem] bg-slate-900 border-2 border-white/5 p-6 sm:p-8 shadow-2xl flex flex-col md:flex-row items-center gap-8">
+      <div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-slate-900 border border-white/5 p-5 sm:p-6 shadow-2xl flex flex-col md:flex-row items-center gap-6">
         <div className="relative shrink-0">
-          <div className="text-8xl bg-slate-800 rounded-[2.5rem] p-6 border-4 border-indigo-500/30 shadow-2xl">
+          <div className="text-6xl sm:text-7xl bg-slate-800 rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/30 shadow-2xl">
             {profile.avatar}
           </div>
-          <div className="absolute -bottom-2 -right-2 bg-indigo-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-black border-4 border-slate-900">
+          <div className="absolute -bottom-2 -right-2 bg-indigo-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-black border-[3px] border-slate-900 text-xs text-center">
             {stats.level}
           </div>
         </div>
 
         <div className="flex-1 text-center md:text-left">
-          <h2 className="font-display text-6xl text-white mb-2 italic tracking-tighter">Hey, {profile.name}!</h2>
-          <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
-            <span className="px-5 py-2 bg-indigo-500/10 text-indigo-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-indigo-500/20 flex items-center gap-2">
-              <TrendingUp size={14} /> Level {stats.level}
+          <h2 className="font-display text-4xl sm:text-5xl text-white mb-2 italic tracking-tighter">Hey, {profile.name}!</h2>
+          <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
+            <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20 flex items-center gap-1.5">
+              <TrendingUp size={12} /> Level {stats.level}
             </span>
-            <span className="px-5 py-2 bg-amber-500/10 text-amber-400 rounded-full text-[11px] font-black uppercase tracking-widest border border-amber-500/20 flex items-center gap-2">
-              <Sparkles size={14} /> {stats.xp} XP Points
+            <span className="px-4 py-1.5 bg-amber-500/10 text-amber-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-500/20 flex items-center gap-1.5">
+              <Sparkles size={12} /> {stats.xp} XP
             </span>
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={handleHqClick} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-8 py-5 rounded-[2rem] text-sm font-black transition-all border-b-8 border-slate-950 active:translate-y-1">
-            <ShieldCheck size={20} className={isAdminMode ? "text-emerald-400" : "text-slate-400"} /> {isAdminMode ? 'DASHBOARD' : 'HQ ACCESS'}
+        <div className="flex gap-2">
+          <button onClick={handleHqClick} className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3.5 rounded-full text-xs font-black transition-all border-b-4 border-slate-950 active:translate-y-1">
+            <ShieldCheck size={18} className={isAdminMode ? "text-emerald-400" : "text-slate-400"} /> {isAdminMode ? 'DASHBOARD' : 'HQ'}
           </button>
-          <button onClick={handleLogoutClick} className="p-5 bg-slate-800 hover:bg-red-900/30 text-slate-500 hover:text-red-400 rounded-[2rem] border-b-8 border-slate-950 active:translate-y-1">
-            <LogOut size={24} />
+          <button onClick={handleLogoutClick} className="p-3.5 bg-slate-800 hover:bg-red-900/30 text-slate-500 hover:text-red-400 rounded-full border-b-4 border-slate-950 active:translate-y-1">
+            <LogOut size={20} />
           </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
+      <div className="grid lg:grid-cols-12 gap-6">
         {/* Main Content Area */}
-        <div className="lg:col-span-8 space-y-8">
+        <div className="lg:col-span-8 space-y-6">
           {/* Featured Quest */}
-          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-[3.5rem] shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
-            <div className="bg-slate-900/80 backdrop-blur-xl p-6 sm:p-10 rounded-[3.4rem] flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-125 transition-transform"></div>
-              <div className="flex items-center gap-6 relative z-10">
-                <div className="bg-white/10 p-5 rounded-[1.5rem] animate-float"><Palette size={48} className="text-white" /></div>
+          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-3xl shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
+            <div className="bg-slate-900/80 backdrop-blur-xl p-5 sm:p-8 rounded-[1.8rem] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 group-hover:scale-125 transition-transform"></div>
+              <div className="flex items-center gap-4 sm:gap-6 relative z-10">
+                <div className="bg-white/10 p-3.5 sm:p-5 rounded-2xl animate-float"><Palette size={32} className="text-white" /></div>
                 <div>
-                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
-                  <h3 className="font-display text-4xl text-white">"Paint a Neon Jungle!"</h3>
+                  <p className="text-[9px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
+                  <h3 className="font-display text-2xl sm:text-3xl text-white">"Paint a Neon Jungle!"</h3>
                 </div>
               </div>
-              <div className="bg-white text-pink-600 px-10 py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-xl group-hover:bg-pink-50 transition-colors">START +200 XP</div>
+              <div className="bg-white text-pink-600 px-6 py-3 rounded-full font-black text-sm uppercase tracking-widest shadow-xl group-hover:bg-pink-50 transition-colors mt-4 md:mt-0">START +200 XP</div>
             </div>
           </div>
 
@@ -192,25 +192,25 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
         {/* Sidebar Area: HQ Leaderboard */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900/50 backdrop-blur-xl border-2 border-white/5 rounded-[3.5rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 bg-indigo-600/20 rounded-2xl"><Trophy className="text-indigo-400" size={24} /></div>
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 sm:p-3 bg-indigo-600/20 rounded-xl"><Trophy className="text-indigo-400" size={20} /></div>
               <div>
-                <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">HQ Leaderboard</h4>
-                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Global Standings</p>
+                <h4 className="text-xl sm:text-2xl font-black text-white italic tracking-tighter uppercase">Leaderboard</h4>
+                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Global Standings</p>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {leaderboardData.map((user, idx) => (
-                <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.name === profile.name ? 'bg-indigo-600 border-indigo-400 shadow-lg' : 'bg-slate-800/40 border-white/5'}`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-black text-slate-600 w-5 italic">{idx + 1}</span>
-                    <span className="text-4xl">{user.avatar}</span>
-                    <span className="text-sm font-black text-white uppercase tracking-tighter italic">{user.name}</span>
+                <div key={user.id} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${user.name === profile.name ? 'bg-indigo-600 border-indigo-400 shadow-md' : 'bg-slate-800/40 border-white/5'}`}>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-lg font-black text-slate-500 w-4 italic">{idx + 1}</span>
+                    <span className="text-2xl sm:text-3xl">{user.avatar}</span>
+                    <span className="text-xs font-black text-white uppercase tracking-tighter italic whitespace-pre-wrap truncate max-w-[80px] sm:max-w-[120px]">{user.name}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-white">{user.xp}</p>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-black text-white">{user.xp}</p>
                     <p className="text-[8px] font-black text-indigo-300 uppercase tracking-tighter">XP</p>
                   </div>
                 </div>
@@ -219,7 +219,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
             <button
               onClick={() => onNavigate(View.ACTIVITIES)}
-              className="w-full mt-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center justify-center gap-2 group transition-all"
+              className="w-full mt-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center justify-center gap-2 group transition-all shrink-0"
             >
               GO EARN XP <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </button>
@@ -227,9 +227,9 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
           {/* Love Note from Parents */}
           {comments.length > 0 && (
-            <div className="bg-pink-600/10 border-2 border-pink-500/20 rounded-[3rem] p-6 sm:p-8 animate-slide-up">
-              <MessageCircle className="text-pink-400 mb-4" size={32} />
-              <p className="text-xl text-slate-200 font-medium italic leading-tight">"{comments[0].text}"</p>
+            <div className="bg-pink-600/10 border border-pink-500/20 rounded-3xl p-5 sm:p-6 animate-slide-up">
+              <MessageCircle className="text-pink-400 mb-3" size={24} />
+              <p className="text-lg text-slate-200 font-medium italic leading-snug">"{comments[0].text}"</p>
               <p className="text-[9px] text-pink-400 font-black uppercase tracking-widest mt-4">— From Admin</p>
             </div>
           )}
@@ -240,10 +240,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 };
 
 const LaunchCard = ({ icon, label, color, onClick }: any) => (
-  <button onClick={onClick} className="group bg-slate-900 p-6 sm:p-10 rounded-[2.5rem] border-2 border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 shadow-2xl relative overflow-hidden flex flex-col items-center">
-    <div className={`absolute top-0 left-0 w-full h-2 ${color}`}></div>
-    <div className="text-7xl group-hover:scale-125 transition-transform duration-500 group-hover:rotate-6 mb-4">{icon}</div>
-    <span className="font-black text-white uppercase tracking-widest text-[10px] opacity-60 group-hover:opacity-100">{label}</span>
+  <button onClick={onClick} className="group bg-slate-900 p-5 sm:p-8 rounded-[1.8rem] border border-slate-800 hover:border-indigo-500 transition-all hover:-translate-y-2 shadow-2xl relative overflow-hidden flex flex-col items-center">
+    <div className={`absolute top-0 left-0 w-full h-1.5 ${color}`}></div>
+    <div className="text-5xl sm:text-6xl group-hover:scale-125 transition-transform duration-500 group-hover:rotate-6 mb-3">{icon}</div>
+    <span className="font-black text-white uppercase tracking-widest text-[9px] sm:text-[10px] opacity-60 group-hover:opacity-100">{label}</span>
   </button>
 );
 
