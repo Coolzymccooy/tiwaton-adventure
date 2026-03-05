@@ -18,6 +18,8 @@ export const AudioService = {
     isSpeaking: false,
     locale: 'en',
     heartbeat: null as any,
+    ttsEnabled: localStorage.getItem('tts_enabled') !== 'false',
+    watchdog: null as any,
   },
 
   SARCASM: {
@@ -48,9 +50,7 @@ export const AudioService = {
   },
 
   speak: (text: string, mood: Mood = 'neutral') => {
-    // Only speak if enabled in settings (default to enabled for now)
-    const enabled = localStorage.getItem('tts_enabled') !== 'false';
-    if (!enabled) return;
+    if (!AudioService.private.ttsEnabled) return;
 
     // Split long text into sentences for better pacing and reliability
     // Split by punctuation followed by space or newline
@@ -87,7 +87,19 @@ export const AudioService = {
     AudioService.private.queue = [];
     AudioService.private.isSpeaking = false;
     if (AudioService.private.heartbeat) clearInterval(AudioService.private.heartbeat);
+    if (AudioService.private.watchdog) clearTimeout(AudioService.private.watchdog);
   },
+
+  toggleTTS: () => {
+    AudioService.private.ttsEnabled = !AudioService.private.ttsEnabled;
+    localStorage.setItem('tts_enabled', String(AudioService.private.ttsEnabled));
+    if (!AudioService.private.ttsEnabled) {
+      AudioService.cancel();
+    }
+    return AudioService.private.ttsEnabled;
+  },
+
+  isEnabled: () => AudioService.private.ttsEnabled,
 
   processQueue: async () => {
     if (AudioService.private.queue.length === 0) {
@@ -171,12 +183,22 @@ export const AudioService = {
 
     // PUNCTUATION PACING (Natural breathing)
     utterance.onend = () => {
+      if (AudioService.private.watchdog) clearTimeout(AudioService.private.watchdog);
       let delay = 350;
       if (text.endsWith('!') || text.endsWith('?')) delay = 750;
       if (text.endsWith('.')) delay = 500;
 
       setTimeout(() => AudioService.processQueue(), delay);
     };
+
+    // Watchdog to prevent hanging if onend doesn't fire
+    if (AudioService.private.watchdog) clearTimeout(AudioService.private.watchdog);
+    AudioService.private.watchdog = setTimeout(() => {
+      if (AudioService.private.isSpeaking) {
+        console.warn("TTS Watchdog triggered: forcing next chunk");
+        AudioService.processQueue();
+      }
+    }, 15000); // 15s timeout per chunk
 
     utterance.onerror = (e) => {
       console.warn("TTS Error:", e);

@@ -58,14 +58,49 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
     onNavigate(View.HOME);
   };
 
+  // Dynamic Background Vibe
+  const getVibeColor = () => {
+    switch (currentView) {
+      case View.GAMES: return 'bg-emerald-900/20';
+      case View.STORIES: return 'bg-blue-900/20';
+      case View.ACTIVITIES: return 'bg-rose-900/20';
+      case View.COUNTDOWN: return 'bg-amber-900/20';
+      case View.DRAWING: return 'bg-indigo-900/20';
+      default: return 'bg-indigo-950/20';
+    }
+  };
+
   return (
     <div className="h-full w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
 
       {/* Immersive Edge-to-Edge Cinematic Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] bg-indigo-950/20 rounded-full blur-[160px] animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[120vw] h-[120vw] bg-purple-950/20 rounded-full blur-[160px] animate-pulse delay-700"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vw] bg-blue-950/10 rounded-full blur-[200px]"></div>
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Animated Moving Blobs */}
+        <div className={`absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] ${getVibeColor()} rounded-full blur-[160px] animate-pulse transition-colors duration-1000`}></div>
+
+        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-purple-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+        <div className="absolute top-1/3 -right-20 w-80 h-80 bg-indigo-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
+
+        {/* Shimmering Sparkles (Subtle Dots) */}
+        <div className="absolute inset-0 opacity-20">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute bg-white rounded-full animate-twinkle"
+              style={{
+                width: Math.random() * 3 + 'px',
+                height: Math.random() * 3 + 'px',
+                top: Math.random() * 100 + '%',
+                left: Math.random() * 100 + '%',
+                animationDelay: Math.random() * 5 + 's',
+                animationDuration: 3 + Math.random() * 4 + 's'
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="absolute bottom-[-10%] right-[-10%] w-[120vw] h-[120vw] bg-purple-950/20 rounded-full blur-[160px] animate-pulse delay-700 transition-colors duration-1000"></div>
       </div>
 
       {/* Dynamic Top Header - Adapts to safe areas */}
