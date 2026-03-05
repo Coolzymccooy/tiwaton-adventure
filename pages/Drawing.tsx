@@ -6,7 +6,7 @@ import {
   PaintBucket, SprayCan, Highlighter, Circle as CircleIcon,
   Square, Star, Split, Stamp, FolderOpen, Edit2,
   Layers, Move, ZoomIn, ZoomOut, Hand, MousePointer2, Settings2, Grid,
-  Music, Volume2, VolumeX, Play, Pause, ChevronRight, Check, Home
+  Music, Volume2, VolumeX, Play, Pause, ChevronRight, Check, Home, Trophy, RefreshCcw
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
@@ -22,6 +22,19 @@ const COLORS = [
 ];
 
 const STICKERS = ["⭐", "❤️", "🦄", "🦁", "🚀", "REX", "👑", "🌈", "🔥", "⚽", "👀", "🎈", "🦋", "🍄", "🍦", "🎸", "🍕", "🚗", "👻", "🤖", "🐱", "🐶"];
+
+const CHALLENGES = [
+  "Draw a Flying Pig! 🐷✈️",
+  "Draw a Space Dinosaur! 🦖🚀",
+  "Draw your Dream Treehouse! 🌳🏡",
+  "Draw a Robot eating Ice Cream! 🤖🍦",
+  "Draw a Castle in the Clouds! ☁️🏰",
+  "Draw an Underwater City! 🌊🏙️",
+  "Draw a Superhero Cat! 🐱🦸",
+  "Draw a Banana wearing Sunglasses! 🍌😎",
+  "Draw a Pirate Ship! 🏴‍☠️⛵",
+  "Draw a Friendly Monster! 👾🎈"
+];
 
 const LIBRARY_CATEGORIES = [
   { id: 'animals', label: 'Animals', emoji: '🦁', prompt: 'a cute baby animal', type: 'ai' },
@@ -98,6 +111,8 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [storyStep, setStoryStep] = useState<StoryBuilderStep>('NONE');
   const [storyAssets, setStoryAssets] = useState<string[]>([]);
   const [storyResult, setStoryResult] = useState<{ title: string, content: string } | null>(null);
+
+  const [activeChallenge, setActiveChallenge] = useState<string | null>(null);
 
   useEffect(() => {
     const handleResize = () => setTimeout(initCanvas, 100);
@@ -205,7 +220,29 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       await StorageService.saveDrawing(newDrawing);
       await loadGallery();
       AudioService.speak("Saved to gallery!");
-      if (!isMagic) setShowGallery(true);
+      if (!isMagic && !activeChallenge) setShowGallery(true);
+    }
+  };
+
+  const startChallengeMode = () => {
+    const random = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
+    setActiveChallenge(random);
+    AudioService.speak("Challenge accepted! " + random);
+    handleClearCanvas(false); // don't wipe history, just give blank slate
+  };
+
+  const finishChallenge = async () => {
+    AudioService.playEffect('achievement');
+    AudioService.speak("Amazing job! Challenge completed!");
+    await handleSaveToGallery(undefined, false); // Auto-save their challenge masterpiece
+    setActiveChallenge(null);
+  };
+
+  const handleClearCanvas = (wipeHistory = true) => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && canvasRef.current) {
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      if (wipeHistory) saveHistory();
     }
   };
 
@@ -662,6 +699,19 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       )}
 
 
+      {/* CHALLENGE BANNER OVERLAY */}
+      {activeChallenge && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border-4 border-amber-400 animate-slide-in-top">
+          <div className="flex flex-col">
+            <span className="text-yellow-300 font-bold text-xs uppercase tracking-widest">Active Challenge</span>
+            <span className="font-display text-xl">{activeChallenge}</span>
+          </div>
+          <button onClick={finishChallenge} title="Complete Challenge!" className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg ml-4">
+            <Check size={18} /> Done!
+          </button>
+        </div>
+      )}
+
       {showLibrary && (
         <div className="absolute inset-0 z-40 bg-slate-900/95 flex items-center justify-center p-4 rounded-3xl animate-fade-in">
           <div className="bg-slate-800 p-5 rounded-2xl max-w-3xl w-full border border-slate-700 shadow-2xl max-h-[80vh] overflow-y-auto custom-scrollbar">
@@ -793,28 +843,44 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       </div>
 
       <div className="bg-slate-800 border-t border-slate-700 p-2 flex flex-col gap-2 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+
+        {/* UPPER TOOLBAR (Actions) */}
         <div className="flex justify-between items-center px-1 overflow-x-auto gap-2">
-          <div className="flex gap-1 shrink-0">
-            <button onClick={undo} data-tooltip="Undo Last Stroke" className="p-2 text-slate-300 hover:text-white bg-slate-700/50 rounded-lg hover:bg-slate-700"><Undo2 size={18} /></button>
-            <button onClick={() => { }} data-tooltip="Redo Action" className="p-2 text-slate-300 hover:text-white bg-slate-700/50 rounded-lg hover:bg-slate-700"><Redo2 size={18} /></button>
+          {/* Main Drawing Actions */}
+          <div className="flex gap-1 shrink-0 bg-slate-700/50 p-1 rounded-xl">
+            <button onClick={undo} data-tooltip="Undo Last Stroke" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Undo2 size={18} /></button>
+            <button onClick={() => { }} data-tooltip="Redo Action" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Redo2 size={18} /></button>
+            <div className="w-px bg-slate-600 mx-1"></div>
+            <button onClick={() => handleClearCanvas(true)} data-tooltip="Clear Canvas" className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg"><Trash2 size={18} /></button>
+            <button onClick={() => setIsSymmetry(!isSymmetry)} data-tooltip="Mirror Symmetry" className={`p-2 rounded-lg ${isSymmetry ? 'bg-indigo-600 text-white shadow-glow' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}><Split size={18} /></button>
           </div>
 
+          {/* AI and Creative Actions */}
           <div className="flex gap-2 shrink-0">
+            {/* CHALLENGE BUTTON */}
+            <button
+              onClick={startChallengeMode}
+              data-tooltip="Get a Random Challenge!"
+              className="flex items-center gap-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-black shadow-lg hover:brightness-110"
+            >
+              <Trophy size={14} className="animate-pulse" /> Challenge!
+            </button>
             <button onClick={() => setShowLibrary(true)} data-tooltip="Open Coloring Library" className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-600">
               <ImageIcon size={14} /> {t('drawing.templatesLabel')}
             </button>
-            <button onClick={startStoryMode} data-tooltip={t('drawing.storyModeHint')} className="flex items-center gap-1 bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
+            <button onClick={startStoryMode} data-tooltip={t('drawing.storyModeHint')} className="flex items-center gap-1 bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110 hidden sm:flex">
               <Layers size={14} /> {t('drawing.storyModeLabel')}
             </button>
             <button onClick={handleAutoFix} data-tooltip="AI Line Cleanup" className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
               <Wand2 size={14} /> Fix
             </button>
-            <button onClick={handleMagicTransform} data-tooltip="3D Magic Realism" className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110">
+            <button onClick={handleMagicTransform} data-tooltip="3D Magic Realism" className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:brightness-110 hidden sm:flex">
               <Sparkles size={14} /> Real!
             </button>
           </div>
 
-          <div className="flex gap-1 shrink-0">
+          {/* Save/Gallery */}
+          <div className="flex gap-1 shrink-0 bg-slate-700/30 p-1 rounded-xl">
             <button onClick={() => handleSaveToGallery()} data-tooltip="Save Masterpiece" className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Save size={18} /></button>
             <button onClick={() => handleDownload()} data-tooltip="Save to Device" className="p-2 bg-green-600 hover:bg-green-500 text-white rounded-lg"><Download size={18} /></button>
             <button onClick={() => setShowGallery(true)} data-tooltip="View Gallery" className="p-2 bg-slate-700 hover:bg-slate-600 text-amber-400 rounded-lg"><FolderOpen size={18} /></button>

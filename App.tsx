@@ -147,7 +147,7 @@ const App: React.FC = () => {
       case View.PARENT_DASHBOARD:
         return <ParentDashboard onBack={() => setCurrentView(View.HOME)} />;
       case View.STORIES:
-        return <StoriesPage />;
+        return <StoriesPage onNavigate={setCurrentView} />;
       case View.DRAWING:
         return <DrawingPage onNavigate={setCurrentView} />;
       case View.ACTIVITIES:

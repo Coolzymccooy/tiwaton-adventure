@@ -191,7 +191,7 @@ router.post("/story-from-assets", async (req, res, next) => {
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -235,7 +235,7 @@ router.post("/quiz", async (req, res, next) => {
       `Return JSON array with objects: {question, options (4 strings), correctIndex (0-3), explanation}.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: { parts: [{ text: prompt }] },
       config: { responseMimeType: "application/json" },
     });
@@ -261,7 +261,7 @@ router.post("/story-from-prompt", async (req, res, next) => {
       `Keep the length appropriate for a single page reading.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
@@ -295,11 +295,11 @@ router.post("/story-quiz", async (req, res, next) => {
     const age = Number(req.body.age || 6);
 
     const prompt = `Based on the story "${title}" with content: "${content}", ` +
-      `generate 3 fun comprehension questions for a ${age}-year-old. ` +
+      `generate 5 fun comprehension questions for a ${age}-year-old. ` +
       `Return a JSON array of objects: {question, options (4 strings), correctIndex (0-3), explanation}.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts: [{ text: prompt }] },
       config: { responseMimeType: "application/json" },
     });

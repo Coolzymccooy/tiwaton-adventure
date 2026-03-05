@@ -60,6 +60,22 @@ export const StorageService = {
         ...childrenSnap.docs.map(d => d.data() as FamilyProfile)
       ];
 
+      // Auto-backfill old children into the new global login index
+      childrenSnap.docs.forEach(d => {
+        const childData = d.data() as FamilyProfile;
+        try {
+          // Fire-and-forget indexing (won't throw or block the load)
+          const indexRef = doc(db, `children_index/${childData.name.toLowerCase()}`);
+          setDoc(indexRef, {
+            tenantId: uid,
+            childId: childData.id,
+            password: childData.password || '123'
+          }, { merge: true });
+        } catch (e) {
+          console.warn("Could not index child", childData.name, e);
+        }
+      });
+
       StorageService.setCachedProfiles(loadedProfiles);
       return loadedProfiles;
     } catch (err) {
@@ -159,9 +175,45 @@ export const StorageService = {
     const docRef = doc(db, `tenants/${tenantId}/children/${childId}`);
     await setDoc(docRef, newProfile);
 
+    // Save lightweight index for global sign in
+    try {
+      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      await setDoc(indexRef, {
+        tenantId,
+        childId,
+        password: password || '123'
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Could not save to children_index", e);
+    }
+
     cachedProfiles.push(newProfile);
     StorageService.setCachedProfiles([...cachedProfiles]);
     return newProfile;
+  },
+
+  findChildGlobal: async (name: string, pin: string): Promise<FamilyProfile | null> => {
+    try {
+      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const indexSnap = await getDoc(indexRef);
+      if (indexSnap.exists()) {
+        const data = indexSnap.data();
+        if (data.password.toLowerCase() === pin.toLowerCase()) {
+          const profileRef = doc(db, `tenants/${data.tenantId}/children/${data.childId}`);
+          const profileSnap = await getDoc(profileRef);
+          if (profileSnap.exists()) {
+            const p = profileSnap.data() as FamilyProfile;
+            StorageService.setTenantContext(data.tenantId);
+            StorageService.setCachedProfiles([p]); // Cache this profile locally
+            return p;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error("Global child fetch error", e);
+      return null;
+    }
   },
 
   getGameStats: (): GameStat => {
@@ -226,6 +278,14 @@ export const StorageService = {
     const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stories/${s.id}`);
     const payload = { ...s, ownerChildId: currentProfileId, createdByUid: auth.currentUser?.uid || currentProfileId };
     await setDoc(docRef, payload);
+  },
+
+  deleteStory: async (storyId: string) => {
+    const tenantId = getTenantId();
+    if (!tenantId || !currentProfileId) return;
+    const { deleteDoc } = await import('firebase/firestore');
+    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stories/${storyId}`);
+    await deleteDoc(docRef);
   },
 
   getComments: async () => {

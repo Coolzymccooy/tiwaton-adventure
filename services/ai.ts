@@ -113,11 +113,14 @@ export const AIService = {
         topic,
         age,
       });
-      if (!data?.title || !data?.content) return null;
+      if (!data?.title || !data?.content) throw new Error("Empty response");
       return data;
     } catch (e) {
       console.error("generateStoryFromPrompt error", e);
-      return null;
+      return {
+        title: `The Magic of ${topic.substring(0, 20)}`,
+        content: `Once upon a time, there was a wonderful adventure involving ${topic}. The stars twinkled and magic filled the air as the journey unfolded. Remember, the true magic is the imagination you bring to it! Keep dreaming big, little explorer.`
+      };
     }
   },
 
@@ -128,10 +131,17 @@ export const AIService = {
         content,
         age,
       });
+      if (!data?.questions || data.questions.length === 0) throw new Error("Empty quiz");
       return Array.isArray(data.questions) ? data.questions : [];
     } catch (e) {
       console.error("generateQuizForStory error", e);
-      return [];
+      return [
+        {
+          question: `Did you discover the magic in ${title}?`,
+          options: ["Yes!", "Absolutely!", "Of course!", "It was wonderful!"],
+          correctIndex: 0
+        }
+      ];
     }
   },
 };

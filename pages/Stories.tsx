@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Volume2, Mic, Sparkles, ChevronDown, ChevronUp, StopCircle, X } from 'lucide-react';
-import type { Story } from '../types';
+import { View, type Story } from '../types';
 import { StorageService } from '../services/storage';
 import { AudioService, Mood } from '../services/audio';
 import { AIService } from '../services/ai';
 import { useI18n } from '../i18n/I18nProvider';
+
+interface StoriesPageProps {
+  onNavigate?: (view: View) => void;
+}
 
 // ✅ Longer, more engaging versions (aimed at ~3+ mins read-aloud each)
 // Drop this in place of your existing DEFAULT_STORIES.
@@ -159,8 +163,7 @@ const DEFAULT_STORIES: Story[] = [
   }
 ];
 
-
-const StoriesPage: React.FC = () => {
+const StoriesPage: React.FC<StoriesPageProps> = ({ onNavigate }) => {
   const [stories, setStories] = useState<Story[]>(DEFAULT_STORIES);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -171,10 +174,15 @@ const StoriesPage: React.FC = () => {
   const [narratorMood, setNarratorMood] = useState<Mood>('neutral');
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuizQuestions, setCurrentQuizQuestions] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'All' | 'Unread' | 'Read'>('All');
+  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
+  const [readStoryIds, setReadStoryIds] = useState<string[]>([]);
   const { t } = useI18n();
 
   useEffect(() => {
     loadUserStories();
+    const savedReads = JSON.parse(localStorage.getItem('read_stories_ids') || '[]');
+    setReadStoryIds(savedReads);
   }, []);
 
   const loadUserStories = async () => {
@@ -192,9 +200,32 @@ const StoriesPage: React.FC = () => {
     // Cancel any current speech
     AudioService.cancel();
 
+    let intro = "";
+    if (narratorMood === 'excited') intro = "Oh my goodness, you're going to love this! ";
+    if (narratorMood === 'sarcastic') intro = "Ugh, another story? Fine. Here we go. ";
+
     // Use our enhanced AudioService with the selected mood
-    AudioService.speak(text, narratorMood);
+    AudioService.speak(intro + text, narratorMood);
     setSpeakingStoryId(id);
+
+    // Mark as read when played
+    markAsRead(id);
+  };
+
+  const markAsRead = (id: string) => {
+    if (!readStoryIds.includes(id)) {
+      const newReads = [...readStoryIds, id];
+      setReadStoryIds(newReads);
+      localStorage.setItem('read_stories_ids', JSON.stringify(newReads));
+    }
+  };
+
+  const handleDeleteStory = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this magic story?")) {
+      await StorageService.deleteStory(id);
+      loadUserStories(); // Refresh list
+    }
   };
 
   const handleAiGenerate = async () => {
@@ -214,7 +245,8 @@ const StoriesPage: React.FC = () => {
         const userStories = await StorageService.getStories();
         setStories([...DEFAULT_STORIES, ...userStories]);
         setAiTopic('');
-        alert("✨ Your magic story is ready in the library!");
+        setIsLibraryOpen(true); // Open the library so they can see it
+        handleSpeak(result.content, newStory.id); // Auto-play the magic story!
       }
     } catch (e) {
       console.error("AI Story Error:", e);
@@ -227,7 +259,11 @@ const StoriesPage: React.FC = () => {
   const handleIllustrate = (story: Story) => {
     localStorage.setItem('pending_illustration_title', story.title);
     localStorage.setItem('pending_illustration_context', story.content.substring(0, 500));
-    window.location.hash = '#/drawing';
+    if (onNavigate) {
+      onNavigate(View.DRAWING);
+    } else {
+      window.location.hash = '#/drawing';
+    }
   };
 
   const [quizScore, setQuizScore] = useState(0);
@@ -270,11 +306,13 @@ const StoriesPage: React.FC = () => {
     const stats = StorageService.getGameStats();
     stats.xp += 50;
     StorageService.saveGameStats(stats);
+    setIsLibraryOpen(true);
+    // Auto-scroll or simple alert
     alert(t('stories.savedAlert'));
   };
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col gap-4 w-full max-w-7xl mx-auto px-2 sm:px-4">
       {/* Create Story Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* AI Story Magic */}
@@ -364,42 +402,123 @@ const StoriesPage: React.FC = () => {
         </button>
 
         {isLibraryOpen && (
-          <div className="grid gap-3 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
-            {stories.map((story) => {
-              const isPlaying = speakingStoryId === story.id;
-              return (
-                <div key={story.id} className={`bg-slate-800/50 border ${isPlaying ? 'border-amber-500 bg-slate-800' : 'border-slate-700'} rounded-xl p-4 hover:bg-slate-800 transition-colors`}>
-                  <div className="flex justify-between items-start mb-1.5">
-                    <h4 className="font-bold text-base text-slate-100">{story.title}</h4>
-                    {story.isUserCreated && <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase">{t('stories.familyMadeTag')}</span>}
+          <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 overflow-x-auto custom-scrollbar pb-2">
+              {(['All', 'Unread', 'Read'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-3 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+              {stories.filter(s => {
+                if (activeTab === 'Read') return readStoryIds.includes(s.id);
+                if (activeTab === 'Unread') return !readStoryIds.includes(s.id);
+                return true;
+              }).map((story) => {
+                const isPlaying = speakingStoryId === story.id;
+                const isExpanded = expandedStoryId === story.id || isPlaying;
+                const isRead = readStoryIds.includes(story.id);
+
+                return (
+                  <div key={story.id} className={`bg-slate-800/80 border ${isPlaying ? 'border-amber-500 box-shadow-glow' : 'border-slate-700'} rounded-xl overflow-hidden transition-all duration-300`}>
+                    {/* Header (Always Visible) */}
+                    <div
+                      className="p-4 cursor-pointer hover:bg-slate-700/50 flex justify-between items-center"
+                      onClick={() => setExpandedStoryId(isExpanded ? null : story.id)}
+                    >
+                      <div className="flex flex-col gap-1 pr-4">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`font-bold text-base ${isRead ? 'text-slate-400' : 'text-slate-100'}`}>{story.title}</h4>
+                          {isRead && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full uppercase font-black tracking-wider">READ</span>}
+                          {story.isUserCreated && <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase font-black">{t('stories.familyMadeTag')}</span>}
+                        </div>
+                        {!isExpanded && (
+                          <p className="text-slate-500 text-xs line-clamp-1">{story.content.substring(0, 80)}...</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isExpanded ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Content Body (Collapsible) */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 bg-slate-900/30">
+                        <p className="text-slate-300 text-sm whitespace-pre-wrap mb-4 leading-relaxed">
+                          {story.content}
+                        </p>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-2 items-center justify-between">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleSpeak(story.content, story.id); }}
+                              title={isPlaying ? t('stories.stopReading') : t('stories.readAloud')}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${isPlaying ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 border border-emerald-500/30 hover:text-white'}`}
+                            >
+                              {isPlaying ? <><StopCircle size={16} /> Stop</> : <><Volume2 size={16} /> Read Aloud</>}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleIllustrate(story); }}
+                              className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-bold hover:bg-indigo-500 hover:text-white transition-all border border-indigo-500/30"
+                            >
+                              🎨 Illustrate
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleOpenQuiz(story); }}
+                              className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-bold hover:bg-amber-500 hover:text-slate-900 transition-all border border-amber-500/30"
+                            >
+                              🧠 Take Quiz
+                            </button>
+                          </div>
+
+                          {/* Destructive Actions (Right aligned) */}
+                          <div className="flex gap-2 justify-end mt-2 sm:mt-0 w-full sm:w-auto">
+                            {!isRead && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); markAsRead(story.id); }}
+                                className="px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                              >
+                                Mark Read
+                              </button>
+                            )}
+                            {story.isUserCreated && (
+                              <button
+                                onClick={(e) => handleDeleteStory(e, story.id)}
+                                className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-colors border border-red-500/20"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 mb-3">
-                    {story.content}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handleSpeak(story.content, story.id)}
-                      title={isPlaying ? t('stories.stopReading') : t('stories.readAloud')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${isPlaying ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'}`}
-                    >
-                      {isPlaying ? <><StopCircle size={16} /> {t('stories.stopReading')}</> : <><Volume2 size={16} /> {t('stories.readAloud')}</>}
-                    </button>
-                    <button
-                      onClick={() => handleIllustrate(story)}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-bold hover:bg-indigo-500/30 transition-all border border-indigo-500/30"
-                    >
-                      🎨 Illustrate
-                    </button>
-                    <button
-                      onClick={() => handleOpenQuiz(story)}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-bold hover:bg-amber-500/30 transition-all border border-amber-500/30"
-                    >
-                      🧠 Take Quiz
-                    </button>
+                );
+              })}
+
+              {/* Empty State */}
+              {stories.length > 0 && stories.filter(s => {
+                if (activeTab === 'Read') return readStoryIds.includes(s.id);
+                if (activeTab === 'Unread') return !readStoryIds.includes(s.id);
+                return true;
+              }).length === 0 && (
+                  <div className="text-center py-10 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+                    <BookOpen size={40} className="mx-auto text-slate-600 mb-3" />
+                    <p className="text-slate-400 font-bold">No {activeTab.toLowerCase()} stories found.</p>
                   </div>
-                </div>
-              );
-            })}
+                )}
+            </div>
           </div>
         )}
       </div>

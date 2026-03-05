@@ -120,7 +120,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                         setError('Incorrect password');
                     }
                 } else {
-                    setError('Child profile not found. Parent/Teacher must log in first.');
+                    const globalProfile = await StorageService.findChildGlobal(loginIdentifier, authInput);
+                    if (globalProfile) {
+                        onLogin(globalProfile);
+                    } else {
+                        setError('Child profile not found. Parent/Teacher must log in first, or check name and secret.');
+                    }
                 }
             }
         } catch (err: any) {

@@ -151,20 +151,20 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
       {/* Immersive Persistent Galaxy Backdrop */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute top-[-20%] left-[-10%] w-[150vw] h-[150vw] bg-fuchsia-600/20 rounded-full blur-[180px] animate-pulse-slow"
-          style={{ transform: `translateY(${scrollY * -0.2}px)` }}
+          className="absolute top-[-20%] left-[-10%] w-[150vw] h-[150vw] bg-fuchsia-600/20 rounded-full blur-[60px] md:blur-[120px] animate-pulse-slow transform-gpu will-change-transform"
+          style={{ transform: `translateY(${scrollY * -0.2}px) translateZ(0)` }}
         ></div>
         <div
-          className="absolute bottom-[-20%] right-[-10%] w-[150vw] h-[150vw] bg-cyan-600/20 rounded-full blur-[180px] animate-pulse-slow delay-1000"
-          style={{ transform: `translateY(${scrollY * -0.1}px)` }}
+          className="absolute bottom-[-20%] right-[-10%] w-[150vw] h-[150vw] bg-cyan-600/20 rounded-full blur-[60px] md:blur-[120px] animate-pulse-slow delay-1000 transform-gpu will-change-transform"
+          style={{ transform: `translateY(${scrollY * -0.1}px) translateZ(0)` }}
         ></div>
         <div
-          className="absolute top-[20%] right-[10%] w-[80vw] h-[80vw] bg-purple-600/15 rounded-full blur-[150px] animate-pulse-slow delay-500"
-          style={{ transform: `translateY(${scrollY * -0.15}px)` }}
+          className="absolute top-[20%] right-[10%] w-[80vw] h-[80vw] bg-purple-600/15 rounded-full blur-[50px] md:blur-[100px] animate-pulse-slow delay-500 transform-gpu will-change-transform"
+          style={{ transform: `translateY(${scrollY * -0.15}px) translateZ(0)` }}
         ></div>
 
         {/* Star Particles */}
-        {[...Array(60)].map((_, i) => (
+        {[...Array(30)].map((_, i) => (
           <div
             key={i}
             className="absolute bg-white rounded-full animate-twinkle"
@@ -281,7 +281,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
       </section>
 
       {/* --- WHY TIWATON SECTION --- */}
-      <section id="vision" className="relative px-6 py-32 z-10 bg-slate-950/40 backdrop-blur-3xl border-y border-white/5">
+      <section id="vision" className="relative px-6 py-32 z-10 bg-slate-950/40 backdrop-blur-xl border-y border-white/5">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
           <div className="space-y-8">
             <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
@@ -351,8 +351,8 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
 
       {/* --- FAMILY CONNECTION (COUNTDOWN) --- */}
       <section id="events" className="relative px-6 py-32 z-10 overflow-hidden">
-        <div className="max-w-4xl mx-auto bg-slate-900/60 backdrop-blur-3xl p-12 rounded-[4rem] border-2 border-white/5 relative shadow-[0_0_100px_rgba(99,102,241,0.1)] group">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] group-hover:bg-indigo-500/20 transition-colors"></div>
+        <div className="max-w-4xl mx-auto bg-slate-900/60 backdrop-blur-xl p-12 rounded-[4rem] border-2 border-white/5 relative shadow-[0_0_100px_rgba(99,102,241,0.1)] group">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-[50px] group-hover:bg-indigo-500/20 transition-colors"></div>
           <div className="flex flex-col md:flex-row items-center gap-12 text-center md:text-left">
             <div className="relative shrink-0">
               <div className="w-40 h-40 bg-slate-800 rounded-full flex items-center justify-center border-4 border-indigo-400/20 shadow-2xl relative z-10 group-hover:border-indigo-400/40 transition-all">
