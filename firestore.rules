@@ -21,12 +21,16 @@ service cloud.firestore {
       return memberDoc(tenantId).data.role;
     }
 
+    function isTenantOwner(tenantId) {
+      return signedIn() && request.auth.uid == tenantId;
+    }
+
     function isAdmin(tenantId) {
-      return isActiveMember(tenantId) && role(tenantId) == "ADMIN";
+      return isTenantOwner(tenantId) || (isActiveMember(tenantId) && role(tenantId) == "ADMIN");
     }
 
     function isStaff(tenantId) {
-      return isActiveMember(tenantId) && (role(tenantId) == "STAFF" || role(tenantId) == "ADMIN");
+      return isTenantOwner(tenantId) || (isActiveMember(tenantId) && (role(tenantId) == "STAFF" || role(tenantId) == "ADMIN"));
     }
 
     // Child can access if:
@@ -34,11 +38,11 @@ service cloud.firestore {
     // OR - requester is in guardianUids
     // OR - requester is STAFF/ADMIN
     function canAccessChild(tenantId, childId) {
-      return isActiveMember(tenantId) && (
+      return isTenantOwner(tenantId) || (isActiveMember(tenantId) && (
         isStaff(tenantId)
         || request.auth.uid == get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.loginUid
         || request.auth.uid in get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.guardianUids
-      );
+      ));
     }
 
     // Default deny
@@ -48,13 +52,14 @@ service cloud.firestore {
 
     // Tenants root (optional metadata)
     match /tenants/{tenantId} {
+      allow read, write: if isTenantOwner(tenantId);
       allow read: if isActiveMember(tenantId);
       allow write: if isAdmin(tenantId);
     }
 
     // Membership management
     match /tenants/{tenantId}/members {
-      allow list: if signedIn() && (request.auth.uid == tenantId || isStaff(tenantId));
+      allow list: if isTenantOwner(tenantId) || (signedIn() && isStaff(tenantId));
     }
     match /tenants/{tenantId}/members/{uid} {
       // Users can read their own membership (helps UI decide role)
@@ -70,7 +75,7 @@ service cloud.firestore {
 
     // Child profiles
     match /tenants/{tenantId}/children {
-      allow list: if signedIn() && (request.auth.uid == tenantId || isStaff(tenantId));
+      allow list: if isTenantOwner(tenantId) || (signedIn() && isStaff(tenantId));
     }
     match /tenants/{tenantId}/children/{childId} {
       allow read: if canAccessChild(tenantId, childId);
