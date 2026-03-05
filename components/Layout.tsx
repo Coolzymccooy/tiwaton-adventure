@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View } from '../types';
-import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Palette, BrainCircuit, Gamepad2, CalendarClock, Home, Volume2, VolumeX, Cloud, Star, HelpCircle, Lightbulb, Circle, Square, Triangle } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
 import { useI18n } from '../i18n/I18nProvider';
@@ -70,11 +70,54 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
     }
   };
 
+  // Cartoon Backdrop Elements
+  const renderCartoonElements = () => {
+    const elementsArray = [...Array(6)];
+
+    switch (currentView) {
+      case View.STORIES:
+        return elementsArray.map((_, i) => (
+          <div key={i} className="absolute animate-float-slow opacity-20 text-white"
+            style={{ top: `${15 + i * 15}%`, left: `${(i * 20) % 90}%`, animationDelay: `${i * 1.5}s` }}>
+            <Cloud size={64 + (i % 3) * 32} />
+          </div>
+        ));
+      case View.GAMES:
+        return elementsArray.map((_, i) => (
+          <div key={i} className="absolute animate-spin-slow opacity-20 text-yellow-400"
+            style={{ top: `${Math.random() * 80}%`, left: `${Math.random() * 90}%`, animationDelay: `${i * 0.5}s` }}>
+            <Star size={32 + (i % 2) * 16} fill="currentColor" />
+          </div>
+        ));
+      case View.ACTIVITIES:
+        return elementsArray.map((_, i) => (
+          <div key={i} className="absolute animate-bounce-soft opacity-20 text-indigo-400"
+            style={{ top: `${10 + i * 15}%`, left: `${20 + (i * 15) % 60}%`, animationDelay: `${i * 1.2}s` }}>
+            {i % 2 === 0 ? <HelpCircle size={48} /> : <Lightbulb size={48} />}
+          </div>
+        ));
+      case View.HOME:
+        return elementsArray.map((_, i) => (
+          <div key={i} className="absolute animate-bounce-soft opacity-10 text-white"
+            style={{ top: `${Math.random() * 80}%`, left: `${Math.random() * 80}%`, animationDelay: `${i * 2}s` }}>
+            {i % 3 === 0 ? <Circle size={40} /> : i % 3 === 1 ? <Square size={40} /> : <Triangle size={40} />}
+          </div>
+        ));
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="h-full w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
 
       {/* Immersive Edge-to-Edge Cinematic Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Cartoon Animation Layer */}
+        <div className="absolute inset-0 z-10 overflow-hidden">
+          {renderCartoonElements()}
+        </div>
+
         {/* Animated Moving Blobs */}
         <div className={`absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] ${getVibeColor()} rounded-full blur-[160px] animate-pulse transition-colors duration-1000`}></div>
 
