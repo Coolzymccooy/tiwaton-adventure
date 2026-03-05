@@ -55,7 +55,11 @@ service cloud.firestore {
     // Membership management
     match /tenants/{tenantId}/members/{uid} {
       // Users can read their own membership (helps UI decide role)
-      allow read: if signedIn() && request.auth.uid == uid && isActiveMember(tenantId);
+      allow read: if signedIn() && request.auth.uid == uid;
+
+      // Initial Account Creation: Allow users to create their own initial Admin/Teacher profile
+      // storage.ts uses `uid` as the initial `tenantId`
+      allow create: if signedIn() && request.auth.uid == uid && tenantId == uid;
 
       // Admin can read/manage all memberships
       allow read, create, update, delete: if isAdmin(tenantId);
