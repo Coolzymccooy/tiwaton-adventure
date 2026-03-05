@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Volume2, Mic, Sparkles, ChevronDown, ChevronUp, StopCircle } from 'lucide-react';
 import type { Story } from '../types';
 import { StorageService } from '../services/storage';
+import { AudioService } from '../services/audio';
 import { useI18n } from '../i18n/I18nProvider';
 
 // ✅ Longer, more engaging versions (aimed at ~3+ mins read-aloud each)
@@ -176,30 +177,21 @@ const StoriesPage: React.FC = () => {
   };
 
   const handleSpeak = (text: string, id: string) => {
-    if ('speechSynthesis' in window) {
-      if (speakingStoryId === id) {
-        window.speechSynthesis.cancel();
-        setSpeakingStoryId(null);
-        return;
-      }
-
-      // Cancel any current speech
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.onend = () => setSpeakingStoryId(null);
-
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(v => v.name.includes('Google US English') || v.lang === 'en-US');
-      if (preferred) utterance.voice = preferred;
-      utterance.rate = 0.9;
-      utterance.pitch = 1.1;
-
-      window.speechSynthesis.speak(utterance);
-      setSpeakingStoryId(id);
-    } else {
-      alert("Sorry, your browser doesn't support reading aloud!");
+    if (speakingStoryId === id) {
+      AudioService.cancel();
+      setSpeakingStoryId(null);
+      return;
     }
+
+    // Cancel any current speech
+    AudioService.cancel();
+
+    // Use our enhanced AudioService
+    AudioService.speak(text, 'neutral');
+    setSpeakingStoryId(id);
+
+    // Simple way to track end (AudioService doesn't expose individual chunk callback to UI easily yet,
+    // but we can at least allow cancelling)
   };
 
   const handleSaveStory = async () => {

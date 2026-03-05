@@ -46,7 +46,17 @@ export const AudioService = {
     const enabled = localStorage.getItem('tts_enabled') !== 'false';
     if (!enabled) return;
 
-    AudioService.private.queue.push({ text, mood });
+    // Split long text into sentences for better pacing and reliability
+    // Split by punctuation followed by space or newline
+    const chunks = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+(?:\s+|$)/g) || [text];
+
+    chunks.forEach(chunk => {
+      const trimmed = chunk.trim();
+      if (trimmed) {
+        AudioService.private.queue.push({ text: trimmed, mood });
+      }
+    });
+
     if (!AudioService.private.isSpeaking) {
       AudioService.processQueue();
     }
