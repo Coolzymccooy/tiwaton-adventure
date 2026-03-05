@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Firebase Storage Rules for Multi-Tenant School Architecture
+// Note: Storage rules CANNOT query Firestore documents natively (no `get()` function).
+// Therefore, we secure files by enforcing the directory path matches the user's Auth UID.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Core function checking if a user is simply logged in
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ---------------------------------------------------------
+    // TENANT STORAGE
+    // Path Architecture: /tenants/{tenantId}/...
+    // ---------------------------------------------------------
+    match /tenants/{tenantId} {
+      
+      // 1. Members Folder (Teachers, Parents, Staff)
+      // Path: /tenants/{tenantId}/members/{uid}/...
+      // e.g. /tenants/school_123/members/teacher_456/profile_pic.png
+      match /members/{memberUid}/{allPaths=**} {
+        // A member can only read and write to their own folder within the tenant
+        allow read, write: if signedIn() && request.auth.uid == memberUid;
+      }
+
+      // 2. Children Folder (Students)
+      // Path: /tenants/{tenantId}/children/{childId}/...
+      // e.g. /tenants/school_123/children/student_789/drawing_1.png
+      match /children/{childId}/{allPaths=**} {
+        // Allow the child to read/write their own files if their UID matches
+        allow read, write: if signedIn() && request.auth.uid == childId;
+        
+        // Alternatively, since Guardians/Teachers often access child files:
+        // You could open this up slightly for internal tenant sharing:
+        // allow read: if signedIn(); 
+      }
+      
+      // 3. Shared Resources (Curriculum, Global Assets for the School)
+      // Path: /tenants/{tenantId}/shared/{allPaths=**}
+      match /shared/{allPaths=**} {
+        // Any authenticated user part of the app can read.
+        // Only someone with an admin/staff claim could write (requires Custom Claims).
+        // Since we don't have Custom Claims yet, we strictly lock writes.
+        allow read: if signedIn();
+        allow write: if false; 
+      }
+    }
+    
+    // ---------------------------------------------------------
+    // GLOBAL PUBLIC ASSETS
+    // Path Architecture: /public/...
+    // ---------------------------------------------------------
+    match /public/{allPaths=**} {
+      allow read: if true; // Anyone can view public files (e.g., logos, default avatars)
+      allow write: if false; // No one can modify public files from the app
+    }
+  }
+}

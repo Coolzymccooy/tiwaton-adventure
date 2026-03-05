@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
-import { SyncService } from '../services/sync';
 import { FamilyProfile } from '../types';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
@@ -115,34 +114,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
     };
 
-    const handleAdminSetup = () => {
+    const handleAdminSetup = async () => {
         if (!adminName || !adminEmail || adminPin.length < 4) {
             setError(t('login.errorAllFields'));
             return;
         }
 
-        // Generate a random 4-digit code for mock verification
-        const code = Math.floor(1000 + Math.random() * 9000).toString();
-        setVerificationCode(code);
-
-        // In a real app, send email here. We simulate by showing an alert/toast.
-        console.log(`[Mock Email] Verification code for ${adminEmail} is: ${code}`);
-
-        setViewMode('VERIFY_ACCOUNT');
-        setError('');
-    };
-
-    const handleVerifyEmail = async () => {
-        if (inputVerificationCode !== verificationCode && inputVerificationCode !== '0000') {
-            setError('Incorrect verification code. (Hint: check console or use 0000)');
-            return;
-        }
-
         try {
+            setError('');
+
             // 1. Create the Auth User
-            // Note: We are using `adminPin` as the actual Firebase password for the parent/teacher account 
-            // since Firebase requires min 6 chars, let's pad it strictly or assume they enter 6.
-            // Actually, the UI restricts to 4 chars for PIN. Let's pad it to 6 for Firebase Auth compatibility:
             const paddedPass = adminPin.padEnd(6, '0');
             const userCreds = await createUserWithEmailAndPassword(auth, adminEmail, paddedPass);
             const uid = userCreds.user.uid;
@@ -155,17 +136,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             setRecoveryKey(p.recoveryKey || '');
             setProfiles(StorageService.getProfiles());
 
-            // SyncService is deprecated for Firebase
-            // SyncService.sendSnapshot(StorageService.buildSnapshot(p.id));
-
             setViewMode('RECOVERY_INFO');
-            setError('');
-            setInputVerificationCode('');
         } catch (err: any) {
             console.error("Signup err", err);
             setError(err.message || "Failed to create account");
         }
     };
+
+
 
     const handleChildSetup = async (finish = false) => {
         if (!name || !childPass) {
@@ -338,37 +316,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         </div>
     );
 
-    if (viewMode === 'VERIFY_ACCOUNT') return (
-        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
-            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-sky-500/20 text-center shadow-xl relative flex flex-col items-center">
-                <BackButton onClick={() => setViewMode('SETUP_ADMIN')} />
-                <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center mb-4">
-                    <ShieldCheck size={24} className="text-sky-400" />
-                </div>
-                <h2 className="text-2xl font-display text-white mb-2 italic tracking-tight">Verify Email</h2>
-                <p className="text-slate-400 text-xs mb-2">We sent a 4-digit code to <br /><span className="text-white font-bold">{adminEmail}</span></p>
 
-                <div className="space-y-4 w-full mt-2">
-                    <input
-                        type="text"
-                        maxLength={4}
-                        value={inputVerificationCode}
-                        onChange={e => setInputVerificationCode(e.target.value)}
-                        placeholder="••••"
-                        className="w-full bg-[#050810] border-2 border-slate-800 rounded-xl p-4 text-white text-center text-2xl tracking-[0.4em] outline-none focus:border-sky-500 transition-all"
-                    />
-                    {error && <p className="text-red-500 text-[9px] font-bold uppercase">{error}</p>}
-                    <button
-                        onClick={handleVerifyEmail}
-                        disabled={inputVerificationCode.length < 4}
-                        className="w-full py-4 bg-sky-600 disabled:opacity-50 hover:bg-sky-500 rounded-xl text-white font-bold text-lg italic uppercase shadow-lg transition-all"
-                    >
-                        Verify & Continue
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 
     if (viewMode === 'RECOVERY_INFO') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
