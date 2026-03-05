@@ -51,14 +51,35 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [setupRole, setSetupRole] = useState<'PARENT' | 'TEACHER'>('PARENT');
 
     useEffect(() => {
-        const stored = StorageService.getProfiles();
-        setProfiles(stored);
-        if (initialViewMode) {
-            setViewMode(initialViewMode);
-        } else if (stored.length === 0) {
-            setViewMode('SETUP_ADMIN');
-        }
+        const init = async () => {
+            const stored = StorageService.getProfiles();
+            setProfiles(stored);
+
+            // If we have no local profiles but have a firebase user, sync now
+            if (stored.length === 0 && auth.currentUser) {
+                const synced = await StorageService.syncFromFirestore(auth.currentUser.uid);
+                setProfiles(synced);
+            }
+
+            if (initialViewMode) {
+                setViewMode(initialViewMode);
+            } else if (StorageService.hasProfiles()) {
+                // If we have profiles, default to grid
+                setViewMode('USER_GRID');
+            } else if (!auth.currentUser) {
+                // Completely new device/session
+                setViewMode('SIGN_IN_ENTRY');
+            }
+        };
+        init();
     }, [initialViewMode]);
+
+    // Re-fetch when entering Grid to catch background syncs from App.tsx
+    useEffect(() => {
+        if (viewMode === 'USER_GRID') {
+            setProfiles(StorageService.getProfiles());
+        }
+    }, [viewMode]);
 
     // ... (in component implementation below ...)
 
@@ -77,17 +98,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 const uid = userCredential.user.uid;
 
                 StorageService.setTenantContext(uid);
+                const loadedProfiles = await StorageService.syncFromFirestore(uid);
 
-                // Fetch members for this tenant (admin/teacher)
-                const membersSnap = await getDocs(collection(db, `tenants/${uid}/members`));
-                const childrenSnap = await getDocs(collection(db, `tenants/${uid}/children`));
-
-                const loadedProfiles: FamilyProfile[] = [
-                    ...membersSnap.docs.map(d => d.data() as FamilyProfile),
-                    ...childrenSnap.docs.map(d => d.data() as FamilyProfile)
-                ];
-
-                StorageService.setCachedProfiles(loadedProfiles);
                 setProfiles(loadedProfiles);
                 setViewMode('USER_GRID');
                 setError('');

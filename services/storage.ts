@@ -237,15 +237,31 @@ export const StorageService = {
   },
 
   getEvents: async (): Promise<CountdownEvent[]> => {
-    return [];
+    const tenantId = getTenantId();
+    if (!tenantId) return [];
+    const colRef = collection(db, `tenants/${tenantId}/events`);
+    const snap = await getDocs(colRef);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as CountdownEvent));
   },
 
-  addEvent: async (name: string, date: string, email?: string) => {
-    return [];
+  addEvent: async (name: string, date: string, email?: string): Promise<CountdownEvent[]> => {
+    const tenantId = getTenantId();
+    if (!tenantId) return [];
+    const id = 'event-' + Date.now();
+    const newEvent: CountdownEvent = { id, name, date, notificationEmail: email };
+    const docRef = doc(db, `tenants/${tenantId}/events/${id}`);
+    await setDoc(docRef, newEvent);
+    return await StorageService.getEvents();
   },
 
-  removeEvent: async (id: string) => {
-    return [];
+  removeEvent: async (id: string): Promise<CountdownEvent[]> => {
+    const tenantId = getTenantId();
+    if (!tenantId) return [];
+    const docRef = doc(db, `tenants/${tenantId}/events/${id}`);
+    // Using simple delete from firestore
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(docRef);
+    return await StorageService.getEvents();
   },
 
   setLastView: (view: string) => {

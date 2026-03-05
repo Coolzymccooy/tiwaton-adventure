@@ -13,15 +13,20 @@ const CountdownPage: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    setEvents(StorageService.getEvents());
+    const fetchEvents = async () => {
+      const data = await StorageService.getEvents();
+      // Ensure data is an array before setting state
+      setEvents(Array.isArray(data) ? data : []);
+    };
+    fetchEvents();
   }, []);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newEventName || !newEventDate) return;
-    const updated = StorageService.addEvent(newEventName, newEventDate, notificationEmail);
-    setEvents(updated);
+    const updated = await StorageService.addEvent(newEventName, newEventDate, notificationEmail);
+    setEvents(Array.isArray(updated) ? updated : []);
     if (notificationEmail) {
-        alert(`Reminder scheduled! An email will be sent to ${notificationEmail} closer to the date.`);
+      alert(`Reminder scheduled! An email will be sent to ${notificationEmail} closer to the date.`);
     }
     setNewEventName('');
     setNewEventDate('');
@@ -29,10 +34,10 @@ const CountdownPage: React.FC = () => {
     setShowAdd(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Remove this event?")) {
-      const updated = StorageService.removeEvent(id);
-      setEvents(updated);
+      const updated = await StorageService.removeEvent(id);
+      setEvents(Array.isArray(updated) ? updated : []);
     }
   };
 
@@ -48,13 +53,13 @@ const CountdownPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-           <h2 className="font-display text-3xl text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">
-             {t('countdown.title')}
-           </h2>
-           <p className="text-slate-400 text-sm">{t('countdown.subtitle')}</p>
+          <h2 className="font-display text-3xl text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">
+            {t('countdown.title')}
+          </h2>
+          <p className="text-slate-400 text-sm">{t('countdown.subtitle')}</p>
         </div>
         {!showAdd && (
-          <button 
+          <button
             onClick={() => setShowAdd(true)}
             title="Create New Event"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl font-bold text-white shadow-lg text-sm"
@@ -68,14 +73,14 @@ const CountdownPage: React.FC = () => {
         <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 animate-fade-in">
           <h3 className="text-lg font-bold mb-3">{t('countdown.addTitle')}</h3>
           <div className="space-y-3">
-            <input 
+            <input
               value={newEventName}
               onChange={e => setNewEventName(e.target.value)}
               placeholder={t('countdown.eventNamePlaceholder')}
               title="Event Name"
               className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 outline-none focus:border-indigo-500"
             />
-            <input 
+            <input
               type="date"
               value={newEventDate}
               onChange={e => setNewEventDate(e.target.value)}
@@ -83,15 +88,15 @@ const CountdownPage: React.FC = () => {
               className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white outline-none focus:border-indigo-500"
             />
             <div className="relative">
-                <Mail className="absolute left-3 top-3 text-slate-500" size={16} />
-                <input 
-                  type="email"
-                  value={notificationEmail}
-                  onChange={e => setNotificationEmail(e.target.value)}
-                  placeholder={t('countdown.notifyPlaceholder')}
-                  title="Notification Email"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 pl-10 outline-none focus:border-indigo-500"
-                />
+              <Mail className="absolute left-3 top-3 text-slate-500" size={16} />
+              <input
+                type="email"
+                value={notificationEmail}
+                onChange={e => setNotificationEmail(e.target.value)}
+                placeholder={t('countdown.notifyPlaceholder')}
+                title="Notification Email"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 pl-10 outline-none focus:border-indigo-500"
+              />
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={handleAdd} title="Save Event" className="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded-lg font-bold text-sm">{t('countdown.saveButton')}</button>
@@ -106,36 +111,36 @@ const CountdownPage: React.FC = () => {
           const time = calculateTimeLeft(evt.date);
           return (
             <div key={evt.id} className="relative bg-slate-800 border-l-4 border-indigo-500 p-4 rounded-r-xl shadow-md flex justify-between items-center group overflow-hidden">
-               {/* Background Glow */}
-               <div className="absolute -right-10 -top-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl"></div>
-               
-               <div className="relative z-10">
-                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    {evt.name}
-                    {evt.notificationEmail && (
-                      <span title="Notifications Enabled">
-                        <Bell size={12} className="text-amber-400" />
-                      </span>
-                    )}
-                 </h3>
-                 <div className="text-xs text-slate-500 font-mono mt-1">
-                   {new Date(evt.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                 </div>
-               </div>
+              {/* Background Glow */}
+              <div className="absolute -right-10 -top-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl"></div>
 
-               <div className="flex items-center gap-4 relative z-10">
-                  {time.passed ? (
-                    <span className="text-sm font-bold text-green-400 bg-green-900/30 px-3 py-1 rounded-full">{t('countdown.todayLabel')}</span>
-                  ) : (
-                    <div className="text-right">
-                       <span className="text-2xl font-black text-indigo-300 block leading-none">{time.days}</span>
-                       <span className="text-[10px] text-slate-500 uppercase tracking-widest">{t('countdown.daysLeftLabel')}</span>
-                    </div>
+              <div className="relative z-10">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  {evt.name}
+                  {evt.notificationEmail && (
+                    <span title="Notifications Enabled">
+                      <Bell size={12} className="text-amber-400" />
+                    </span>
                   )}
-                  <button onClick={() => handleDelete(evt.id)} title="Delete Event" className="text-slate-600 hover:text-red-400 transition-colors">
-                     <Trash2 size={18} />
-                  </button>
-               </div>
+                </h3>
+                <div className="text-xs text-slate-500 font-mono mt-1">
+                  {new Date(evt.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 relative z-10">
+                {time.passed ? (
+                  <span className="text-sm font-bold text-green-400 bg-green-900/30 px-3 py-1 rounded-full">{t('countdown.todayLabel')}</span>
+                ) : (
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-indigo-300 block leading-none">{time.days}</span>
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest">{t('countdown.daysLeftLabel')}</span>
+                  </div>
+                )}
+                <button onClick={() => handleDelete(evt.id)} title="Delete Event" className="text-slate-600 hover:text-red-400 transition-colors">
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           );
         })}
