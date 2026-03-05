@@ -4,7 +4,7 @@
 
 import i18n from 'i18next';
 
-type Mood = 'neutral' | 'excited' | 'sarcastic' | 'soft' | 'system';
+export type Mood = 'neutral' | 'excited' | 'sarcastic' | 'soft' | 'system';
 
 interface QueueItem {
   text: string;
@@ -34,6 +34,12 @@ export const AudioService = {
       "Incorrect. But hey, it was a very creative failure!",
       "Not even close. Shall we try using our thinking cap this time?",
       "Wrong! But don't worry, even I was poorly programmed once."
+    ],
+    completion: [
+      "Objective complete! Even my processors are impressed.",
+      "Mission accomplished. You're actually getting good at this.",
+      "Done! I'll stop the sarcastic commentary... for now.",
+      "Victory! Though let's be honest, I did most of the heavy lifting."
     ]
   },
 

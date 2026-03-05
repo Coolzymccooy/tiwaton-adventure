@@ -41,6 +41,15 @@ const V_ANIM_CSS = `
   .firework:nth-child(2), .firework:nth-child(2)::before, .firework:nth-child(2)::after { --color1: pink; --color2: violet; --color3: fuchsia; --color4: orchid; --color5: plum; --color6: lavender; --finalSize: 40vmin; left: 30%; top: 60%; animation-delay: -0.25s; }
   .firework:nth-child(3) { --x: -30vmin; --y: -50vmin; }
   .firework:nth-child(3), .firework:nth-child(3)::before, .firework:nth-child(3)::after { --color1: cyan; --color2: lightcyan; --color3: lightblue; --color4: PaleTurquoise; --color5: SkyBlue; --color6: lavender; --finalSize: 35vmin; left: 70%; top: 60%; animation-delay: -0.4s; }
+  
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
 `;
 
 const VictoryOverlay: React.FC<{
@@ -268,7 +277,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setViewState('PLAYING');
     setActiveClueId(placed[0].answer);
     window.speechSynthesis?.cancel();
-    AudioService.speak(`Crossword Pro Level ${level}. The theme is ${theme}. Select a cell and pick the right word from the options.`, 'sarcastic', 'low');
+    AudioService.speak(`Crossword Pro Level ${level}. The theme is ${theme}. Select a cell and pick the right word from the options.`, 'sarcastic');
   };
 
   const activeClue = clues.find(c => c.answer === activeClueId);
@@ -301,7 +310,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (clue) {
       setActiveClueId(clue.answer);
       window.speechSynthesis?.cancel();
-      AudioService.speak(clue.clue, 'neutral', 'low');
+      AudioService.speak(clue.clue, 'neutral');
     }
   };
 
@@ -311,7 +320,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     // Check if word is correct
     if (word !== activeClue.answer) {
       AudioService.playEffect('wrong');
-      AudioService.speak(AudioService.SARCASM.wrong[Math.floor(Math.random() * AudioService.SARCASM.wrong.length)], 'sarcastic', 'low');
+      AudioService.speak(AudioService.SARCASM.wrong[Math.floor(Math.random() * AudioService.SARCASM.wrong.length)], 'sarcastic');
       return;
     }
 
@@ -325,7 +334,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
     setUserGrid(newGrid);
     window.speechSynthesis?.cancel();
-    AudioService.speak(AudioService.SARCASM.correct[Math.floor(Math.random() * AudioService.SARCASM.correct.length)], 'excited', 'low');
+    AudioService.speak(AudioService.SARCASM.correct[Math.floor(Math.random() * AudioService.SARCASM.correct.length)], 'excited');
 
     // Check Win
     let isComplete = true;
@@ -350,7 +359,7 @@ const CrosswordPro: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setStats(newStats);
     setShowVictory(false);
     window.speechSynthesis?.cancel();
-    AudioService.speak(AudioService.SARCASM.completion[Math.floor(Math.random() * AudioService.SARCASM.completion.length)], 'sarcastic', 'high');
+    AudioService.speak(AudioService.SARCASM.completion[Math.floor(Math.random() * AudioService.SARCASM.completion.length)], 'sarcastic');
   };
 
   return (
@@ -601,7 +610,7 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setSelection([]);
     setViewState('PLAYING');
     window.speechSynthesis?.cancel();
-    AudioService.speak(`Word Search Level ${level}. Focus on ${theme}. Find all hidden treasures!`, 'sarcastic', 'low');
+    AudioService.speak(`Word Search Level ${level}. Focus on ${theme}. Find all hidden treasures!`, 'sarcastic');
   };
 
   const handleCellClick = (r: number, c: number) => {
@@ -623,7 +632,7 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       newSelection.forEach(s => newGrid[s.r][s.c].found = true);
       setGrid(newGrid);
       window.speechSynthesis?.cancel();
-      AudioService.speak(AudioService.SARCASM.correct[Math.floor(Math.random() * AudioService.SARCASM.correct.length)], 'excited', 'low');
+      AudioService.speak(AudioService.SARCASM.correct[Math.floor(Math.random() * AudioService.SARCASM.correct.length)], 'excited');
       if (newFound.length === targetWords.length) setTimeout(() => setShowVictory(true), 1000);
     }
   };
@@ -640,7 +649,7 @@ const WordSearchGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setStats(newStats);
     setShowVictory(false);
     window.speechSynthesis?.cancel();
-    AudioService.speak(AudioService.SARCASM.completion[Math.floor(Math.random() * AudioService.SARCASM.completion.length)], 'sarcastic', 'high');
+    AudioService.speak(AudioService.SARCASM.completion[Math.floor(Math.random() * AudioService.SARCASM.completion.length)], 'sarcastic');
   };
 
   return (
@@ -1002,7 +1011,7 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setTimeout(() => {
       if (token !== speakTokenRef.current) return;
       window.speechSynthesis?.cancel();
-      AudioService.speak(q.speak, "sarcastic", "low");
+      AudioService.speak(q.speak, "sarcastic");
     }, 250);
 
   };
@@ -1033,8 +1042,7 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         AudioService.SARCASM.correct[
         Math.floor(Math.random() * AudioService.SARCASM.correct.length)
         ],
-        "excited",
-        "low"
+        "excited"
       );
 
       // ✅ mission complete => next stage
@@ -1119,8 +1127,7 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       AudioService.SARCASM.wrong[
       Math.floor(Math.random() * AudioService.SARCASM.wrong.length)
       ],
-      "sarcastic",
-      "low"
+      "sarcastic"
     );
 
     setTimeout(() => setFeedback(null), 900);
@@ -1349,7 +1356,7 @@ const EmojiRiddle: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const puzzles = [{ emoji: "🦁👑", ans: "LION KING" }, { emoji: "🕸️🕷️👨", ans: "SPIDER MAN" }, { emoji: "🐠🔍", ans: "FINDING NEMO" }, { emoji: "❄️👸", ans: "FROZEN" }];
   const handleCorrect = () => {
     AudioService.playEffect('correct');
-    const next = solved + 1; setSolved(next); AudioService.speak("Correct! You're a movie buff!", 'excited', 'low');
+    const next = solved + 1; setSolved(next); AudioService.speak("Correct! You're a movie buff!", 'excited');
     if (next >= puzzles.length) setShowVictory(true); else setCurrentIndex(currentIndex + 1);
   };
   return (
@@ -1371,11 +1378,12 @@ const EmojiRiddle: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 };
 
 const GamesPage: React.FC = () => {
-  const [activeGame, setActiveGame] = useState<'MATH' | 'GUESS' | 'SEARCH' | 'CROSSWORD' | null>(null);
+  const [activeGame, setActiveGame] = useState<'MATH' | 'GUESS' | 'SEARCH' | 'CROSSWORD' | 'MOUNTAIN' | null>(null);
   if (activeGame === 'MATH') return <MathGalaxy onBack={() => setActiveGame(null)} />;
   if (activeGame === 'GUESS') return <EmojiRiddle onBack={() => setActiveGame(null)} />;
   if (activeGame === 'SEARCH') return <WordSearchGame onBack={() => setActiveGame(null)} />;
   if (activeGame === 'CROSSWORD') return <CrosswordPro onBack={() => setActiveGame(null)} />;
+  if (activeGame === 'MOUNTAIN') return <MultiplicationMountain onQuit={() => setActiveGame(null)} onComplete={() => setActiveGame(null)} />;
   return (
     <div className="h-full flex flex-col px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
       <div className="text-center mb-6">
@@ -1384,6 +1392,7 @@ const GamesPage: React.FC = () => {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
         <GameCard onClick={() => setActiveGame('MATH')} icon="🌌" title="Math Galaxy" tag="Logic" color="from-indigo-600 to-blue-700" />
+        <GameCard onClick={() => setActiveGame('MOUNTAIN')} icon="🏔️" title="Multiplication Mountain" tag="Math" color="from-amber-600 to-orange-700" />
         <GameCard onClick={() => setActiveGame('SEARCH')} icon="🧩" title="Word Search" tag="Reading" color="from-emerald-600 to-teal-700" />
         <GameCard onClick={() => setActiveGame('CROSSWORD')} icon="⌨️" title="Crossword Pro" tag="Spelling" color="from-purple-600 to-violet-700" />
         <GameCard onClick={() => setActiveGame('GUESS')} icon="🧠" title="Emoji Riddle" tag="Brain" color="from-pink-600 to-rose-700" />
@@ -1421,6 +1430,154 @@ const GameCard: React.FC<GameCardProps> = ({ icon, title, tag, color, onClick })
     </p>
   </button>
 );
+
+// --- MULTIPLICATION MOUNTAIN ---
+
+const MultiplicationMountain: React.FC<{
+  onComplete: (xp: number, coins: number) => void;
+  onQuit: () => void;
+}> = ({ onComplete, onQuit }) => {
+  const [stage, setStage] = useState(1);
+  const [num1, setNum1] = useState(0);
+  const [num2, setNum2] = useState(0);
+  const [answer, setAnswer] = useState('');
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [showVictory, setShowVictory] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [shake, setShake] = useState(false);
+
+  const camps = [
+    { id: 1, name: "Base Camp", tables: [2, 10], color: "text-emerald-400" },
+    { id: 2, name: "Pine Forest", tables: [5, 3], color: "text-green-500" },
+    { id: 3, name: "Rocky Cliff", tables: [4, 6], color: "text-slate-400" },
+    { id: 4, name: "Snowy Slope", tables: [7, 8, 9], color: "text-blue-200" },
+    { id: 5, name: "The Summit", tables: [11, 12], color: "text-amber-400" },
+  ];
+
+  const generateQuestion = () => {
+    const currentCamp = camps[stage - 1];
+    const table = currentCamp.tables[Math.floor(Math.random() * currentCamp.tables.length)];
+    const other = Math.floor(Math.random() * 12) + 1;
+    setNum1(table);
+    setNum2(other);
+    setAnswer('');
+    setFeedback('');
+  };
+
+  useEffect(() => {
+    generateQuestion();
+    AudioService.speak(`Welcome to ${camps[0].name}! Let's start climbing.`, 'excited');
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const correct = num1 * num2;
+    if (parseInt(answer) === correct) {
+      const newScore = score + 1;
+      const newStreak = streak + 1;
+      setScore(newScore);
+      setStreak(newStreak);
+      setFeedback('Great climb! 🏔️');
+
+      if (newStreak % 5 === 0) {
+        AudioService.speak(`Incredible! A ${newStreak} answer streak! You're racing up the mountain!`, 'excited');
+      }
+
+      if (newScore >= stage * 5) {
+        if (stage < 5) {
+          const nextCamp = camps[stage];
+          AudioService.speak(`Camp ${stage} reached! Moving to ${nextCamp.name}. Keep going!`, 'excited');
+          setStage(stage + 1);
+          setScore(0);
+        } else {
+          setShowVictory(true);
+          AudioService.speak("Congratulations! You've conquered Multiplication Mountain! You are a math champion!", 'excited');
+        }
+      }
+      setTimeout(generateQuestion, 600);
+    } else {
+      setShake(true);
+      setStreak(0);
+      setFeedback('Slip! Try again.');
+      AudioService.speak('Careful! Watch your footing.', 'soft');
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  if (showVictory) {
+    return (
+      <VictoryOverlay
+        title="Mountain Conqueror"
+        xp={500}
+        coins={250}
+        badge="Summit Master"
+        onNext={() => {
+          onComplete(500, 250);
+          onQuit();
+        }}
+        onQuit={onQuit}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[500px] p-4 bg-slate-900 rounded-3xl border-4 border-slate-800 shadow-2xl relative overflow-hidden mx-auto max-w-xl my-10">
+      <div className="w-full max-w-md mb-8 px-4">
+        <div className="flex justify-between mb-2">
+          {camps.map((c) => (
+            <div key={c.id} className={`flex flex-col items-center group`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${stage >= c.id ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-700 text-slate-500'}`}>
+                {stage > c.id ? <CheckCircle2 size={16} /> : c.id}
+              </div>
+              <span className={`text-[8px] mt-1 font-bold uppercase tracking-tighter ${stage === c.id ? 'text-amber-400' : 'text-slate-500'}`}>{c.name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+          <div className="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-1000" style={{ width: `${(stage / 5) * 100}%` }}></div>
+        </div>
+      </div>
+
+      <div className={`text-center transition-transform ${shake ? 'animate-shake' : ''}`}>
+        <div className="text-6xl sm:text-7xl font-display mb-8 text-white flex items-center justify-center gap-4">
+          <span className="bg-slate-800 px-6 py-4 rounded-2xl border-2 border-slate-700 shadow-lg">{num1}</span>
+          <span className="text-4xl text-amber-500">×</span>
+          <span className="bg-slate-800 px-6 py-4 rounded-2xl border-2 border-slate-700 shadow-lg">{num2}</span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="relative max-w-[200px] mx-auto">
+          <input
+            autoFocus
+            type="number"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            className="w-full bg-slate-900 border-4 border-slate-700 rounded-2xl py-6 text-4xl text-center text-white outline-none focus:border-amber-500 transition-all shadow-inner"
+            placeholder="?"
+          />
+          <p className={`mt-4 font-bold text-lg animate-bounce ${feedback.includes('Slip') ? 'text-red-400' : 'text-emerald-400'}`}>
+            {feedback}
+          </p>
+        </form>
+
+        <div className="mt-8 flex gap-4 justify-center">
+          <div className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+            <p className="text-[10px] text-slate-500 uppercase font-black">Score</p>
+            <p className="text-2xl font-display text-white">{score}/{stage * 5}</p>
+          </div>
+          <div className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+            <p className="text-[10px] text-slate-500 uppercase font-black">Streak</p>
+            <p className="text-2xl font-display text-amber-500">{streak} 🔥</p>
+          </div>
+        </div>
+      </div>
+
+      <button onClick={onQuit} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors">
+        <X size={24} />
+      </button>
+    </div>
+  );
+};
 
 export default GamesPage;
 

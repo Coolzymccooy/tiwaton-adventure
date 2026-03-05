@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Volume2, Mic, Sparkles, ChevronDown, ChevronUp, StopCircle } from 'lucide-react';
+import { BookOpen, Volume2, Mic, Sparkles, ChevronDown, ChevronUp, StopCircle, X } from 'lucide-react';
 import type { Story } from '../types';
 import { StorageService } from '../services/storage';
-import { AudioService } from '../services/audio';
+import { AudioService, Mood } from '../services/audio';
+import { AIService } from '../services/ai';
 import { useI18n } from '../i18n/I18nProvider';
 
 // ✅ Longer, more engaging versions (aimed at ~3+ mins read-aloud each)
@@ -165,6 +166,11 @@ const StoriesPage: React.FC = () => {
   const [newContent, setNewContent] = useState('');
   const [speakingStoryId, setSpeakingStoryId] = useState<string | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [narratorMood, setNarratorMood] = useState<Mood>('neutral');
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [currentQuizQuestions, setCurrentQuizQuestions] = useState<any[]>([]);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -186,12 +192,64 @@ const StoriesPage: React.FC = () => {
     // Cancel any current speech
     AudioService.cancel();
 
-    // Use our enhanced AudioService
-    AudioService.speak(text, 'neutral');
+    // Use our enhanced AudioService with the selected mood
+    AudioService.speak(text, narratorMood);
     setSpeakingStoryId(id);
+  };
 
-    // Simple way to track end (AudioService doesn't expose individual chunk callback to UI easily yet,
-    // but we can at least allow cancelling)
+  const handleAiGenerate = async () => {
+    if (!aiTopic.trim()) return;
+    setAiLoading(true);
+    try {
+      const result = await AIService.generateStoryFromPrompt(aiTopic);
+      if (result) {
+        const newStory: Story = {
+          id: Date.now().toString(),
+          title: result.title,
+          content: result.content,
+          isUserCreated: true,
+          author: 'AI Magic'
+        };
+        await StorageService.addStory(newStory);
+        const userStories = await StorageService.getStories();
+        setStories([...DEFAULT_STORIES, ...userStories]);
+        setAiTopic('');
+        alert("✨ Your magic story is ready in the library!");
+      }
+    } catch (e) {
+      console.error("AI Story Error:", e);
+      alert("Magic failed this time. Try again!");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleIllustrate = (story: Story) => {
+    localStorage.setItem('pending_illustration_title', story.title);
+    localStorage.setItem('pending_illustration_context', story.content.substring(0, 500));
+    window.location.hash = '#/drawing';
+  };
+
+  const [quizScore, setQuizScore] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+  const handleOpenQuiz = async (story: Story) => {
+    setAiLoading(true);
+    try {
+      const q = await AIService.generateQuizForStory(story.title, story.content);
+      if (q && q.length > 0) {
+        setCurrentQuizQuestions(q);
+        setCurrentQuestionIndex(0);
+        setQuizScore(0);
+        setShowQuiz(true);
+      } else {
+        alert("Could not generate a quiz for this story. Try another one!");
+      }
+    } catch (e) {
+      console.error("Quiz generation error:", e);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSaveStory = async () => {
@@ -218,33 +276,77 @@ const StoriesPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
       {/* Create Story Section */}
-      <div className="bg-slate-800/80 p-4 sm:p-5 rounded-2xl border border-slate-700 shadow-md">
-        <h3 className="font-display text-xl text-pink-400 mb-2 flex items-center gap-2">
-          <Sparkles size={20} /> {t('stories.createTitle')}
-        </h3>
-        <p className="text-slate-400 text-xs mb-3">{t('stories.createSubtitle')}</p>
-        <div className="space-y-3">
-          <input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-pink-500 outline-none"
-            placeholder="Title (e.g. The Magic Sofa)"
-            title="Story Title"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* AI Story Magic */}
+        <div className="bg-indigo-900/40 p-5 rounded-2xl border border-indigo-500/30 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
+            <Sparkles size={40} className="text-amber-300" />
+          </div>
+          <h3 className="font-display text-xl text-amber-300 mb-2 flex items-center gap-2">
+            <Sparkles size={20} /> AI Story Magic
+          </h3>
+          <p className="text-slate-300 text-xs mb-3">Tell me a topic, and I'll write a story for you!</p>
+          <div className="flex gap-2">
+            <input
+              value={aiTopic}
+              onChange={(e) => setAiTopic(e.target.value)}
+              disabled={aiLoading}
+              className="flex-1 bg-slate-900/80 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-amber-500 outline-none"
+              placeholder="e.g. A brave cat in space"
+            />
+            <button
+              onClick={handleAiGenerate}
+              disabled={aiLoading || !aiTopic.trim()}
+              className="px-4 py-2 bg-amber-500 text-slate-900 font-bold rounded-lg text-sm hover:bg-amber-400 disabled:opacity-50 transition-all"
+            >
+              {aiLoading ? "Writing..." : "Go!"}
+            </button>
+          </div>
+        </div>
+
+        {/* Create Story Section */}
+        <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-md">
+          <h3 className="font-display text-xl text-pink-400 mb-2 flex items-center gap-2">
+            <Mic size={20} /> {t('stories.createTitle')}
+          </h3>
+          <div className="flex gap-2 mb-3">
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="flex-1 bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs outline-none"
+              placeholder="Title..."
+            />
+            <button
+              onClick={handleSaveStory}
+              className="px-3 py-1 bg-pink-500 text-white text-xs font-bold rounded-lg hover:bg-pink-400"
+            >
+              Save
+            </button>
+          </div>
           <textarea
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
-            className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm focus:border-pink-500 outline-none resize-none"
+            className="w-full h-12 bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs outline-none resize-none"
             placeholder="Once upon a time..."
-            title="Story Content"
           />
-          <button
-            onClick={handleSaveStory}
-            title="Save your new story"
-            className="w-full py-2.5 bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl font-bold text-sm shadow hover:scale-[1.02] transition-transform"
-          >
-            {t('stories.saveButton')}
-          </button>
+        </div>
+      </div>
+
+      {/* Narrator Controls */}
+      <div className="flex flex-wrap items-center gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+        <span className="text-sm font-bold text-slate-400 flex items-center gap-2">
+          <Volume2 size={16} /> Narrator Mood:
+        </span>
+        <div className="flex gap-1">
+          {(['neutral', 'excited', 'sarcastic'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setNarratorMood(m)}
+              className={`px-3 py-1 rounded-md text-xs font-bold capitalize transition-all ${narratorMood === m ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+            >
+              {m}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -282,12 +384,118 @@ const StoriesPage: React.FC = () => {
                     >
                       {isPlaying ? <><StopCircle size={16} /> {t('stories.stopReading')}</> : <><Volume2 size={16} /> {t('stories.readAloud')}</>}
                     </button>
+                    <button
+                      onClick={() => handleIllustrate(story)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-bold hover:bg-indigo-500/30 transition-all border border-indigo-500/30"
+                    >
+                      🎨 Illustrate
+                    </button>
+                    <button
+                      onClick={() => handleOpenQuiz(story)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-bold hover:bg-amber-500/30 transition-all border border-amber-500/30"
+                    >
+                      🧠 Take Quiz
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+      </div>
+      {showQuiz && (
+        <StoryQuizOverlay
+          questions={currentQuizQuestions}
+          currentIndex={currentQuestionIndex}
+          score={quizScore}
+          onAnswer={(isCorrect) => {
+            if (isCorrect) {
+              setQuizScore(s => s + 1);
+              AudioService.playEffect('correct');
+            } else {
+              AudioService.playEffect('wrong');
+            }
+
+            if (currentQuestionIndex < currentQuizQuestions.length - 1) {
+              setTimeout(() => setCurrentQuestionIndex(prev => prev + 1), 1000);
+            } else {
+              // Quiz finished
+              const finalScore = isCorrect ? quizScore + 1 : quizScore;
+              setTimeout(() => {
+                const stats = StorageService.getGameStats();
+                const xpEarned = finalScore * 50;
+                stats.xp += xpEarned;
+                StorageService.saveGameStats(stats);
+                alert(`Quiz Complete! You got ${finalScore}/${currentQuizQuestions.length} correct. Earned ${xpEarned} XP!`);
+                setShowQuiz(false);
+              }, 1000);
+            }
+          }}
+          onClose={() => setShowQuiz(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+const StoryQuizOverlay: React.FC<{
+  questions: any[];
+  currentIndex: number;
+  score: number;
+  onAnswer: (isCorrect: boolean) => void;
+  onClose: () => void;
+}> = ({ questions, currentIndex, score, onAnswer, onClose }) => {
+  const q = questions[currentIndex];
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  if (!q) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4">
+      <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-lg rounded-3xl p-6 relative shadow-2xl overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
+          <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
+        </div>
+
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20} /></button>
+
+        <div className="text-center mb-8 mt-4">
+          <span className="text-[10px] uppercase font-black tracking-widest text-amber-500 mb-2 block">Question {currentIndex + 1} of {questions.length}</span>
+          <h3 className="text-xl sm:text-2xl font-display text-white italic">{q.question}</h3>
+        </div>
+
+        <div className="grid gap-3 mb-6">
+          {q.options.map((opt: string, i: number) => {
+            const isCorrect = i === q.correctIndex;
+            const isSelected = selectedIdx === i;
+
+            let btnClass = "bg-slate-800 border-b-4 border-slate-950 hover:bg-slate-700";
+            if (selectedIdx !== null) {
+              if (isCorrect) btnClass = "bg-emerald-500/20 border-emerald-500 text-emerald-300";
+              else if (isSelected) btnClass = "bg-rose-500/20 border-rose-500 text-rose-300";
+              else btnClass = "bg-slate-800 opacity-50";
+            }
+
+            return (
+              <button
+                key={i}
+                disabled={selectedIdx !== null}
+                onClick={() => {
+                  setSelectedIdx(i);
+                  onAnswer(isCorrect);
+                  setTimeout(() => setSelectedIdx(null), 1000);
+                }}
+                className={`w-full p-4 rounded-xl text-left font-bold transition-all border-2 border-transparent ${btnClass}`}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-center">
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Score: {score}</p>
+        </div>
       </div>
     </div>
   );

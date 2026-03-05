@@ -249,6 +249,69 @@ router.post("/quiz", async (req, res, next) => {
   }
 });
 
+router.post("/story-from-prompt", async (req, res, next) => {
+  try {
+    assertKey();
+    mustHave(req.body, "topic");
+    const topic = String(req.body.topic);
+    const age = Number(req.body.age || 6);
+
+    const prompt = `Write a short, engaging children's story about: ${topic}. ` +
+      `Suitable for a ${age}-year-old. Return JSON with 'title' and 'content' fields. ` +
+      `Keep the length appropriate for a single page reading.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: { parts: [{ text: prompt }] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            content: { type: Type.STRING },
+          },
+          required: ["title", "content"],
+        }
+      },
+    });
+
+    const obj = safeJsonParse(response.text);
+    if (!obj?.title || !obj?.content) throw new Error("Invalid story format returned");
+
+    res.json({ title: obj.title, content: obj.content });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/story-quiz", async (req, res, next) => {
+  try {
+    assertKey();
+    mustHave(req.body, "title");
+    mustHave(req.body, "content");
+    const title = String(req.body.title);
+    const content = String(req.body.content);
+    const age = Number(req.body.age || 6);
+
+    const prompt = `Based on the story "${title}" with content: "${content}", ` +
+      `generate 3 fun comprehension questions for a ${age}-year-old. ` +
+      `Return a JSON array of objects: {question, options (4 strings), correctIndex (0-3), explanation}.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: { parts: [{ text: prompt }] },
+      config: { responseMimeType: "application/json" },
+    });
+
+    const parsed = safeJsonParse(response.text);
+    const questions = Array.isArray(parsed) ? parsed : [];
+    res.json({ questions });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---- error handler (improved logging) ----
 router.use((err, req, res, next) => {
   const status = err.status || 500;

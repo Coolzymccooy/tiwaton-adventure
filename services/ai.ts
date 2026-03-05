@@ -106,4 +106,32 @@ export const AIService = {
       return [];
     }
   },
+
+  async generateStoryFromPrompt(topic: string, age: number = 6): Promise<StoryResult | null> {
+    try {
+      const data = await postJson<StoryResult>("/api/ai/story-from-prompt", {
+        topic,
+        age,
+      });
+      if (!data?.title || !data?.content) return null;
+      return data;
+    } catch (e) {
+      console.error("generateStoryFromPrompt error", e);
+      return null;
+    }
+  },
+
+  async generateQuizForStory(title: string, content: string, age: number = 6): Promise<any[]> {
+    try {
+      const data = await postJson<{ questions: any[] }>("/api/ai/story-quiz", {
+        title,
+        content,
+        age,
+      });
+      return Array.isArray(data.questions) ? data.questions : [];
+    } catch (e) {
+      console.error("generateQuizForStory error", e);
+      return [];
+    }
+  },
 };
