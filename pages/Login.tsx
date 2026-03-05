@@ -151,6 +151,23 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             if (auth.currentUser) {
                 await auth.currentUser.reload();
                 if (auth.currentUser.emailVerified) {
+                    // Re-fetch profiles to ensure we have the recovery key
+                    const uid = auth.currentUser.uid;
+                    StorageService.setTenantContext(uid);
+                    const membersSnap = await getDocs(collection(db, `tenants/${uid}/members`));
+                    const childrenSnap = await getDocs(collection(db, `tenants/${uid}/children`));
+
+                    const loadedProfiles: FamilyProfile[] = [
+                        ...membersSnap.docs.map(d => d.data() as FamilyProfile),
+                        ...childrenSnap.docs.map(d => d.data() as FamilyProfile)
+                    ];
+
+                    StorageService.setCachedProfiles(loadedProfiles);
+                    setProfiles(loadedProfiles);
+
+                    const admin = loadedProfiles.find(p => p.id === uid);
+                    if (admin?.recoveryKey) setRecoveryKey(admin.recoveryKey);
+
                     setViewMode('RECOVERY_INFO');
                 } else {
                     setError('Email not yet verified. Please check your inbox and click the link.');

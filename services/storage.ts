@@ -65,6 +65,7 @@ export const StorageService = {
       age: 99,
       email,
       pin,
+      recoveryKey: Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
       active: true,
     };
 
@@ -91,6 +92,7 @@ export const StorageService = {
       age: 99,
       email,
       pin,
+      recoveryKey: Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
       active: true,
     };
 
@@ -112,7 +114,7 @@ export const StorageService = {
       name: name,
       role: 'STUDENT',
       schoolId: schoolId || currentTenantId,
-      classId,
+      classId: classId || null,
       age: age,
       mode: age >= 9 ? 'STUDIO' : 'KIDS',
       avatar: ['🦁', '🦄', '🚀', '🦖', '🐼', '🐨', '🐵', '🦊'][Math.floor(Math.random() * 8)],
