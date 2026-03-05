@@ -35,6 +35,7 @@ export interface UserProfile {
   active?: boolean;
   tenantId?: string;
   guardianUids?: string[];
+  gameStats?: GameStat;
 }
 
 // Keep the old exported interface locally mapped in case of legacy local storage

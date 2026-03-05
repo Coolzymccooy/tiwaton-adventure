@@ -2,14 +2,20 @@ import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/fi
 import { db, auth } from './firebase';
 import type { Story, Drawing, GameStat, PlanetProgress, MathPlanet, CountdownEvent, FamilyProfile } from '../types';
 
-let currentTenantId: string | null = null;
-let currentProfileId: string | null = null;
-let cachedProfiles: FamilyProfile[] = [];
+const STORAGE_KEYS = {
+  TENANT: 'tiwaton_tenant_id',
+  PROFILE: 'tiwaton_profile_id',
+  PROFILES: 'tiwaton_profiles_cache',
+  LAST_VIEW: 'tiwaton_last_view'
+};
+
+let currentTenantId: string | null = localStorage.getItem(STORAGE_KEYS.TENANT);
+let currentProfileId: string | null = localStorage.getItem(STORAGE_KEYS.PROFILE);
+let cachedProfiles: FamilyProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
 
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
   if (currentTenantId) return currentTenantId;
-  // Fallback logic could go here depending on how Login sets this
   return null;
 };
 
@@ -17,10 +23,13 @@ export const StorageService = {
   // Initialization & Auth linking
   setTenantContext: (tenantId: string) => {
     currentTenantId = tenantId;
+    localStorage.setItem(STORAGE_KEYS.TENANT, tenantId);
   },
 
   setCurrentProfile: (id: string) => {
     currentProfileId = id;
+    if (id) localStorage.setItem(STORAGE_KEYS.PROFILE, id);
+    else localStorage.removeItem(STORAGE_KEYS.PROFILE);
   },
 
   getCurrentProfile: (): FamilyProfile | null => {
@@ -29,6 +38,7 @@ export const StorageService = {
 
   setCachedProfiles: (profiles: FamilyProfile[]) => {
     cachedProfiles = profiles;
+    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
   },
 
   getProfiles: (): FamilyProfile[] => {
@@ -37,6 +47,25 @@ export const StorageService = {
 
   hasProfiles: (): boolean => {
     return cachedProfiles.length > 0;
+  },
+
+  syncFromFirestore: async (uid: string) => {
+    try {
+      StorageService.setTenantContext(uid);
+      const membersSnap = await getDocs(collection(db, `tenants/${uid}/members`));
+      const childrenSnap = await getDocs(collection(db, `tenants/${uid}/children`));
+
+      const loadedProfiles: FamilyProfile[] = [
+        ...membersSnap.docs.map(d => d.data() as FamilyProfile),
+        ...childrenSnap.docs.map(d => d.data() as FamilyProfile)
+      ];
+
+      StorageService.setCachedProfiles(loadedProfiles);
+      return loadedProfiles;
+    } catch (err) {
+      console.error("Sync storage err", err);
+      return [];
+    }
   },
 
   updateProfile: async (updated: FamilyProfile) => {
@@ -52,6 +81,7 @@ export const StorageService = {
     const index = cachedProfiles.findIndex(p => p.id === updated.id);
     if (index !== -1) {
       cachedProfiles[index] = updated;
+      StorageService.setCachedProfiles([...cachedProfiles]);
     }
   },
 
@@ -69,11 +99,12 @@ export const StorageService = {
       active: true,
     };
 
-    currentTenantId = uid; // For parent mode, the admin UID is the tenant
+    StorageService.setTenantContext(uid);
     const docRef = doc(db, `tenants/${uid}/members/${uid}`);
     await setDoc(docRef, parent);
 
     cachedProfiles.unshift(parent);
+    StorageService.setCachedProfiles([...cachedProfiles]);
     return parent;
   },
 
@@ -96,11 +127,12 @@ export const StorageService = {
       active: true,
     };
 
-    currentTenantId = uid; // For teacher mode, the teacher UID is the tenant
+    StorageService.setTenantContext(uid);
     const docRef = doc(db, `tenants/${uid}/members/${uid}`);
     await setDoc(docRef, teacher);
 
     cachedProfiles.unshift(teacher);
+    StorageService.setCachedProfiles([...cachedProfiles]);
     return teacher;
   },
 
@@ -113,7 +145,7 @@ export const StorageService = {
       id: childId,
       name: name,
       role: 'STUDENT',
-      schoolId: schoolId || currentTenantId,
+      schoolId: schoolId || currentTenantId || '',
       classId: classId || null,
       age: age,
       mode: age >= 9 ? 'STUDIO' : 'KIDS',
@@ -128,33 +160,32 @@ export const StorageService = {
     await setDoc(docRef, newProfile);
 
     cachedProfiles.push(newProfile);
+    StorageService.setCachedProfiles([...cachedProfiles]);
     return newProfile;
   },
 
-  getGameStats: async (): Promise<GameStat> => {
-    const tenantId = getTenantId();
-    if (!tenantId || !currentProfileId) return getDefaultStats();
-
-    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stats/gameStats`);
-    const snapshot = await getDoc(docRef);
-
-    if (snapshot.exists()) {
-      return { ...getDefaultStats(), ...snapshot.data() } as GameStat;
-    }
-    return getDefaultStats();
+  getGameStats: (): GameStat => {
+    const profile = StorageService.getCurrentProfile();
+    return profile?.gameStats || getDefaultStats();
   },
 
   saveGameStats: async (stats: GameStat) => {
     const tenantId = getTenantId();
-    if (!tenantId || !currentProfileId) return;
+    const profile = StorageService.getCurrentProfile();
+    if (!tenantId || !profile) return;
 
-    const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stats/gameStats`);
-    await setDoc(docRef, stats, { merge: true });
+    // Update local cache first
+    profile.gameStats = stats;
+    StorageService.setCachedProfiles([...cachedProfiles]);
+
+    // Update Firestore
+    const collectionName = profile.role !== 'STUDENT' ? 'members' : 'children';
+    const docRef = doc(db, `tenants/${tenantId}/${collectionName}/${profile.id}`);
+    await updateDoc(docRef, { gameStats: stats });
   },
 
   trackUsage: async (profileId: string, view: string, seconds: number) => {
-    // Optional: implement telemetry tracking in Firestore or keep entirely local if desired.
-    // For now, let's keep it simple.
+    // telemetry...
   },
 
   getFamilyUsage: async () => {
@@ -217,8 +248,10 @@ export const StorageService = {
     return [];
   },
 
-  setLastView: (view: string) => { },
-  getLastView: () => null,
+  setLastView: (view: string) => {
+    localStorage.setItem(STORAGE_KEYS.LAST_VIEW, view);
+  },
+  getLastView: () => localStorage.getItem(STORAGE_KEYS.LAST_VIEW),
 };
 
 function getDefaultStats(): GameStat {

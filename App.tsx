@@ -5,6 +5,7 @@ import { View } from './types';
 import type { FamilyProfile } from './types';
 import { StorageService } from './services/storage';
 import { I18nProvider } from './i18n/I18nProvider';
+import { auth } from './services/firebase';
 
 // Pages
 import Home from './pages/Home';
@@ -32,20 +33,52 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const hasProfiles = StorageService.hasProfiles();
-    if (!hasProfiles) {
-      setCurrentView(View.LANDING);
-    } else {
-      const active = StorageService.getCurrentProfile();
-      if (active) {
-        setProfile(active);
-        const maybeView = StorageService.getLastView();
-        setCurrentView(resolveView(maybeView));
-        if (active.mode === 'PARENT') setIsAdminMode(true);
+    const initSession = async () => {
+      // Check if we have local cache
+      const hasProfiles = StorageService.hasProfiles();
+
+      // If no local cache, check if Firebase is signed in
+      if (!hasProfiles) {
+        // Wait for auth to initialize
+        auth.onAuthStateChanged(async (user) => {
+          if (user) {
+            const profiles = await StorageService.syncFromFirestore(user.uid);
+            if (profiles.length > 0) {
+              const activeId = StorageService.getCurrentProfile()?.id;
+              if (activeId) {
+                const active = profiles.find(p => p.id === activeId);
+                if (active) {
+                  setProfile(active);
+                  setCurrentView(resolveView(StorageService.getLastView()));
+                  if (active.role === 'PARENT' || active.role === 'TEACHER') setIsAdminMode(true);
+                } else {
+                  setCurrentView(View.LOGIN);
+                  setLoginInitialView('USER_GRID');
+                }
+              } else {
+                setCurrentView(View.LOGIN);
+                setLoginInitialView('USER_GRID');
+              }
+            } else {
+              setCurrentView(View.LANDING);
+            }
+          } else {
+            setCurrentView(View.LANDING);
+          }
+        });
       } else {
-        setCurrentView(View.LANDING);
+        const active = StorageService.getCurrentProfile();
+        if (active) {
+          setProfile(active);
+          setCurrentView(resolveView(StorageService.getLastView()));
+          if (active.role === 'PARENT' || active.role === 'TEACHER') setIsAdminMode(true);
+        } else {
+          setCurrentView(View.LOGIN);
+          setLoginInitialView('USER_GRID');
+        }
       }
-    }
+    };
+    initSession();
   }, []);
 
   useEffect(() => {
