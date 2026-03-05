@@ -53,9 +53,12 @@ service cloud.firestore {
     }
 
     // Membership management
+    match /tenants/{tenantId}/members {
+      allow list: if signedIn() && (request.auth.uid == tenantId || isStaff(tenantId));
+    }
     match /tenants/{tenantId}/members/{uid} {
       // Users can read their own membership (helps UI decide role)
-      allow read: if signedIn() && request.auth.uid == uid;
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff(tenantId));
 
       // Initial Account Creation: Allow users to create their own initial Admin/Teacher profile
       // storage.ts uses `uid` as the initial `tenantId`
@@ -66,6 +69,9 @@ service cloud.firestore {
     }
 
     // Child profiles
+    match /tenants/{tenantId}/children {
+      allow list: if signedIn() && (request.auth.uid == tenantId || isStaff(tenantId));
+    }
     match /tenants/{tenantId}/children/{childId} {
       allow read: if canAccessChild(tenantId, childId);
 

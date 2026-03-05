@@ -71,7 +71,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         try {
             // Assume it's an email/password Teacher/Parent login first
             if (loginIdentifier.includes('@')) {
-                const userCredential = await signInWithEmailAndPassword(auth, loginIdentifier, authInput);
+                // Pad 4-digit PINs to 6 chars to match the forced signup logic
+                const passwordToUse = authInput.length === 4 ? authInput.padEnd(6, '0') : authInput;
+                const userCredential = await signInWithEmailAndPassword(auth, loginIdentifier, passwordToUse);
                 const uid = userCredential.user.uid;
 
                 StorageService.setTenantContext(uid);
@@ -97,7 +99,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
                 // If they are trying to log in directly via the prompt without an email, 
                 // we'll check if we currently have loaded profiles (e.g., from an active session).
-                const match = profiles.find(p => p.name.toLowerCase() === loginIdentifier.toLowerCase());
+                // profiles should be an array, but we add a defensive check just in case.
+                const match = (profiles || []).find(p => p.name.toLowerCase() === loginIdentifier.toLowerCase());
                 if (match) {
                     if ((match.password || '').toLowerCase() === authInput.toLowerCase()) {
                         onLogin(match);
@@ -110,7 +113,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             }
         } catch (err: any) {
             console.error("Login err", err);
-            setError(err.message || t('login.errorAccountNotFound'));
+            let userMsg = t('login.errorAccountNotFound');
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                userMsg = t('login.errorIncorrect');
+            } else if (err.code === 'auth/too-many-requests') {
+                userMsg = "Too many failed attempts. Please try again later.";
+            } else if (err.code === 'permission-denied') {
+                userMsg = "Access denied. Your profile might still be setting up.";
+            }
+            setError(userMsg);
         }
     };
 
