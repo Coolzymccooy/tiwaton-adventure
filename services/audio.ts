@@ -98,60 +98,89 @@ export const AudioService = {
       return;
     }
 
+    // Ensure voices are loaded. Some browsers load them asynchronously.
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      // Wait for voices to be loaded
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null; // Prevent recursion
+        AudioService.processQueue();
+      };
+      return;
+    }
+
     AudioService.private.isSpeaking = true;
     const { text, mood } = AudioService.private.queue.shift()!;
     const utterance = new SpeechSynthesisUtterance(text);
 
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoices = ['Google US English', 'Samantha', 'en-US'];
-    const normalizeName = (voice?: SpeechSynthesisVoice) => (voice?.name ?? '').toLowerCase();
+    // SMARTER VOICE SELECTION
+    // Prioritize natural/premium voices which sound much more "real"
+    const preferredPatterns = [
+      'premium', 'natural', 'google', 'neural', 'samantha', 'en-us', 'en-gb'
+    ];
 
-    let selectedVoice = voices.find(voice =>
-      preferredVoices.some(pref => normalizeName(voice).includes(pref.toLowerCase()))
+    let selectedVoice = voices.find(v =>
+      preferredPatterns.some(p => v.name.toLowerCase().includes(p) && v.lang.startsWith('en'))
     );
 
+    // Fallback search
     if (!selectedVoice) {
-      selectedVoice = voices.find(voice => normalizeName(voice).includes('english'));
+      selectedVoice = voices.find(v => v.lang.startsWith('en'));
     }
 
-    if (!selectedVoice && voices.length > 0) {
-      selectedVoice = voices[0];
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
     }
 
-    if (selectedVoice) utterance.voice = selectedVoice;
-
+    // IMPROVED PROSODY (Human-like rhythm)
     const locale = AudioService.private.locale || 'en';
-    utterance.lang = locale === 'de' ? 'de-DE' : 'en-US';
+
+    // Dynamic Rate Adjustment: Longer sentences speak slightly faster to sound more natural
+    const wordCount = text.split(/\s+/).length;
+    let baseRate = wordCount > 20 ? 0.95 : 0.88;
+    let basePitch = 1.0;
+
     if (locale === 'de') {
       utterance.rate = 0.85;
-      utterance.pitch = 0.95;
-    } else if (mood === 'sarcastic') {
-      utterance.rate = 0.8;
-      utterance.pitch = 0.85;
-    } else if (mood === 'excited') {
-      utterance.rate = 0.9;
-      utterance.pitch = 1.15;
-    } else {
-      utterance.rate = 0.85;
       utterance.pitch = 1.0;
+    } else if (mood === 'sarcastic') {
+      // Sarcasm: Slower, slightly higher initial pitch, then flat
+      utterance.rate = 0.78;
+      utterance.pitch = 0.9;
+    } else if (mood === 'excited') {
+      // Excited: Faster, higher pitch variation
+      utterance.rate = 1.1;
+      utterance.pitch = 1.2;
+    } else {
+      utterance.rate = baseRate;
+      utterance.pitch = basePitch;
     }
 
+    // PUNCTUATION PACING
+    // Insert small delays on end to allow "breathing" between chunks
     utterance.onend = () => {
-      setTimeout(() => AudioService.processQueue(), 300);
+      let delay = 350; // default pause
+      if (text.endsWith('!') || text.endsWith('?')) delay = 600;
+      if (text.endsWith('.')) delay = 450;
+
+      setTimeout(() => AudioService.processQueue(), delay);
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
+      console.warn("TTS Error:", e);
       AudioService.private.isSpeaking = false;
       AudioService.processQueue();
     };
 
+    // Heartbeat to prevent chrome from cutting off long utterances
     if (AudioService.private.heartbeat) clearInterval(AudioService.private.heartbeat);
     AudioService.private.heartbeat = setInterval(() => {
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.pause();
         window.speechSynthesis.resume();
       }
-    }, 5000);
+    }, 10000);
 
     window.speechSynthesis.speak(utterance);
   },
