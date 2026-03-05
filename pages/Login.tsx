@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import { FamilyProfile } from '../types';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import {
@@ -136,10 +136,31 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
             setRecoveryKey(p.recoveryKey || '');
             setProfiles(StorageService.getProfiles());
 
-            setViewMode('RECOVERY_INFO');
+            // 3. Send Verification Email
+            await sendEmailVerification(userCreds.user);
+            setViewMode('VERIFY_ACCOUNT');
         } catch (err: any) {
             console.error("Signup err", err);
             setError(err.message || "Failed to create account");
+        }
+    };
+
+    const handleCheckVerification = async () => {
+        try {
+            setError('');
+            if (auth.currentUser) {
+                await auth.currentUser.reload();
+                if (auth.currentUser.emailVerified) {
+                    setViewMode('RECOVERY_INFO');
+                } else {
+                    setError('Email not yet verified. Please check your inbox and click the link.');
+                }
+            } else {
+                setError('Authentication error. Please try logging in again.');
+            }
+        } catch (err: any) {
+            console.error("Verification err", err);
+            setError(err.message || "Failed to check verification status");
         }
     };
 
@@ -326,6 +347,38 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 <p className="text-slate-400 text-xs mb-6">{t('login.recoverySubtitle')}</p>
                 <div className="bg-black/40 p-4 rounded-xl border border-white/5 mb-8"><code className="text-xl font-mono text-amber-300 tracking-widest break-all select-all">{recoveryKey}</code></div>
                 <button onClick={() => setViewMode('SETUP_CHILD')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-xl text-white border-b-4 border-indigo-900 active:border-b-0">{t('login.recoveryButton')}</button>
+            </div>
+        </div>
+    );
+
+    if (viewMode === 'VERIFY_ACCOUNT') return (
+        <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] animate-fade-in overflow-y-auto custom-scrollbar">
+            <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-sky-500/20 text-center shadow-xl relative flex flex-col items-center">
+                <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center mb-4">
+                    <ShieldCheck size={24} className="text-sky-400" />
+                </div>
+                <h2 className="text-2xl font-display text-white mb-2 italic tracking-tight">Verify Email</h2>
+                <p className="text-slate-400 text-xs mb-6">
+                    We sent a verification link to <br /><span className="text-white font-bold">{adminEmail}</span>
+                    <br /><br />
+                    Please click the link in your email to verify your account, then click the button below.
+                </p>
+
+                <div className="space-y-4 w-full mt-2">
+                    {error && <p className="text-red-500 text-[10px] font-bold uppercase">{error}</p>}
+                    <button
+                        onClick={handleCheckVerification}
+                        className="w-full py-4 bg-sky-600 hover:bg-sky-500 rounded-xl text-white font-bold text-lg italic uppercase shadow-lg transition-all"
+                    >
+                        I Have Verified Use This App
+                    </button>
+                    <button
+                        onClick={() => setViewMode('SIGN_IN_ENTRY')}
+                        className="w-full py-3 text-slate-500 hover:text-white text-[10px] uppercase font-bold tracking-widest transition-colors"
+                    >
+                        Back to Login
+                    </button>
+                </div>
             </div>
         </div>
     );
