@@ -16,11 +16,13 @@ import { getLogoUrl } from '../components/logo';
 interface LandingProps {
   onAction: (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => void;
   activeProfile: FamilyProfile | null;
+  disableHeavyEffects?: boolean;
+  sessionReady?: boolean;
 }
 
 const SPLASH_WORDS = ["Imagination", "Discovery", "Victory", "Learning", "Creativity", "Adventure"];
 
-const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
+const Landing: React.FC<LandingProps> = ({ onAction, activeProfile, disableHeavyEffects = false, sessionReady = true }) => {
   const { t } = useI18n();
   const [hasProfiles, setHasProfiles] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -101,6 +103,54 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
       tooltip: "Arcade Word Puzzles"
     }
   ], [t]);
+
+
+  if (disableHeavyEffects) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-[#02000a] text-white px-5 py-8 flex flex-col justify-center">
+        <div className="max-w-md w-full mx-auto space-y-6 bg-[#0b1120] border border-white/10 rounded-3xl p-6 shadow-xl">
+          <div className="flex items-center justify-center mb-2">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Tiwaton mark" className="w-16 h-16 object-contain" />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center font-display text-3xl">T</div>
+            )}
+          </div>
+          <h1 className="text-3xl font-display text-center">Adventure Hub</h1>
+          <p className="text-sm text-slate-300 text-center">{heroFullSubtitle}</p>
+
+          {!sessionReady && (
+            <p className="text-center text-xs text-slate-400">Preparing your session...</p>
+          )}
+
+          <button
+            onClick={() => {
+              if (activeProfile) onAction('CONTINUE');
+              else onAction(hasProfiles ? 'LOGIN' : 'SETUP');
+            }}
+            className="w-full py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 transition-colors"
+          >
+            {activeProfile ? t('landing.ctaResume') : t('landing.ctaPrimary')}
+          </button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onAction('LOGIN')}
+              className="py-2.5 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-sm"
+            >
+              {t('landing.ctaSecondary')}
+            </button>
+            <button
+              onClick={() => onAction('RESET')}
+              className="py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-sm"
+            >
+              {t('landing.resetButton')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
