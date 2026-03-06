@@ -55,6 +55,16 @@ export const StorageService = {
     return cachedProfiles.length > 0;
   },
 
+  clearSession: () => {
+    currentTenantId = null;
+    currentProfileId = null;
+    cachedProfiles = [];
+    safeStorage.removeItem(STORAGE_KEYS.TENANT);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILE);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILES);
+    safeStorage.removeItem(STORAGE_KEYS.LAST_VIEW);
+  },
+
   syncFromFirestore: async (uid: string) => {
     try {
       StorageService.setTenantContext(uid);
