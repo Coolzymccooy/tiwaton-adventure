@@ -19,6 +19,28 @@ let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
 let currentProfileId: string | null = safeStorage.getItem(STORAGE_KEYS.PROFILE);
 let cachedProfiles: FamilyProfile[] = JSON.parse(safeStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
 
+type ChildIndexRecord = {
+  tenantId: string;
+  childId: string;
+  password: string;
+  profile?: FamilyProfile;
+};
+
+const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
+  id: profile.id,
+  name: profile.name,
+  role: profile.role,
+  schoolId: profile.schoolId,
+  classId: profile.classId ?? null,
+  avatar: profile.avatar,
+  mode: profile.mode,
+  age: profile.age,
+  password: profile.password,
+  tenantId: profile.tenantId,
+  guardianUids: profile.guardianUids ?? [],
+  active: profile.active ?? true
+});
+
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
   if (currentTenantId) return currentTenantId;
@@ -85,7 +107,8 @@ export const StorageService = {
           setDoc(indexRef, {
             tenantId: uid,
             childId: childData.id,
-            password: childData.password || '123'
+            password: childData.password || '123',
+            profile: buildIndexProfile(childData)
           }, { merge: true });
         } catch (e) {
           console.warn("Could not index child", childData.name, e);
@@ -197,7 +220,8 @@ export const StorageService = {
       await setDoc(indexRef, {
         tenantId,
         childId,
-        password: password || '123'
+        password: password || '123',
+        profile: buildIndexProfile(newProfile)
       }, { merge: true });
     } catch (e) {
       console.warn("Could not save to children_index", e);
@@ -212,20 +236,20 @@ export const StorageService = {
     try {
       const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
       const indexSnap = await getDoc(indexRef);
-      if (indexSnap.exists()) {
-        const data = indexSnap.data();
-        if (data.password.toLowerCase() === pin.toLowerCase()) {
-          const profileRef = doc(db, `tenants/${data.tenantId}/children/${data.childId}`);
-          const profileSnap = await getDoc(profileRef);
-          if (profileSnap.exists()) {
-            const p = profileSnap.data() as FamilyProfile;
-            StorageService.setTenantContext(data.tenantId);
-            StorageService.setCachedProfiles([p]); // Cache this profile locally
-            return p;
-          }
-        }
+      if (!indexSnap.exists()) return null;
+
+      const data = indexSnap.data() as ChildIndexRecord;
+      if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
+
+      if (!data.profile) {
+        console.warn('Child index is missing profile snapshot for', name);
+        return null;
       }
-      return null;
+
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([data.profile]);
+      StorageService.setCurrentProfile(data.profile.id);
+      return data.profile;
     } catch (e) {
       console.error("Global child fetch error", e);
       return null;

@@ -1,5 +1,9 @@
 
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import React, { useState, useEffect, useMemo } from 'react';
+
 import Layout from './components/Layout';
 import { View } from './types';
 import type { FamilyProfile } from './types';
@@ -26,6 +30,8 @@ const App: React.FC = () => {
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
   const [sessionReady, setSessionReady] = useState(false);
 
+  const authEventVersion = useRef(0);
+
   const resolveView = (candidate?: string | null): View => {
     if (candidate && Object.values(View).includes(candidate as View)) {
       return candidate as View;
@@ -34,6 +40,35 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    let mounted = true;
+    let receivedAuthEvent = false;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!mounted || receivedAuthEvent) return;
+      setSessionReady(true);
+      setCurrentView(View.LANDING);
+    }, 4000);
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      const eventId = ++authEventVersion.current;
+      receivedAuthEvent = true;
+      clearTimeout(fallbackTimer);
+
+      if (!mounted) return;
+
+      if (!user) {
+        StorageService.clearSession();
+        setProfile(null);
+        setIsAdminMode(false);
+        setCurrentView(View.LANDING);
+        setSessionReady(true);
+        return;
+      }
+
+      try {
+        const profiles = await StorageService.syncFromFirestore(user.uid);
+        if (!mounted || eventId !== authEventVersion.current) return;
+
     const initSession = () => {
       const unsubscribe = auth.onAuthStateChanged(async (user) => {
         if (!user) {
@@ -46,6 +81,7 @@ const App: React.FC = () => {
         }
 
         const profiles = await StorageService.syncFromFirestore(user.uid);
+
         if (profiles.length === 0) {
           setProfile(null);
           setIsAdminMode(false);
@@ -66,7 +102,25 @@ const App: React.FC = () => {
           setLoginInitialView('USER_GRID');
         }
 
-        setSessionReady(true);
+      } catch (error) {
+        console.error('Session bootstrap failed', error);
+        if (!mounted || eventId !== authEventVersion.current) return;
+        setProfile(null);
+        setIsAdminMode(false);
+        setCurrentView(View.LANDING);
+      } finally {
+        if (mounted && eventId === authEventVersion.current) {
+          setSessionReady(true);
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearTimeout(fallbackTimer);
+      authEventVersion.current += 1;
+
+      setSessionReady(true);
       });
 
       return unsubscribe;
@@ -74,6 +128,7 @@ const App: React.FC = () => {
 
     const unsubscribe = initSession();
     return () => {
+
       unsubscribe();
     };
   }, []);
@@ -87,7 +142,7 @@ const App: React.FC = () => {
     StorageService.setCurrentProfile(p.id);
     const active = StorageService.getCurrentProfile() || p;
     setProfile(active);
-    setIsAdminMode(active.mode === 'PARENT');
+    setIsAdminMode(active.mode === 'PARENT' || active.mode === 'TEACHER');
     setCurrentView(resolveView(StorageService.getLastView()));
   };
 
@@ -122,13 +177,17 @@ const App: React.FC = () => {
     setCurrentView(View.LOGIN);
   };
 
-
   const isMobileLikeDevice = useMemo(() => {
     if (typeof window === 'undefined') return false;
 
     const width = window.innerWidth || document.documentElement.clientWidth || 0;
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+    const ua = navigator.userAgent || '';
+    const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+
+    return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
 
     return width <= 900 || coarsePointer || reducedMotion;
   }, []);
@@ -143,10 +202,11 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         initialViewMode={loginInitialView}
         onBackToLanding={() => setCurrentView(View.LANDING)}
+        compactMode={isMobileLikeDevice}
       />;
     }
 
-    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} />;
+    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} />;
 
     switch (currentView) {
       case View.HOME:
