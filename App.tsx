@@ -5,6 +5,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 
 
@@ -88,6 +92,17 @@ const App: React.FC = () => {
       setSessionReady(true);
       setCurrentView(View.LANDING);
     }, 4000);
+
+
+
+    const handleAuthState = async (user: User | null) => {
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+
+    const handleAuthState = async (user: Parameters<typeof auth.onAuthStateChanged>[0] extends (arg: infer U) => any ? U : never) => {
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+
 
 
     const handleAuthState = async (user: User | null) => {
@@ -192,12 +207,20 @@ const App: React.FC = () => {
 
       unsubscribe();
     };
+        
+    const unsubscribe = auth.onAuthStateChanged(handleAuthState);
+
+    return () => {
+      mounted = false;
+
+
 
 
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
 
     return () => {
       mountedRef.current = false;
+
       clearTimeout(fallbackTimer);
       authEventVersion.current += 1;
       unsubscribe();

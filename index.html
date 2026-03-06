@@ -184,24 +184,54 @@
         display: none;
       }
     }
+
+    /* Startup fallback so mobile never shows a blank dark screen */
+    #boot-fallback {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 45%, #020617 100%);
+      color: #e2e8f0;
+      padding: 24px;
+    }
+
+    .boot-card {
+      width: min(92vw, 420px);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(6px);
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      text-align: center;
+      font-family: "Baloo 2", sans-serif;
+    }
+
+    .boot-title {
+      font-size: 28px;
+      margin: 0 0 8px;
+      color: #c4b5fd;
+      font-family: Pacifico, cursive;
+    }
+
+    .boot-sub {
+      margin: 0;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
   </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
-  }
-}
-</script>
-  <link rel="stylesheet" href="/index.css">
 </head>
 
 <body>
-  <div id="root"></div>
-  <script type="module" src="index.tsx"></script>
+  <div id="root">
+    <div id="boot-fallback" role="status" aria-live="polite">
+      <div class="boot-card">
+        <h1 class="boot-title">Adventure Hub</h1>
+        <p class="boot-sub">Loading your adventure…</p>
+      </div>
+    </div>
+  </div>
   <script type="module" src="/index.tsx"></script>
 </body>
 

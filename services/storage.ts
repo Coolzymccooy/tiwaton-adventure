@@ -41,6 +41,24 @@ const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
   active: profile.active ?? true
 });
 
+
+const normalizeChildIndexKey = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const buildFallbackChildProfile = (name: string, data: ChildIndexRecord): FamilyProfile => ({
+  id: data.childId,
+  name: name.trim(),
+  role: 'STUDENT',
+  avatar: '🧒',
+  mode: 'KIDS',
+  age: 8,
+  password: data.password || '123',
+  tenantId: data.tenantId,
+  guardianUids: [],
+  active: true
+});
+
+
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
   if (currentTenantId) return currentTenantId;
@@ -103,7 +121,7 @@ export const StorageService = {
         const childData = d.data() as FamilyProfile;
         try {
           // Fire-and-forget indexing (won't throw or block the load)
-          const indexRef = doc(db, `children_index/${childData.name.toLowerCase()}`);
+          const indexRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
           setDoc(indexRef, {
             tenantId: uid,
             childId: childData.id,
@@ -216,7 +234,7 @@ export const StorageService = {
 
     // Save lightweight index for global sign in
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const indexRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
       await setDoc(indexRef, {
         tenantId,
         childId,
@@ -234,12 +252,26 @@ export const StorageService = {
 
   findChildGlobal: async (name: string, pin: string): Promise<FamilyProfile | null> => {
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const normalizedName = normalizeChildIndexKey(name);
+      const indexRef = doc(db, `children_index/${normalizedName}`);
       const indexSnap = await getDoc(indexRef);
       if (!indexSnap.exists()) return null;
 
       const data = indexSnap.data() as ChildIndexRecord;
       if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
+
+
+      const resolvedProfile = data.profile ?? buildFallbackChildProfile(name, data);
+
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([resolvedProfile]);
+      StorageService.setCurrentProfile(resolvedProfile.id);
+
+      if (!data.profile) {
+        console.warn('Child index profile snapshot missing; using fallback profile for', normalizedName);
+      }
+
+      return resolvedProfile;
 
       if (!data.profile) {
         console.warn('Child index is missing profile snapshot for', name);
@@ -250,6 +282,7 @@ export const StorageService = {
       StorageService.setCachedProfiles([data.profile]);
       StorageService.setCurrentProfile(data.profile.id);
       return data.profile;
+
     } catch (e) {
       console.error("Global child fetch error", e);
       return null;
