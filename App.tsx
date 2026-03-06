@@ -5,6 +5,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import React, { useState, useEffect, useMemo } from 'react';
 
 
@@ -14,6 +17,7 @@ import type { FamilyProfile } from './types';
 import { StorageService } from './services/storage';
 import { I18nProvider } from './i18n/I18nProvider';
 import { auth } from './services/firebase';
+import type { User } from 'firebase/auth';
 
 // Pages
 import Home from './pages/Home';
@@ -34,7 +38,6 @@ const App: React.FC = () => {
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
   const [sessionReady, setSessionReady] = useState(false);
 
-
   const authEventVersion = useRef(0);
 
   const resolveView = (candidate?: string | null): View => {
@@ -44,17 +47,58 @@ const App: React.FC = () => {
     return View.HOME;
   };
 
+  const bootstrapAuthenticatedSession = async (user: User, eventId: number, mountedRef: { current: boolean }) => {
+    const profiles = await StorageService.syncFromFirestore(user.uid);
+    if (!mountedRef.current || eventId !== authEventVersion.current) return;
+
+    if (profiles.length === 0) {
+      setProfile(null);
+      setIsAdminMode(false);
+      setCurrentView(View.LANDING);
+      setSessionReady(true);
+      return;
+    }
+
+    const active = StorageService.getCurrentProfile();
+    if (active) {
+      setProfile(active);
+      setCurrentView(resolveView(StorageService.getLastView()));
+      setIsAdminMode(active.role === 'PARENT' || active.role === 'TEACHER');
+      return;
+    }
+
+    setProfile(null);
+    setIsAdminMode(false);
+    setCurrentView(View.LOGIN);
+    setLoginInitialView('USER_GRID');
+  };
+
   useEffect(() => {
+
+    const mountedRef = { current: true };
+    let receivedAuthEvent = false;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!mountedRef.current || receivedAuthEvent) return;
+
     let mounted = true;
     let receivedAuthEvent = false;
 
     const fallbackTimer = window.setTimeout(() => {
       if (!mounted || receivedAuthEvent) return;
+
       setSessionReady(true);
       setCurrentView(View.LANDING);
     }, 4000);
 
+
     const handleAuthState = async (user: Parameters<typeof auth.onAuthStateChanged>[0] extends (arg: infer U) => any ? U : never) => {
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+
+
+
+    const handleAuthState = async (user: User | null) => {
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
 
@@ -62,7 +106,11 @@ const App: React.FC = () => {
       receivedAuthEvent = true;
       clearTimeout(fallbackTimer);
 
+
+      if (!mountedRef.current) return;
+
       if (!mounted) return;
+
 
       if (!user) {
         StorageService.clearSession();
@@ -74,6 +122,18 @@ const App: React.FC = () => {
       }
 
       try {
+
+        await bootstrapAuthenticatedSession(user, eventId, mountedRef);
+      } catch (error) {
+        console.error('Session bootstrap failed', error);
+        if (!mountedRef.current || eventId !== authEventVersion.current) return;
+        setProfile(null);
+        setIsAdminMode(false);
+        setCurrentView(View.LANDING);
+      } finally {
+        if (mountedRef.current && eventId === authEventVersion.current) {
+          setSessionReady(true);
+
         const profiles = await StorageService.syncFromFirestore(user.uid);
         if (!mounted || eventId !== authEventVersion.current) return;
 
@@ -108,6 +168,7 @@ const App: React.FC = () => {
           setIsAdminMode(false);
           setCurrentView(View.LOGIN);
           setLoginInitialView('USER_GRID');
+
         }
 
       } catch (error) {
@@ -139,10 +200,19 @@ const App: React.FC = () => {
 
       unsubscribe();
     };
+
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
 
     return () => {
       mounted = false;
+
+
+
+    const unsubscribe = auth.onAuthStateChanged(handleAuthState);
+
+    return () => {
+      mountedRef.current = false;
+
       clearTimeout(fallbackTimer);
       authEventVersion.current += 1;
       unsubscribe();
@@ -205,6 +275,7 @@ const App: React.FC = () => {
     const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
 
     return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
+
 
     return width <= 900 || coarsePointer || reducedMotion;
 
