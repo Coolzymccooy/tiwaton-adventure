@@ -15,11 +15,12 @@ interface LoginProps {
     onLogin: (profile: FamilyProfile) => void;
     onBackToLanding?: () => void;
     initialViewMode?: ViewMode;
+    compactMode?: boolean;
 }
 
 export type ViewMode = 'SETUP_ADMIN' | 'RECOVERY_INFO' | 'SETUP_CHILD' | 'USER_GRID' | 'VERIFY_ACCOUNT' | 'FORGOT_FLOW' | 'SIGN_IN_ENTRY';
 
-const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode, compactMode = false }) => {
     const { t } = useI18n();
     const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || 'SIGN_IN_ENTRY');
     const [profiles, setProfiles] = useState<FamilyProfile[]>([]);
@@ -28,6 +29,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [classCode, setClassCode] = useState('');
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Setup Form State
     const [adminName, setAdminName] = useState('');
@@ -83,6 +85,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     // ... (in component implementation below ...)
 
+
+    const withTimeout = async <T,>(task: Promise<T>, timeoutMs = 12000): Promise<T> => {
+        return await Promise.race([
+            task,
+            new Promise<T>((_, reject) => {
+                setTimeout(() => reject(new Error('timeout')), timeoutMs);
+            })
+        ]);
+    };
+
     const handleGlobalSignIn = async () => {
         if (!loginIdentifier || !authInput) {
             setError(t('login.errorMissingCredentials'));
@@ -90,15 +102,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
 
         try {
+            setIsSubmitting(true);
             // Assume it's an email/password Teacher/Parent login first
             if (loginIdentifier.includes('@')) {
                 // Pad 4-digit PINs to 6 chars to match the forced signup logic
                 const passwordToUse = authInput.length === 4 ? authInput.padEnd(6, '0') : authInput;
-                const userCredential = await signInWithEmailAndPassword(auth, loginIdentifier, passwordToUse);
+                const userCredential = await withTimeout(signInWithEmailAndPassword(auth, loginIdentifier, passwordToUse));
                 const uid = userCredential.user.uid;
 
                 StorageService.setTenantContext(uid);
-                const loadedProfiles = await StorageService.syncFromFirestore(uid);
+                const loadedProfiles = await withTimeout(StorageService.syncFromFirestore(uid));
 
                 setProfiles(loadedProfiles);
                 setViewMode('USER_GRID');
@@ -120,11 +133,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                         setError('Incorrect password');
                     }
                 } else {
-                    const globalProfile = await StorageService.findChildGlobal(loginIdentifier, authInput);
+                    const globalProfile = await withTimeout(StorageService.findChildGlobal(loginIdentifier, authInput));
                     if (globalProfile) {
                         onLogin(globalProfile);
                     } else {
-                        setError('Child profile not found. Parent/Teacher must log in first, or check name and secret.');
+                        setError('Child profile not found. Check the name and secret, then try again.');
                     }
                 }
             }
@@ -137,8 +150,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 userMsg = "Too many failed attempts. Please try again later.";
             } else if (err.code === 'permission-denied') {
                 userMsg = "Access denied. Your profile might still be setting up.";
+            } else if (err.message === 'timeout') {
+                userMsg = 'Login is taking too long. Please try again.';
             }
             setError(userMsg);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -274,6 +291,68 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
 
     // --- RENDER VIEWS ---
 
+
+    if (compactMode && viewMode === 'SIGN_IN_ENTRY') return (
+        <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#050810] font-sans">
+            <div className="max-w-md w-full bg-[#0b1120] p-5 rounded-3xl border border-white/10 shadow-xl space-y-4">
+                <button
+                    type="button"
+                    onClick={onBackToLanding}
+                    className="text-slate-400 hover:text-white text-sm"
+                >
+                    ← Back
+                </button>
+                <div className="text-center space-y-1">
+                    <h1 className="text-3xl font-display text-white">{t('login.signInTitle')}</h1>
+                    <p className="text-xs text-slate-400">Fast login for mobile</p>
+                </div>
+                <input
+                    value={loginIdentifier}
+                    onChange={e => setLoginIdentifier(e.target.value)}
+                    className="w-full bg-[#050810] border border-slate-700 rounded-xl p-3 text-white"
+                    placeholder="Teacher email or child name"
+                />
+                <input
+                    type="password"
+                    value={authInput}
+                    onChange={e => setAuthInput(e.target.value)}
+                    className="w-full bg-[#050810] border border-slate-700 rounded-xl p-3 text-white"
+                    placeholder="PIN / Password"
+                />
+                {error && <p className="text-rose-400 text-xs text-center">{error}</p>}
+                <button
+                    onClick={handleGlobalSignIn}
+                    disabled={!loginIdentifier || !authInput || isSubmitting}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl font-bold text-white"
+                >
+                    {isSubmitting ? 'Signing in…' : t('login.enterButton')}
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setViewMode('SETUP_ADMIN')} className="py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-200 text-sm">Sign up</button>
+                    <button onClick={() => setViewMode('FORGOT_FLOW')} className="py-2 rounded-xl bg-amber-600/20 border border-amber-500/30 text-amber-200 text-sm">Reset</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    if (compactMode && viewMode === 'USER_GRID') return (
+        <div className="min-h-screen w-full bg-[#050810] p-4 text-white">
+            <div className="max-w-md mx-auto">
+                <button onClick={() => setViewMode('SIGN_IN_ENTRY')} className="text-slate-400 text-sm mb-4">← Back</button>
+                <h2 className="text-2xl font-display mb-4 text-center">Choose profile</h2>
+                <div className="grid grid-cols-2 gap-3">
+                    {profiles.map(p => (
+                        <button key={p.id} onClick={() => onLogin(p)} className="p-4 rounded-2xl bg-slate-900 border border-slate-700 text-center">
+                            <div className="text-3xl">{p.avatar}</div>
+                            <div className="font-bold text-sm mt-1">{p.name}</div>
+                        </button>
+                    ))}
+                    <button onClick={() => setViewMode('SETUP_CHILD')} className="p-4 rounded-2xl border border-dashed border-slate-600 text-slate-300 text-sm">+ {t('login.newHero')}</button>
+                </div>
+            </div>
+        </div>
+    );
+
     if (viewMode === 'SIGN_IN_ENTRY') return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 py-8 bg-[#050810] font-sans overflow-y-auto custom-scrollbar">
             <div className="max-w-md w-full bg-[#0b1120] p-6 sm:p-8 rounded-[2rem] border-2 border-white/5 shadow-xl relative animate-fade-in flex flex-col items-center">
@@ -330,10 +409,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                     {error && <p className="text-rose-500 text-[9px] font-bold text-center animate-pulse uppercase tracking-widest">{error}</p>}
                     <button
                         onClick={handleGlobalSignIn}
-                        disabled={!loginIdentifier || !authInput}
+                        disabled={!loginIdentifier || !authInput || isSubmitting}
                         className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-black text-lg sm:text-xl text-white shadow-lg border-b-4 border-indigo-900 active:border-b-0 active:translate-y-[2px] transition-all"
                     >
-                        {t('login.enterButton')}
+                        {isSubmitting ? 'Signing in…' : t('login.enterButton')}
                     </button>
                     <div className="flex flex-col gap-3 pt-5 border-t border-white/5 w-full mt-3">
                         <button onClick={() => setViewMode('SETUP_ADMIN')} className="w-full py-3 sm:py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-xl font-bold text-base text-white shadow-md shadow-emerald-900/20 transition-all border border-emerald-400/30 flex items-center justify-center gap-1.5">

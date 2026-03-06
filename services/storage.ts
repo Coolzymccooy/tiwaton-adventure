@@ -19,6 +19,44 @@ let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
 let currentProfileId: string | null = safeStorage.getItem(STORAGE_KEYS.PROFILE);
 let cachedProfiles: FamilyProfile[] = JSON.parse(safeStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
 
+type ChildIndexRecord = {
+  tenantId: string;
+  childId: string;
+  password: string;
+  profile?: FamilyProfile;
+};
+
+const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
+  id: profile.id,
+  name: profile.name,
+  role: profile.role,
+  schoolId: profile.schoolId,
+  classId: profile.classId ?? null,
+  avatar: profile.avatar,
+  mode: profile.mode,
+  age: profile.age,
+  password: profile.password,
+  tenantId: profile.tenantId,
+  guardianUids: profile.guardianUids ?? [],
+  active: profile.active ?? true
+});
+
+const normalizeChildIndexKey = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const buildFallbackChildProfile = (name: string, data: ChildIndexRecord): FamilyProfile => ({
+  id: data.childId,
+  name: name.trim(),
+  role: 'STUDENT',
+  avatar: '🧒',
+  mode: 'KIDS',
+  age: 8,
+  password: data.password || '123',
+  tenantId: data.tenantId,
+  guardianUids: [],
+  active: true
+});
+
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
   if (currentTenantId) return currentTenantId;
@@ -55,6 +93,16 @@ export const StorageService = {
     return cachedProfiles.length > 0;
   },
 
+  clearSession: () => {
+    currentTenantId = null;
+    currentProfileId = null;
+    cachedProfiles = [];
+    safeStorage.removeItem(STORAGE_KEYS.TENANT);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILE);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILES);
+    safeStorage.removeItem(STORAGE_KEYS.LAST_VIEW);
+  },
+
   syncFromFirestore: async (uid: string) => {
     try {
       StorageService.setTenantContext(uid);
@@ -71,11 +119,12 @@ export const StorageService = {
         const childData = d.data() as FamilyProfile;
         try {
           // Fire-and-forget indexing (won't throw or block the load)
-          const indexRef = doc(db, `children_index/${childData.name.toLowerCase()}`);
+          const indexRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
           setDoc(indexRef, {
             tenantId: uid,
             childId: childData.id,
-            password: childData.password || '123'
+            password: childData.password || '123',
+            profile: buildIndexProfile(childData)
           }, { merge: true });
         } catch (e) {
           console.warn("Could not index child", childData.name, e);
@@ -183,11 +232,12 @@ export const StorageService = {
 
     // Save lightweight index for global sign in
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const indexRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
       await setDoc(indexRef, {
         tenantId,
         childId,
-        password: password || '123'
+        password: password || '123',
+        profile: buildIndexProfile(newProfile)
       }, { merge: true });
     } catch (e) {
       console.warn("Could not save to children_index", e);
@@ -200,22 +250,25 @@ export const StorageService = {
 
   findChildGlobal: async (name: string, pin: string): Promise<FamilyProfile | null> => {
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const normalizedName = normalizeChildIndexKey(name);
+      const indexRef = doc(db, `children_index/${normalizedName}`);
       const indexSnap = await getDoc(indexRef);
-      if (indexSnap.exists()) {
-        const data = indexSnap.data();
-        if (data.password.toLowerCase() === pin.toLowerCase()) {
-          const profileRef = doc(db, `tenants/${data.tenantId}/children/${data.childId}`);
-          const profileSnap = await getDoc(profileRef);
-          if (profileSnap.exists()) {
-            const p = profileSnap.data() as FamilyProfile;
-            StorageService.setTenantContext(data.tenantId);
-            StorageService.setCachedProfiles([p]); // Cache this profile locally
-            return p;
-          }
-        }
+      if (!indexSnap.exists()) return null;
+
+      const data = indexSnap.data() as ChildIndexRecord;
+      if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
+
+      const resolvedProfile = data.profile ?? buildFallbackChildProfile(name, data);
+
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([resolvedProfile]);
+      StorageService.setCurrentProfile(resolvedProfile.id);
+
+      if (!data.profile) {
+        console.warn('Child index profile snapshot missing; using fallback profile for', normalizedName);
       }
-      return null;
+
+      return resolvedProfile;
     } catch (e) {
       console.error("Global child fetch error", e);
       return null;
