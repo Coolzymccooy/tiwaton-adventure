@@ -41,6 +41,7 @@ const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
   active: profile.active ?? true
 });
 
+
 const normalizeChildIndexKey = (name: string) =>
   name.trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -56,6 +57,7 @@ const buildFallbackChildProfile = (name: string, data: ChildIndexRecord): Family
   guardianUids: [],
   active: true
 });
+
 
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
@@ -258,6 +260,7 @@ export const StorageService = {
       const data = indexSnap.data() as ChildIndexRecord;
       if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
 
+
       const resolvedProfile = data.profile ?? buildFallbackChildProfile(name, data);
 
       StorageService.setTenantContext(data.tenantId);
@@ -269,6 +272,17 @@ export const StorageService = {
       }
 
       return resolvedProfile;
+
+      if (!data.profile) {
+        console.warn('Child index is missing profile snapshot for', name);
+        return null;
+      }
+
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([data.profile]);
+      StorageService.setCurrentProfile(data.profile.id);
+      return data.profile;
+
     } catch (e) {
       console.error("Global child fetch error", e);
       return null;
