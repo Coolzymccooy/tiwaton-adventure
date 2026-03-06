@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 
 
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
   const [sessionReady, setSessionReady] = useState(false);
+
 
   const authEventVersion = useRef(0);
 
@@ -91,6 +93,11 @@ const App: React.FC = () => {
       setCurrentView(View.LANDING);
     }, 4000);
 
+
+
+    const handleAuthState = async (user: User | null) => {
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
 
     const handleAuthState = async (user: Parameters<typeof auth.onAuthStateChanged>[0] extends (arg: infer U) => any ? U : never) => {
 
@@ -200,11 +207,12 @@ const App: React.FC = () => {
 
       unsubscribe();
     };
-
+        
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
 
     return () => {
       mounted = false;
+
 
 
 
@@ -217,6 +225,7 @@ const App: React.FC = () => {
       authEventVersion.current += 1;
       unsubscribe();
     };
+
 
   }, []);
 
@@ -271,10 +280,13 @@ const App: React.FC = () => {
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
+
+
     const ua = navigator.userAgent || '';
     const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
 
     return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
+
 
 
     return width <= 900 || coarsePointer || reducedMotion;
