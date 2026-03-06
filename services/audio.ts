@@ -49,9 +49,16 @@ export const AudioService = {
   speak: (text: string, mood: Mood = 'neutral') => {
     if (!AudioService.private.ttsEnabled) return;
 
+    // Strip punctuation and formatting that TTS often reads out literally
+    const cleanText = text
+      .replace(/["*~_`#]/g, '')
+      .replace(/--/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     // Split long text into sentences for better pacing and reliability
     // Split by punctuation followed by space or newline
-    const chunks = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+(?:\s+|$)/g) || [text];
+    const chunks = cleanText.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+(?:\s+|$)/g) || [cleanText];
 
     chunks.forEach(chunk => {
       const trimmed = chunk.trim();

@@ -105,7 +105,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile }) => {
   return (
     <div
       ref={containerRef}
-      className="h-screen w-screen bg-[#02000a] overflow-y-auto overflow-x-hidden relative font-sans custom-scrollbar scroll-smooth"
+      className="min-h-[100dvh] w-full bg-[#02000a] overflow-y-auto overflow-x-hidden relative font-sans custom-scrollbar scroll-smooth"
     >
       {/* --- STUNNING FIXED HEADER --- */}
       <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 px-6 sm:px-12 py-3 flex items-center justify-between ${scrollY > 50 ? 'bg-[#02000a]/80 backdrop-blur-2xl border-b border-white/10' : 'bg-transparent'}`}>

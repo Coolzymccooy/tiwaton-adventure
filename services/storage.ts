@@ -9,9 +9,15 @@ const STORAGE_KEYS = {
   LAST_VIEW: 'tiwaton_last_view'
 };
 
-let currentTenantId: string | null = localStorage.getItem(STORAGE_KEYS.TENANT);
-let currentProfileId: string | null = localStorage.getItem(STORAGE_KEYS.PROFILE);
-let cachedProfiles: FamilyProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+const safeStorage = {
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  setItem: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { } },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { } }
+};
+
+let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
+let currentProfileId: string | null = safeStorage.getItem(STORAGE_KEYS.PROFILE);
+let cachedProfiles: FamilyProfile[] = JSON.parse(safeStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
 
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
@@ -23,13 +29,13 @@ export const StorageService = {
   // Initialization & Auth linking
   setTenantContext: (tenantId: string) => {
     currentTenantId = tenantId;
-    localStorage.setItem(STORAGE_KEYS.TENANT, tenantId);
+    safeStorage.setItem(STORAGE_KEYS.TENANT, tenantId);
   },
 
   setCurrentProfile: (id: string) => {
     currentProfileId = id;
-    if (id) localStorage.setItem(STORAGE_KEYS.PROFILE, id);
-    else localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    if (id) safeStorage.setItem(STORAGE_KEYS.PROFILE, id);
+    else safeStorage.removeItem(STORAGE_KEYS.PROFILE);
   },
 
   getCurrentProfile: (): FamilyProfile | null => {
@@ -38,7 +44,7 @@ export const StorageService = {
 
   setCachedProfiles: (profiles: FamilyProfile[]) => {
     cachedProfiles = profiles;
-    localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+    safeStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
   },
 
   getProfiles: (): FamilyProfile[] => {
@@ -325,9 +331,9 @@ export const StorageService = {
   },
 
   setLastView: (view: string) => {
-    localStorage.setItem(STORAGE_KEYS.LAST_VIEW, view);
+    safeStorage.setItem(STORAGE_KEYS.LAST_VIEW, view);
   },
-  getLastView: () => localStorage.getItem(STORAGE_KEYS.LAST_VIEW),
+  getLastView: () => safeStorage.getItem(STORAGE_KEYS.LAST_VIEW),
 };
 
 function getDefaultStats(): GameStat {

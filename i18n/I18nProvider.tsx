@@ -344,7 +344,7 @@ const STORAGE_KEY = 'tiwaton_locale';
 
 const I18nContext = createContext<I18nContextValue>({
   locale: 'en',
-  setLocale: () => {},
+  setLocale: () => { },
   t: (key) => key,
 });
 
@@ -354,12 +354,16 @@ const translateFromPath = (dictionary: Record<string, any>, path: string): strin
 
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocale] = useState<Locale>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === 'de' ? 'de' : 'en';
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored === 'de' ? 'de' : 'en';
+    } catch {
+      return 'en';
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, locale);
+    try { localStorage.setItem(STORAGE_KEY, locale); } catch { }
     AudioService.setLocale(locale);
   }, [locale]);
 
