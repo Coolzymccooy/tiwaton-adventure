@@ -42,7 +42,16 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
   const isLoginMode = currentView === View.LOGIN;
   const showNav = !isLandingMode && !isLoginMode && !isDrawingMode;
   const { locale, setLocale, t } = useI18n();
-  const [isTTS, setIsTTS] = useState(false); // default off
+  const [isTTS, setIsTTS] = useState(false);
+
+  // Detect mobile — skip heavy background GPU effects on low-power devices
+  const isMobile = typeof window !== 'undefined' && (
+    window.innerWidth <= 1024 ||
+    window.matchMedia?.('(pointer: coarse)').matches ||
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+  );
+  // On landing/login on mobile, skip all background effects — they cause blank screens
+  const skipHeavyBg = isMobile && (isLandingMode || isLoginMode);
 
   useEffect(() => {
     // Sync initial state with service (which defaults OFF)
@@ -113,37 +122,41 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
 
       {/* Immersive Edge-to-Edge Cinematic Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Cartoon Animation Layer */}
-        <div className="absolute inset-0 z-10 overflow-hidden">
-          {renderCartoonElements()}
-        </div>
+        {!skipHeavyBg && (
+          <>
+            {/* Cartoon Animation Layer */}
+            <div className="absolute inset-0 z-10 overflow-hidden">
+              {renderCartoonElements()}
+            </div>
 
-        {/* Animated Moving Blobs */}
-        <div className={`absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] ${getVibeColor()} rounded-full blur-[160px] animate-pulse transition-colors duration-1000`}></div>
+            {/* Animated Moving Blobs */}
+            <div className={`absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] ${getVibeColor()} rounded-full blur-[160px] animate-pulse transition-colors duration-1000`}></div>
 
-        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-purple-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
-        <div className="absolute top-1/3 -right-20 w-80 h-80 bg-indigo-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
+            <div className="absolute top-1/4 -left-20 w-72 h-72 bg-purple-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+            <div className="absolute top-1/3 -right-20 w-80 h-80 bg-indigo-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-600/10 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
 
-        {/* Shimmering Sparkles (Subtle Dots) */}
-        <div className="absolute inset-0 opacity-20">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute bg-white rounded-full animate-twinkle"
-              style={{
-                width: Math.random() * 3 + 'px',
-                height: Math.random() * 3 + 'px',
-                top: Math.random() * 100 + '%',
-                left: Math.random() * 100 + '%',
-                animationDelay: Math.random() * 5 + 's',
-                animationDuration: 3 + Math.random() * 4 + 's'
-              }}
-            />
-          ))}
-        </div>
+            {/* Shimmering Sparkles (Subtle Dots) */}
+            <div className="absolute inset-0 opacity-20">
+              {[...Array(20)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute bg-white rounded-full animate-twinkle"
+                  style={{
+                    width: Math.random() * 3 + 'px',
+                    height: Math.random() * 3 + 'px',
+                    top: Math.random() * 100 + '%',
+                    left: Math.random() * 100 + '%',
+                    animationDelay: Math.random() * 5 + 's',
+                    animationDuration: 3 + Math.random() * 4 + 's'
+                  }}
+                />
+              ))}
+            </div>
 
-        <div className="absolute bottom-[-10%] right-[-10%] w-[120vw] h-[120vw] bg-purple-950/20 rounded-full blur-[160px] animate-pulse delay-700 transition-colors duration-1000"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[120vw] h-[120vw] bg-purple-950/20 rounded-full blur-[160px] animate-pulse delay-700 transition-colors duration-1000"></div>
+          </>
+        )}
       </div>
 
       {/* Dynamic Top Header - Adapts to safe areas */}

@@ -25,7 +25,9 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<FamilyProfile | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
-  const [sessionReady, setSessionReady] = useState(false);
+  // sessionReady starts as TRUE so we show the landing page instantly.
+  // Firebase auth resolves in the background and may redirect the user silently.
+  const [sessionReady, setSessionReady] = useState(true);
   const authEventVersion = useRef(0);
 
   const resolveView = (candidate?: string | null): View => {
@@ -37,31 +39,35 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const mountedRef = { current: true };
-    let receivedAuthEvent = false;
 
-    // Fallback: if Firebase auth doesn't respond in 4s, show landing anyway
-    const fallbackTimer = window.setTimeout(() => {
-      if (!mountedRef.current || receivedAuthEvent) return;
-      setSessionReady(true);
-      setCurrentView(View.LANDING);
-    }, 4000);
+    // If local cache says we have profiles, resolve immediately without waiting
+    // for Firebase — the user sees their hub in < 100ms.
+    const cachedProfile = StorageService.getCurrentProfile();
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+      setIsAdminMode(cachedProfile.role === 'PARENT' || cachedProfile.role === 'TEACHER');
+      setCurrentView(resolveView(StorageService.getLastView()));
+      // Still subscribe to auth to keep session in sync, but don't block render
+    }
 
     const handleAuthState = async (user: User | null) => {
       const eventId = ++authEventVersion.current;
-      receivedAuthEvent = true;
-      clearTimeout(fallbackTimer);
 
       if (!mountedRef.current) return;
 
       if (!user) {
-        StorageService.clearSession();
-        setProfile(null);
-        setIsAdminMode(false);
-        setCurrentView(View.LANDING);
+        // Only clear if we didn't get anything from the cache
+        if (!cachedProfile) {
+          StorageService.clearSession();
+          setProfile(null);
+          setIsAdminMode(false);
+          setCurrentView(View.LANDING);
+        }
         setSessionReady(true);
         return;
       }
 
+      // Sync from Firestore in the background — don't block the UI
       try {
         const profiles = await StorageService.syncFromFirestore(user.uid);
         if (!mountedRef.current || eventId !== authEventVersion.current) return;
@@ -87,10 +93,6 @@ const App: React.FC = () => {
         }
       } catch (error) {
         console.error('Session bootstrap failed', error);
-        if (!mountedRef.current || eventId !== authEventVersion.current) return;
-        setProfile(null);
-        setIsAdminMode(false);
-        setCurrentView(View.LANDING);
       } finally {
         if (mountedRef.current && eventId === authEventVersion.current) {
           setSessionReady(true);
@@ -102,7 +104,6 @@ const App: React.FC = () => {
 
     return () => {
       mountedRef.current = false;
-      clearTimeout(fallbackTimer);
       authEventVersion.current += 1;
       unsubscribe();
     };
@@ -133,7 +134,6 @@ const App: React.FC = () => {
     }
 
     setCurrentView(View.LANDING);
-    setSessionReady(true);
   };
 
   const handleLandingAction = (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => {
@@ -141,7 +141,6 @@ const App: React.FC = () => {
       setCurrentView(View.HOME);
       return;
     }
-
     if (action === 'LOGIN') {
       setLoginInitialView('SIGN_IN_ENTRY');
     } else if (action === 'SETUP') {
@@ -165,7 +164,12 @@ const App: React.FC = () => {
 
   const renderView = () => {
     if (currentView === View.LANDING) {
-      return <Landing onAction={handleLandingAction} activeProfile={profile} disableHeavyEffects={isMobileLikeDevice} sessionReady={sessionReady} />;
+      return <Landing
+        onAction={handleLandingAction}
+        activeProfile={profile}
+        disableHeavyEffects={isMobileLikeDevice}
+        sessionReady={sessionReady}
+      />;
     }
 
     if (currentView === View.LOGIN) {
