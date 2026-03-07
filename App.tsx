@@ -1,17 +1,5 @@
 
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-
-
-import React, { useState, useEffect, useMemo } from 'react';
-
-
 import Layout from './components/Layout';
 import { View } from './types';
 import type { FamilyProfile } from './types';
@@ -38,8 +26,6 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
   const [sessionReady, setSessionReady] = useState(false);
-
-
   const authEventVersion = useRef(0);
 
   const resolveView = (candidate?: string | null): View => {
@@ -49,75 +35,23 @@ const App: React.FC = () => {
     return View.HOME;
   };
 
-  const bootstrapAuthenticatedSession = async (user: User, eventId: number, mountedRef: { current: boolean }) => {
-    const profiles = await StorageService.syncFromFirestore(user.uid);
-    if (!mountedRef.current || eventId !== authEventVersion.current) return;
-
-    if (profiles.length === 0) {
-      setProfile(null);
-      setIsAdminMode(false);
-      setCurrentView(View.LANDING);
-      setSessionReady(true);
-      return;
-    }
-
-    const active = StorageService.getCurrentProfile();
-    if (active) {
-      setProfile(active);
-      setCurrentView(resolveView(StorageService.getLastView()));
-      setIsAdminMode(active.role === 'PARENT' || active.role === 'TEACHER');
-      return;
-    }
-
-    setProfile(null);
-    setIsAdminMode(false);
-    setCurrentView(View.LOGIN);
-    setLoginInitialView('USER_GRID');
-  };
-
   useEffect(() => {
-
     const mountedRef = { current: true };
     let receivedAuthEvent = false;
 
+    // Fallback: if Firebase auth doesn't respond in 4s, show landing anyway
     const fallbackTimer = window.setTimeout(() => {
       if (!mountedRef.current || receivedAuthEvent) return;
-
-    let mounted = true;
-    let receivedAuthEvent = false;
-
-    const fallbackTimer = window.setTimeout(() => {
-      if (!mounted || receivedAuthEvent) return;
-
       setSessionReady(true);
       setCurrentView(View.LANDING);
     }, 4000);
 
-
-
     const handleAuthState = async (user: User | null) => {
-
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-
-    const handleAuthState = async (user: Parameters<typeof auth.onAuthStateChanged>[0] extends (arg: infer U) => any ? U : never) => {
-
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-
-
-
-    const handleAuthState = async (user: User | null) => {
-
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-
       const eventId = ++authEventVersion.current;
       receivedAuthEvent = true;
       clearTimeout(fallbackTimer);
 
-
       if (!mountedRef.current) return;
-
-      if (!mounted) return;
-
 
       if (!user) {
         StorageService.clearSession();
@@ -129,33 +63,8 @@ const App: React.FC = () => {
       }
 
       try {
-
-        await bootstrapAuthenticatedSession(user, eventId, mountedRef);
-      } catch (error) {
-        console.error('Session bootstrap failed', error);
+        const profiles = await StorageService.syncFromFirestore(user.uid);
         if (!mountedRef.current || eventId !== authEventVersion.current) return;
-        setProfile(null);
-        setIsAdminMode(false);
-        setCurrentView(View.LANDING);
-      } finally {
-        if (mountedRef.current && eventId === authEventVersion.current) {
-          setSessionReady(true);
-
-        const profiles = await StorageService.syncFromFirestore(user.uid);
-        if (!mounted || eventId !== authEventVersion.current) return;
-
-    const initSession = () => {
-      const unsubscribe = auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          StorageService.clearSession();
-          setProfile(null);
-          setIsAdminMode(false);
-          setCurrentView(View.LANDING);
-          setSessionReady(true);
-          return;
-        }
-
-        const profiles = await StorageService.syncFromFirestore(user.uid);
 
         if (profiles.length === 0) {
           setProfile(null);
@@ -175,58 +84,28 @@ const App: React.FC = () => {
           setIsAdminMode(false);
           setCurrentView(View.LOGIN);
           setLoginInitialView('USER_GRID');
-
         }
-
       } catch (error) {
         console.error('Session bootstrap failed', error);
-        if (!mounted || eventId !== authEventVersion.current) return;
+        if (!mountedRef.current || eventId !== authEventVersion.current) return;
         setProfile(null);
         setIsAdminMode(false);
         setCurrentView(View.LANDING);
       } finally {
-        if (mounted && eventId === authEventVersion.current) {
+        if (mountedRef.current && eventId === authEventVersion.current) {
           setSessionReady(true);
         }
       }
-    });
-
-    return () => {
-      mounted = false;
-      clearTimeout(fallbackTimer);
-      authEventVersion.current += 1;
-
-      setSessionReady(true);
-      });
-
-      return unsubscribe;
     };
-
-    const unsubscribe = initSession();
-    return () => {
-
-      unsubscribe();
-    };
-        
-    const unsubscribe = auth.onAuthStateChanged(handleAuthState);
-
-    return () => {
-      mounted = false;
-
-
-
 
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
 
     return () => {
       mountedRef.current = false;
-
       clearTimeout(fallbackTimer);
       authEventVersion.current += 1;
       unsubscribe();
     };
-
-
   }, []);
 
   useEffect(() => {
@@ -273,24 +152,15 @@ const App: React.FC = () => {
     setCurrentView(View.LOGIN);
   };
 
+  // Detect mobile/low-power devices to disable heavy animations
   const isMobileLikeDevice = useMemo(() => {
     if (typeof window === 'undefined') return false;
-
     const width = window.innerWidth || document.documentElement.clientWidth || 0;
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
-
-
     const ua = navigator.userAgent || '';
     const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
-
     return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
-
-
-
-    return width <= 900 || coarsePointer || reducedMotion;
-
   }, []);
 
   const renderView = () => {

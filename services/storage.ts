@@ -10,9 +10,9 @@ const STORAGE_KEYS = {
 };
 
 const safeStorage = {
-  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
-  setItem: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { } },
-  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { } }
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch (_e) { return null; } },
+  setItem: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch (_e) { } },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch (_e) { } }
 };
 
 let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
@@ -272,16 +272,6 @@ export const StorageService = {
       }
 
       return resolvedProfile;
-
-      if (!data.profile) {
-        console.warn('Child index is missing profile snapshot for', name);
-        return null;
-      }
-
-      StorageService.setTenantContext(data.tenantId);
-      StorageService.setCachedProfiles([data.profile]);
-      StorageService.setCurrentProfile(data.profile.id);
-      return data.profile;
 
     } catch (e) {
       console.error("Global child fetch error", e);

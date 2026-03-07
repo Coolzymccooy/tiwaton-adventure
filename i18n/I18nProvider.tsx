@@ -357,13 +357,13 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored === 'de' ? 'de' : 'en';
-    } catch {
+    } catch (_e) {
       return 'en';
     }
   });
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, locale); } catch { }
+    try { localStorage.setItem(STORAGE_KEY, locale); } catch (_e) { }
     AudioService.setLocale(locale);
   }, [locale]);
 
