@@ -1385,12 +1385,12 @@ const GamesPage: React.FC = () => {
   if (activeGame === 'CROSSWORD') return <CrosswordPro onBack={() => setActiveGame(null)} />;
   if (activeGame === 'MOUNTAIN') return <MultiplicationMountain onQuit={() => setActiveGame(null)} onComplete={() => setActiveGame(null)} />;
   return (
-    <div className="h-full flex flex-col px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
+    <div className="w-full px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
       <div className="text-center mb-6">
-        <h2 className="font-display text-4xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
+        <h2 className="font-display text-3xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
         <p className="text-slate-400 text-sm font-medium tracking-tight">Level up and earn Star Treasures!</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
         <GameCard onClick={() => setActiveGame('MATH')} icon="🌌" title="Math Galaxy" tag="Logic" color="from-indigo-600 to-blue-700" />
         <GameCard onClick={() => setActiveGame('MOUNTAIN')} icon="🏔️" title="Multiplication Mountain" tag="Math" color="from-amber-600 to-orange-700" />
         <GameCard onClick={() => setActiveGame('SEARCH')} icon="🧩" title="Word Search" tag="Reading" color="from-emerald-600 to-teal-700" />
@@ -1413,19 +1413,19 @@ type GameCardProps = {
 const GameCard: React.FC<GameCardProps> = ({ icon, title, tag, color, onClick }) => (
   <button
     onClick={onClick}
-    className="group relative bg-slate-900/70 backdrop-blur-xl p-5 sm:p-6 rounded-[1.5rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-hidden flex flex-col items-center shadow-lg"
+    className="group relative bg-slate-900/70 backdrop-blur-xl p-4 sm:p-6 rounded-[1.5rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-visible flex flex-col items-center shadow-lg active:scale-95"
   >
-    <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`} />
+    <div className={`absolute inset-0 rounded-[1.5rem] bg-gradient-to-br ${color} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`} />
 
-    <div className="relative text-4xl sm:text-5xl mb-4 group-hover:scale-105 transition-transform duration-500 group-hover:rotate-3">
+    <div className="relative text-4xl sm:text-5xl mb-3 group-hover:scale-110 transition-transform duration-300 leading-none select-none">
       {icon}
     </div>
 
-    <h3 className="relative text-lg sm:text-xl font-black text-white uppercase italic tracking-tight mb-1">
+    <h3 className="relative text-sm sm:text-base font-black text-white uppercase italic tracking-tight mb-1.5 text-center leading-tight">
       {title}
     </h3>
 
-    <p className="relative text-indigo-300 font-bold text-[9px] uppercase tracking-widest bg-indigo-400/10 px-2 py-0.5 rounded-full border border-indigo-400/20">
+    <p className="relative text-indigo-300 font-bold text-[8px] sm:text-[9px] uppercase tracking-widest bg-indigo-400/10 px-2 py-0.5 rounded-full border border-indigo-400/20">
       {tag} Challenge
     </p>
   </button>

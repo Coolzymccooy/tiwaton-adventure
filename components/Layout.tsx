@@ -118,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
   };
 
   return (
-    <div className="h-full w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
+    <div className="min-h-[100dvh] w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
 
       {/* Immersive Edge-to-Edge Cinematic Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">

@@ -261,17 +261,42 @@ export const StorageService = {
       if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
 
 
-      const resolvedProfile = data.profile ?? buildFallbackChildProfile(name, data);
-
-      StorageService.setTenantContext(data.tenantId);
-      StorageService.setCachedProfiles([resolvedProfile]);
-      StorageService.setCurrentProfile(resolvedProfile.id);
-
-      if (!data.profile) {
-        console.warn('Child index profile snapshot missing; using fallback profile for', normalizedName);
+      // Use cached profile snapshot if available (fast path)
+      if (data.profile) {
+        StorageService.setTenantContext(data.tenantId);
+        StorageService.setCachedProfiles([data.profile]);
+        StorageService.setCurrentProfile(data.profile.id);
+        return data.profile;
       }
 
-      return resolvedProfile;
+      // Fallback: fetch directly from Firestore (covers older accounts without a profile snapshot)
+      console.warn('Child index has no profile snapshot; fetching from Firestore for:', normalizedName);
+      try {
+        const profileRef = doc(db, `tenants/${data.tenantId}/children/${data.childId}`);
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists()) {
+          const p = profileSnap.data() as FamilyProfile;
+          StorageService.setTenantContext(data.tenantId);
+          StorageService.setCachedProfiles([p]);
+          StorageService.setCurrentProfile(p.id);
+          // Backfill the index with the profile snapshot so next login is instant
+          try {
+            const indexRef = doc(db, `children_index/${normalizedName}`);
+            setDoc(indexRef, { profile: buildIndexProfile(p) }, { merge: true });
+          } catch (_e) { /* non-critical */ }
+          return p;
+        }
+      } catch (fetchErr) {
+        console.error('Firestore fallback fetch error', fetchErr);
+      }
+
+      // Last resort: build a minimal profile from index data
+      const fallback = buildFallbackChildProfile(name, data);
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([fallback]);
+      StorageService.setCurrentProfile(fallback.id);
+      return fallback;
+
 
     } catch (e) {
       console.error("Global child fetch error", e);
