@@ -67,6 +67,19 @@ const App: React.FC = () => {
         return;
       }
 
+      // Block unverified email accounts from auto-resuming
+      if (!user.emailVerified) {
+        if (!cachedProfile) {
+          StorageService.clearSession();
+          setProfile(null);
+          setIsAdminMode(false);
+          setCurrentView(View.LOGIN);
+          setLoginInitialView('SIGN_IN_ENTRY');
+        }
+        setSessionReady(true);
+        return;
+      }
+
       // Sync from Firestore in the background — don't block the UI
       try {
         const profiles = await StorageService.syncFromFirestore(user.uid);

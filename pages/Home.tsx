@@ -4,6 +4,9 @@ import { View } from '../types';
 import type { FamilyProfile, GameStat, ParentComment } from '../types';
 import { StorageService } from '../services/storage';
 import { Palette, MessageCircle, ShieldCheck, LogOut, Lock, Star, Sparkles, TrendingUp, Trophy, ArrowRight, X } from 'lucide-react';
+import DailyQuestBanner from '../components/DailyQuestBanner';
+import { getTodayChallenges, isChallengeCompleted } from '../services/daily-challenges';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface HomeProps {
   onNavigate: (view: View) => void;
@@ -21,6 +24,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
 
   const [pinInput, setPinInput] = useState('');
   const [showPinPad, setShowPinPad] = useState(false);
+  const { locale } = useI18n();
 
   useEffect(() => {
     setStats(StorageService.getGameStats());
@@ -43,7 +47,14 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
     const allProfiles = StorageService.getProfiles();
     const parent = allProfiles.find(p => p.mode === 'PARENT' || p.mode === 'TEACHER' || p.role === 'TEACHER' || p.id === 'admin');
 
-    if (parent && pinInput === parent.pin) {
+    if (!parent?.pin) {
+      // PIN not yet loaded (Firestore sync still in progress) — ask user to wait
+      alert("Still loading credentials. Please try again in a moment.");
+      setPinInput('');
+      return;
+    }
+
+    if (pinInput === parent.pin) {
       setIsAdminMode(true);
       if (parent.role === 'TEACHER' || parent.mode === 'TEACHER') onNavigate(View.TEACHER_DASHBOARD);
       else onNavigate(View.PARENT_DASHBOARD);
@@ -166,20 +177,39 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Main Content Area */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Featured Quest */}
-          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-3xl shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
-            <div className="bg-slate-900/80 backdrop-blur-xl p-5 sm:p-8 rounded-[1.8rem] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 group-hover:scale-125 transition-transform"></div>
-              <div className="flex items-center gap-4 sm:gap-6 relative z-10">
-                <div className="bg-white/10 p-3.5 sm:p-5 rounded-2xl animate-float"><Palette size={32} className="text-white" /></div>
-                <div>
-                  <p className="text-[9px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
-                  <h3 className="font-display text-2xl sm:text-3xl text-white">"Paint a Neon Jungle!"</h3>
+          {/* Featured Daily Quest */}
+          {(() => {
+            const todayChallenges = getTodayChallenges(3);
+            const featured = todayChallenges.find(c => !isChallengeCompleted(c.id)) || todayChallenges[0];
+            if (!featured) return null;
+            const done = isChallengeCompleted(featured.id);
+            const gradients: Record<string, string> = {
+              quiz: 'from-amber-600 to-orange-600',
+              drawing: 'from-pink-600 to-purple-600',
+              games: 'from-emerald-600 to-teal-600',
+              stories: 'from-blue-600 to-indigo-600',
+              math: 'from-violet-600 to-fuchsia-600',
+            };
+            const grad = gradients[featured.category] || 'from-pink-600 to-purple-600';
+            return (
+              <div onClick={() => !done && onNavigate(featured.targetView)} className={`bg-gradient-to-r ${grad} p-1 rounded-3xl shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group`}>
+                <div className="bg-slate-900/80 backdrop-blur-xl p-5 sm:p-8 rounded-[1.8rem] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 group-hover:scale-125 transition-transform"></div>
+                  <div className="flex items-center gap-4 sm:gap-6 relative z-10">
+                    <div className="bg-white/10 p-3.5 sm:p-5 rounded-2xl animate-float text-4xl">{featured.icon}</div>
+                    <div>
+                      <p className="text-[9px] font-black text-white/70 uppercase tracking-widest mb-1">Today's Quest</p>
+                      <h3 className="font-display text-2xl sm:text-3xl text-white">{featured.title[locale]}</h3>
+                      <p className="text-xs text-white/60 mt-1">{featured.description[locale]}</p>
+                    </div>
+                  </div>
+                  <div className={`px-6 py-3 rounded-full font-black text-sm uppercase tracking-widest shadow-xl transition-colors mt-4 md:mt-0 ${done ? 'bg-emerald-500 text-white' : 'bg-white text-slate-900 group-hover:bg-slate-100'}`}>
+                    {done ? 'DONE!' : `START +${featured.xpReward} XP`}
+                  </div>
                 </div>
               </div>
-              <div className="bg-white text-pink-600 px-6 py-3 rounded-full font-black text-sm uppercase tracking-widest shadow-xl group-hover:bg-pink-50 transition-colors mt-4 md:mt-0">START +200 XP</div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Grid Menu */}
           <div className="grid grid-cols-2 gap-6">
@@ -190,8 +220,9 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
           </div>
         </div>
 
-        {/* Sidebar Area: HQ Leaderboard */}
+        {/* Sidebar Area: Daily Quests + Leaderboard */}
         <div className="lg:col-span-4 space-y-6">
+          <DailyQuestBanner onNavigate={onNavigate} />
           <div className="bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 sm:p-3 bg-indigo-600/20 rounded-xl"><Trophy className="text-indigo-400" size={20} /></div>

@@ -13,6 +13,21 @@ import { AIService } from '../services/ai';
 import { AudioService } from '../services/audio';
 import { Drawing, AppMode, View } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
+import {
+  getRandomPrompt,
+  getStudioMissions,
+  markPromptCompleted,
+  markMissionCompleted,
+  getDrawingStats,
+  type DrawingTier,
+  DRAWING_TIERS,
+} from '../services/drawing-engine';
+import {
+  DRAWING_PROMPTS,
+  DRAWING_CATEGORIES,
+  type DrawingPrompt,
+  type DrawingCategory,
+} from '../data/drawing-challenges';
 
 // --- CONFIGURATION ---
 const COLORS = [
@@ -23,18 +38,8 @@ const COLORS = [
 
 const STICKERS = ["⭐", "❤️", "🦄", "🦁", "🚀", "REX", "👑", "🌈", "🔥", "⚽", "👀", "🎈", "🦋", "🍄", "🍦", "🎸", "🍕", "🚗", "👻", "🤖", "🐱", "🐶"];
 
-const CHALLENGES = [
-  "Draw a Flying Pig! 🐷✈️",
-  "Draw a Space Dinosaur! 🦖🚀",
-  "Draw your Dream Treehouse! 🌳🏡",
-  "Draw a Robot eating Ice Cream! 🤖🍦",
-  "Draw a Castle in the Clouds! ☁️🏰",
-  "Draw an Underwater City! 🌊🏙️",
-  "Draw a Superhero Cat! 🐱🦸",
-  "Draw a Banana wearing Sunglasses! 🍌😎",
-  "Draw a Pirate Ship! 🏴‍☠️⛵",
-  "Draw a Friendly Monster! 👾🎈"
-];
+// Simple prompts now come from data/drawing-challenges.ts (120+ bilingual prompts)
+// The old 10-item CHALLENGES array has been replaced by the DRAWING_PROMPTS bank.
 
 const LIBRARY_CATEGORIES = [
   { id: 'animals', label: 'Animals', emoji: '🦁', prompt: 'a cute baby animal', type: 'ai' },
@@ -111,94 +116,22 @@ interface DrawingPageProps {
   onNavigate?: (view: View) => void;
 }
 
-const STUDIO_CHALLENGES: StudioChallenge[] = [
-  {
-    id: 'space-rescue',
-    title: 'Space Rescue Poster',
-    prompt: 'Draw a rescue ship helping a lost space explorer get home.',
-    setup: 'Make it feel urgent and heroic.',
-    reward: 'Galaxy Rescuer',
-    difficulty: 'Rookie',
-    timeLimitSec: 180,
-    goals: [
-      { kind: 'colors', count: 4, label: 'Use 4 colors' },
-      { kind: 'tools', count: 2, label: 'Use 2 tools' },
-      { kind: 'strokes', count: 8, label: 'Make 8 drawing moves' },
-    ],
-  },
-  {
-    id: 'monster-party',
-    title: 'Monster Party Invite',
-    prompt: 'Invent a friendly monster hosting the wildest birthday party ever.',
-    setup: 'Make it funny, not scary.',
-    reward: 'Party Architect',
-    difficulty: 'Rookie',
-    timeLimitSec: 180,
-    goals: [
-      { kind: 'colors', count: 5, label: 'Use 5 colors' },
-      { kind: 'sticker', count: 1, label: 'Place 1 sticker' },
-      { kind: 'strokes', count: 10, label: 'Make 10 drawing moves' },
-    ],
-  },
-  {
-    id: 'underwater-map',
-    title: 'Underwater Treasure Map',
-    prompt: 'Create a map to a hidden treasure under the sea.',
-    setup: 'Add clear paths, clues, and one surprise danger.',
-    reward: 'Ocean Navigator',
-    difficulty: 'Brave',
-    timeLimitSec: 210,
-    goals: [
-      { kind: 'fill', count: 1, label: 'Use the paint bucket' },
-      { kind: 'tools', count: 3, label: 'Use 3 tools' },
-      { kind: 'strokes', count: 10, label: 'Make 10 drawing moves' },
-    ],
-  },
-  {
-    id: 'mirror-beast',
-    title: 'Mirror Beast Lab',
-    prompt: 'Design a magical creature with balanced wings, horns, or armor.',
-    setup: 'Mirror mode is your secret power.',
-    reward: 'Symmetry Scientist',
-    difficulty: 'Brave',
-    timeLimitSec: 180,
-    goals: [
-      { kind: 'symmetry', label: 'Use mirror mode' },
-      { kind: 'colors', count: 3, label: 'Use 3 colors' },
-      { kind: 'strokes', count: 8, label: 'Make 8 drawing moves' },
-    ],
-  },
-  {
-    id: 'future-city',
-    title: 'Future City Sprint',
-    prompt: 'Build a city from the future with transport, towers, and power.',
-    setup: 'Every area should feel alive.',
-    reward: 'City Builder',
-    difficulty: 'Legend',
-    timeLimitSec: 240,
-    goals: [
-      { kind: 'colors', count: 6, label: 'Use 6 colors' },
-      { kind: 'tools', count: 3, label: 'Use 3 tools' },
-      { kind: 'strokes', count: 12, label: 'Make 12 drawing moves' },
-      { kind: 'fill', count: 1, label: 'Use the paint bucket' },
-    ],
-  },
-  {
-    id: 'hero-poster',
-    title: 'Hero Poster Challenge',
-    prompt: 'Create a poster for a new superhero and the world they protect.',
-    setup: 'Give them a clear symbol and a dramatic background.',
-    reward: 'Poster Master',
-    difficulty: 'Legend',
-    timeLimitSec: 240,
-    goals: [
-      { kind: 'colors', count: 5, label: 'Use 5 colors' },
-      { kind: 'tools', count: 3, label: 'Use 3 tools' },
-      { kind: 'sticker', count: 1, label: 'Place 1 sticker' },
-      { kind: 'strokes', count: 12, label: 'Make 12 drawing moves' },
-    ],
-  },
-];
+// Studio challenges now come from data/drawing-challenges.ts (30 bilingual missions)
+// Served via services/drawing-engine.ts with no-repeat tracking.
+
+/** Convert a bilingual StudioMission to the local StudioChallenge format */
+function missionToChallenge(m: import('../data/drawing-challenges').StudioMission, locale: 'en' | 'de'): StudioChallenge {
+  return {
+    id: m.id,
+    title: m.title[locale],
+    prompt: m.prompt[locale],
+    setup: m.setup[locale],
+    reward: m.reward,
+    difficulty: m.difficulty,
+    timeLimitSec: m.timeLimitSec,
+    goals: m.goals.map(g => ({ kind: g.kind as ChallengeGoalKind, count: g.count, label: g.label[locale] })),
+  };
+}
 
 const formatTimeLeft = (totalSeconds: number) => {
   const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -245,7 +178,7 @@ const getGoalProgress = (goal: ChallengeGoal, stats: ChallengeStats) => {
 };
 
 const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const profile = StorageService.getCurrentProfile();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -441,10 +374,13 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   };
 
   const startChallengeMode = () => {
-    const random = STUDIO_CHALLENGES[Math.floor(Math.random() * STUDIO_CHALLENGES.length)];
+    const missions = getStudioMissions(); // shuffled, no-repeat
+    const mission = missions[0];
+    if (!mission) return;
+    const challenge = missionToChallenge(mission, locale as 'en' | 'de');
     setChallengeResult(null);
-    setActiveChallenge(random);
-    resetChallengeStats(random);
+    setActiveChallenge(challenge);
+    resetChallengeStats(challenge);
     setTool('marker');
     setBrushSize(10);
     setIsSymmetry(false);
@@ -453,8 +389,8 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     setShowLibrary(false);
     setStoryStep('NONE');
     setTransformedImage(null);
-    AudioService.speak(`Challenge accepted. ${random.title}. ${random.prompt}`);
-    handleClearCanvas(false); // don't wipe history, just give blank slate
+    AudioService.speak(`Challenge accepted. ${challenge.title}. ${challenge.prompt}`);
+    handleClearCanvas(false);
   };
 
   const finishChallenge = async () => {
@@ -516,6 +452,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       aiHighlights: aiJudgement?.highlights || [],
     });
     await handleSaveToGallery(undefined, false); // Auto-save their challenge masterpiece
+    if (activeChallenge) markMissionCompleted(activeChallenge.id);
     setActiveChallenge(null);
     setChallengeStats(null);
   };
