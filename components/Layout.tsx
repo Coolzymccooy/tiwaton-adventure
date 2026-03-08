@@ -118,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
+    <div className="h-[100dvh] min-h-[100dvh] w-full bg-[#050810] text-slate-100 flex flex-col font-sans overflow-hidden relative">
 
       {/* Immersive Edge-to-Edge Cinematic Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -210,7 +210,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children, name
 
       {/* Viewport - Fills the entire screen */}
       <main
-        className={`flex-1 w-full relative z-10 overflow-y-auto overflow-x-hidden transition-all duration-500 ${!showNav ? 'p-0' : 'p-4 sm:p-12 pb-32 sm:pb-28 custom-scrollbar'}`}
+        className={`flex-1 min-h-0 w-full relative z-10 overflow-y-auto overflow-x-hidden transition-all duration-500 ${!showNav ? 'p-0 flex flex-col' : 'p-4 sm:p-12 pb-32 sm:pb-28 custom-scrollbar'}`}
       >
         {children}
       </main>

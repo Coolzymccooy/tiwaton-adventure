@@ -312,6 +312,77 @@ router.post("/story-quiz", async (req, res, next) => {
   }
 });
 
+router.post("/judge-challenge", async (req, res, next) => {
+  try {
+    assertKey();
+    mustHave(req.body, "imageDataUrl");
+    mustHave(req.body, "challenge");
+
+    const inline = dataUrlToInlineData(String(req.body.imageDataUrl));
+    if (!inline) return res.status(400).json({ error: "Invalid imageDataUrl" });
+
+    const challenge = req.body.challenge || {};
+    const title = String(challenge.title || "Art Challenge");
+    const prompt = String(challenge.prompt || "");
+    const setup = String(challenge.setup || "");
+    const goals = Array.isArray(challenge.goals) ? challenge.goals.map((g) => String(g)) : [];
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: {
+        parts: [
+          { inlineData: inline },
+          {
+            text:
+              `You are judging a kid's drawing challenge submission.\n` +
+              `Challenge title: ${title}\n` +
+              `Mission prompt: ${prompt}\n` +
+              `Extra setup: ${setup}\n` +
+              `Visible goals the child saw: ${goals.join("; ") || "none"}\n` +
+              `Be encouraging, fair, and concise. Judge whether the drawing matches the mission idea, not artistic perfection. ` +
+              `Return JSON with: matchedPrompt (boolean), creativityScore (0-10), missionScore (0-10), feedback (string, max 2 sentences), highlights (array of 2-4 short strings).`,
+          },
+        ],
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            matchedPrompt: { type: Type.BOOLEAN },
+            creativityScore: { type: Type.NUMBER },
+            missionScore: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            highlights: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ["matchedPrompt", "creativityScore", "missionScore", "feedback", "highlights"],
+        },
+      },
+    });
+
+    const obj = safeJsonParse(response.text);
+    if (!obj?.feedback || !Array.isArray(obj?.highlights)) {
+      return res.status(502).json({
+        error: "Gemini returned invalid JSON for challenge judge",
+        raw: response.text || "",
+      });
+    }
+
+    res.json({
+      matchedPrompt: Boolean(obj.matchedPrompt),
+      creativityScore: Math.max(0, Math.min(10, Number(obj.creativityScore || 0))),
+      missionScore: Math.max(0, Math.min(10, Number(obj.missionScore || 0))),
+      feedback: String(obj.feedback),
+      highlights: obj.highlights.map((x) => String(x)).slice(0, 4),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---- error handler (improved logging) ----
 router.use((err, req, res, next) => {
   const status = err.status || 500;

@@ -64,10 +64,185 @@ const MUSIC_TRACKS = [
 
 type ToolType = 'brush' | 'pencil' | 'marker' | 'neon' | 'spray' | 'rainbow' | 'eraser' | 'fill' | 'rect' | 'circle' | 'star' | 'sticker' | 'watercolor' | 'pan';
 type StoryBuilderStep = 'NONE' | 'HERO' | 'VILLAIN' | 'SETTING' | 'GENERATING' | 'DONE';
+type ChallengeGoalKind = 'colors' | 'tools' | 'strokes' | 'sticker' | 'symmetry' | 'fill';
+
+interface ChallengeGoal {
+  kind: ChallengeGoalKind;
+  label: string;
+  count?: number;
+}
+
+interface StudioChallenge {
+  id: string;
+  title: string;
+  prompt: string;
+  setup: string;
+  reward: string;
+  difficulty: 'Rookie' | 'Brave' | 'Legend';
+  timeLimitSec: number;
+  goals: ChallengeGoal[];
+}
+
+interface ChallengeStats {
+  colorsUsed: string[];
+  toolsUsed: ToolType[];
+  strokes: number;
+  stickersPlaced: number;
+  symmetryMoves: number;
+  fillsUsed: number;
+  timeLeftSec: number;
+}
+
+interface ChallengeResult {
+  title: string;
+  reward: string;
+  stars: number;
+  beatClock: boolean;
+  completedGoals: number;
+  totalGoals: number;
+  aiMatchedPrompt?: boolean;
+  aiCreativityScore?: number;
+  aiMissionScore?: number;
+  aiFeedback?: string;
+  aiHighlights?: string[];
+}
 
 interface DrawingPageProps {
   onNavigate?: (view: View) => void;
 }
+
+const STUDIO_CHALLENGES: StudioChallenge[] = [
+  {
+    id: 'space-rescue',
+    title: 'Space Rescue Poster',
+    prompt: 'Draw a rescue ship helping a lost space explorer get home.',
+    setup: 'Make it feel urgent and heroic.',
+    reward: 'Galaxy Rescuer',
+    difficulty: 'Rookie',
+    timeLimitSec: 180,
+    goals: [
+      { kind: 'colors', count: 4, label: 'Use 4 colors' },
+      { kind: 'tools', count: 2, label: 'Use 2 tools' },
+      { kind: 'strokes', count: 8, label: 'Make 8 drawing moves' },
+    ],
+  },
+  {
+    id: 'monster-party',
+    title: 'Monster Party Invite',
+    prompt: 'Invent a friendly monster hosting the wildest birthday party ever.',
+    setup: 'Make it funny, not scary.',
+    reward: 'Party Architect',
+    difficulty: 'Rookie',
+    timeLimitSec: 180,
+    goals: [
+      { kind: 'colors', count: 5, label: 'Use 5 colors' },
+      { kind: 'sticker', count: 1, label: 'Place 1 sticker' },
+      { kind: 'strokes', count: 10, label: 'Make 10 drawing moves' },
+    ],
+  },
+  {
+    id: 'underwater-map',
+    title: 'Underwater Treasure Map',
+    prompt: 'Create a map to a hidden treasure under the sea.',
+    setup: 'Add clear paths, clues, and one surprise danger.',
+    reward: 'Ocean Navigator',
+    difficulty: 'Brave',
+    timeLimitSec: 210,
+    goals: [
+      { kind: 'fill', count: 1, label: 'Use the paint bucket' },
+      { kind: 'tools', count: 3, label: 'Use 3 tools' },
+      { kind: 'strokes', count: 10, label: 'Make 10 drawing moves' },
+    ],
+  },
+  {
+    id: 'mirror-beast',
+    title: 'Mirror Beast Lab',
+    prompt: 'Design a magical creature with balanced wings, horns, or armor.',
+    setup: 'Mirror mode is your secret power.',
+    reward: 'Symmetry Scientist',
+    difficulty: 'Brave',
+    timeLimitSec: 180,
+    goals: [
+      { kind: 'symmetry', label: 'Use mirror mode' },
+      { kind: 'colors', count: 3, label: 'Use 3 colors' },
+      { kind: 'strokes', count: 8, label: 'Make 8 drawing moves' },
+    ],
+  },
+  {
+    id: 'future-city',
+    title: 'Future City Sprint',
+    prompt: 'Build a city from the future with transport, towers, and power.',
+    setup: 'Every area should feel alive.',
+    reward: 'City Builder',
+    difficulty: 'Legend',
+    timeLimitSec: 240,
+    goals: [
+      { kind: 'colors', count: 6, label: 'Use 6 colors' },
+      { kind: 'tools', count: 3, label: 'Use 3 tools' },
+      { kind: 'strokes', count: 12, label: 'Make 12 drawing moves' },
+      { kind: 'fill', count: 1, label: 'Use the paint bucket' },
+    ],
+  },
+  {
+    id: 'hero-poster',
+    title: 'Hero Poster Challenge',
+    prompt: 'Create a poster for a new superhero and the world they protect.',
+    setup: 'Give them a clear symbol and a dramatic background.',
+    reward: 'Poster Master',
+    difficulty: 'Legend',
+    timeLimitSec: 240,
+    goals: [
+      { kind: 'colors', count: 5, label: 'Use 5 colors' },
+      { kind: 'tools', count: 3, label: 'Use 3 tools' },
+      { kind: 'sticker', count: 1, label: 'Place 1 sticker' },
+      { kind: 'strokes', count: 12, label: 'Make 12 drawing moves' },
+    ],
+  },
+];
+
+const formatTimeLeft = (totalSeconds: number) => {
+  const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const secs = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${mins}:${secs}`;
+};
+
+const addUnique = <T,>(items: T[], item: T) => (
+  items.includes(item) ? items : [...items, item]
+);
+
+const getGoalProgress = (goal: ChallengeGoal, stats: ChallengeStats) => {
+  switch (goal.kind) {
+    case 'colors': {
+      const target = goal.count || 0;
+      const current = stats.colorsUsed.length;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'tools': {
+      const target = goal.count || 0;
+      const current = stats.toolsUsed.length;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'strokes': {
+      const target = goal.count || 0;
+      const current = stats.strokes;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'sticker': {
+      const target = goal.count || 1;
+      const current = stats.stickersPlaced;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'fill': {
+      const target = goal.count || 1;
+      const current = stats.fillsUsed;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'symmetry': {
+      const current = stats.symmetryMoves > 0 ? 1 : 0;
+      return { current, target: 1, done: current >= 1, label: goal.label };
+    }
+  }
+};
 
 const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const { t } = useI18n();
@@ -112,7 +287,9 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [storyAssets, setStoryAssets] = useState<string[]>([]);
   const [storyResult, setStoryResult] = useState<{ title: string, content: string } | null>(null);
 
-  const [activeChallenge, setActiveChallenge] = useState<string | null>(null);
+  const [activeChallenge, setActiveChallenge] = useState<StudioChallenge | null>(null);
+  const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
+  const [challengeResult, setChallengeResult] = useState<ChallengeResult | null>(null);
 
   useEffect(() => {
     const handleResize = () => setTimeout(initCanvas, 100);
@@ -154,6 +331,17 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  useEffect(() => {
+    if (!activeChallenge || !challengeStats || challengeStats.timeLeftSec <= 0) return;
+    const timer = window.setInterval(() => {
+      setChallengeStats(prev => {
+        if (!prev) return prev;
+        return { ...prev, timeLeftSec: Math.max(0, prev.timeLeftSec - 1) };
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeChallenge, challengeStats]);
+
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const bgCanvas = bgCanvasRef.current;
@@ -193,6 +381,34 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     setGallery(g);
   };
 
+  const resetChallengeStats = (challenge: StudioChallenge) => {
+    setChallengeStats({
+      colorsUsed: [],
+      toolsUsed: [],
+      strokes: 0,
+      stickersPlaced: 0,
+      symmetryMoves: 0,
+      fillsUsed: 0,
+      timeLeftSec: challenge.timeLimitSec,
+    });
+  };
+
+  const updateChallengeStats = (updates: Partial<ChallengeStats> & { toolUsed?: ToolType; colorUsed?: string }) => {
+    if (!activeChallenge) return;
+    setChallengeStats(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorsUsed: updates.colorUsed ? addUnique(prev.colorsUsed, updates.colorUsed) : prev.colorsUsed,
+        toolsUsed: updates.toolUsed ? addUnique(prev.toolsUsed, updates.toolUsed) : prev.toolsUsed,
+        strokes: prev.strokes + (updates.strokes || 0),
+        stickersPlaced: prev.stickersPlaced + (updates.stickersPlaced || 0),
+        symmetryMoves: prev.symmetryMoves + (updates.symmetryMoves || 0),
+        fillsUsed: prev.fillsUsed + (updates.fillsUsed || 0),
+      };
+    });
+  };
+
   const handleSaveToGallery = async (customDataUrl?: string, isMagic = false) => {
     if (!canvasRef.current && !customDataUrl) return;
     let dataUrl = customDataUrl;
@@ -225,24 +441,91 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   };
 
   const startChallengeMode = () => {
-    const random = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
+    const random = STUDIO_CHALLENGES[Math.floor(Math.random() * STUDIO_CHALLENGES.length)];
+    setChallengeResult(null);
     setActiveChallenge(random);
-    AudioService.speak("Challenge accepted! " + random);
+    resetChallengeStats(random);
+    setTool('marker');
+    setBrushSize(10);
+    setIsSymmetry(false);
+    setTransform({ x: 0, y: 0, scale: 1 });
+    setShowGallery(false);
+    setShowLibrary(false);
+    setStoryStep('NONE');
+    setTransformedImage(null);
+    AudioService.speak(`Challenge accepted. ${random.title}. ${random.prompt}`);
     handleClearCanvas(false); // don't wipe history, just give blank slate
   };
 
   const finishChallenge = async () => {
-    AudioService.playEffect('achievement');
-    AudioService.speak("Amazing job! Challenge completed!");
+    if (!activeChallenge || !challengeStats) return;
+
+    const totalMoves = challengeStats.strokes + challengeStats.stickersPlaced + challengeStats.fillsUsed;
+    if (totalMoves === 0) {
+      AudioService.speak("Add a few marks before you score this challenge.");
+      return;
+    }
+
+    const completedGoals = activeChallenge.goals.filter(goal => getGoalProgress(goal, challengeStats).done).length;
+    const beatClock = challengeStats.timeLeftSec > 0;
+    const clearedChallenge = completedGoals === activeChallenge.goals.length;
+    let aiJudgement: Awaited<ReturnType<typeof AIService.judgeChallengeDrawing>> = null;
+
+    if (canvasRef.current) {
+      setIsGenerating(true);
+      setLoadingText('AI judge is reviewing your mission...');
+      aiJudgement = await AIService.judgeChallengeDrawing(canvasRef.current.toDataURL('image/png'), {
+        title: activeChallenge.title,
+        prompt: activeChallenge.prompt,
+        setup: activeChallenge.setup,
+        goals: activeChallenge.goals.map(goal => goal.label),
+      });
+      setIsGenerating(false);
+    }
+
+    let stars = clearedChallenge ? (beatClock ? 3 : 2) : 1;
+    if (aiJudgement?.matchedPrompt && aiJudgement.creativityScore >= 7 && stars < 3) {
+      stars += 1;
+    }
+    if (aiJudgement && !aiJudgement.matchedPrompt && stars > 1) {
+      stars -= 1;
+    }
+
+    if (clearedChallenge && (aiJudgement?.matchedPrompt ?? true)) {
+      AudioService.playEffect('achievement');
+      AudioService.speak(beatClock ? "Brilliant. You beat the clock." : "Challenge cleared. Strong finish.");
+    } else if (aiJudgement && !aiJudgement.matchedPrompt) {
+      AudioService.playEffect('click');
+      AudioService.speak("Strong effort. The AI wants a closer match to the mission.");
+    } else {
+      AudioService.playEffect('click');
+      AudioService.speak("Nice try. You earned a practice star and saved your work.");
+    }
+
+    setChallengeResult({
+      title: activeChallenge.title,
+      reward: clearedChallenge && (aiJudgement?.matchedPrompt ?? true) ? activeChallenge.reward : 'Practice Star',
+      stars,
+      beatClock,
+      completedGoals,
+      totalGoals: activeChallenge.goals.length,
+      aiMatchedPrompt: aiJudgement?.matchedPrompt,
+      aiCreativityScore: aiJudgement?.creativityScore,
+      aiMissionScore: aiJudgement?.missionScore,
+      aiFeedback: aiJudgement?.feedback,
+      aiHighlights: aiJudgement?.highlights || [],
+    });
     await handleSaveToGallery(undefined, false); // Auto-save their challenge masterpiece
     setActiveChallenge(null);
+    setChallengeStats(null);
   };
 
-  const handleClearCanvas = (wipeHistory = true) => {
+  const handleClearCanvas = (wipeHistory = true, resetCurrentChallenge = false) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx && canvasRef.current) {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       if (wipeHistory) saveHistory();
+      if (resetCurrentChallenge && activeChallenge) resetChallengeStats(activeChallenge);
     }
   };
 
@@ -466,6 +749,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     if (tool === 'fill') {
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      updateChallengeStats({ toolUsed: 'fill', colorUsed: color, strokes: 1, fillsUsed: 1 });
       saveHistory();
       AudioService.playEffect('click');
       setIsDrawing(false);
@@ -478,10 +762,22 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       ctx.fillText(selectedSticker, x, y);
       AudioService.playEffect('click');
       if (isSymmetry) ctx.fillText(selectedSticker, canvasRef.current.width - x, y);
+      updateChallengeStats({
+        toolUsed: 'sticker',
+        colorUsed: color,
+        strokes: 1,
+        stickersPlaced: 1,
+        symmetryMoves: isSymmetry ? 1 : 0
+      });
       saveHistory();
       setIsDrawing(false);
       return;
     }
+    updateChallengeStats({
+      toolUsed: tool,
+      colorUsed: tool === 'eraser' ? undefined : color,
+      symmetryMoves: isSymmetry ? 1 : 0
+    });
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineCap = 'round';
@@ -561,6 +857,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     }
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) ctx.closePath();
+    updateChallengeStats({ strokes: 1 });
     saveHistory();
   };
 
@@ -591,7 +888,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="flex flex-col h-full relative select-none overflow-hidden bg-slate-100">
+    <div className="flex flex-1 min-h-0 flex-col relative select-none overflow-hidden bg-slate-100">
 
       {isGenerating && (
         <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
@@ -698,17 +995,113 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         </div>
       )}
 
+      {challengeResult && (
+        <div className="absolute inset-0 z-50 bg-slate-900/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-amber-400/30 bg-slate-900 text-white p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="text-4xl mb-3">{'★'.repeat(challengeResult.stars)}{'☆'.repeat(3 - challengeResult.stars)}</div>
+              <p className="text-[10px] uppercase tracking-[0.35em] text-amber-300 font-black">Challenge Result</p>
+              <h3 className="mt-2 text-3xl font-display text-white">{challengeResult.title}</h3>
+              <p className="mt-3 text-amber-200 font-bold">{challengeResult.reward}</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Goals cleared: {challengeResult.completedGoals}/{challengeResult.totalGoals}
+                {challengeResult.beatClock ? ' | Clock bonus earned' : ''}
+              </p>
+            </div>
+            {challengeResult.aiFeedback && (
+              <div className="mt-5 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 p-4">
+                <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300">
+                  <span>AI Judge</span>
+                  <span>
+                    Mission {challengeResult.aiMissionScore}/10 | Creative {challengeResult.aiCreativityScore}/10
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-100">{challengeResult.aiFeedback}</p>
+                {challengeResult.aiHighlights && challengeResult.aiHighlights.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {challengeResult.aiHighlights.map((highlight) => (
+                      <span key={highlight} className="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-200 border border-white/10">
+                        {highlight}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {!challengeResult.aiFeedback && (
+              <p className="mt-5 text-center text-xs text-slate-400">AI judging was unavailable, so this score used the mission goals and timer only.</p>
+            )}
+            <div className="mt-6 flex gap-2 justify-center">
+              <button
+                onClick={startChallengeMode}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-slate-950 font-black hover:brightness-110"
+              >
+                <RefreshCcw size={16} /> Another
+              </button>
+              <button
+                onClick={() => setChallengeResult(null)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-white font-bold hover:bg-slate-600"
+              >
+                <Check size={16} /> Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* CHALLENGE BANNER OVERLAY */}
-      {activeChallenge && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border-4 border-amber-400 animate-slide-in-top">
-          <div className="flex flex-col">
-            <span className="text-yellow-300 font-bold text-xs uppercase tracking-widest">Active Challenge</span>
-            <span className="font-display text-xl">{activeChallenge}</span>
+      {activeChallenge && challengeStats && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[min(92vw,36rem)] rounded-3xl border-2 border-amber-400 bg-slate-900/95 text-white p-4 shadow-2xl animate-slide-in-top">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">
+                <Trophy size={12} />
+                <span>{activeChallenge.difficulty} Challenge</span>
+              </div>
+              <h3 className="mt-1 text-2xl font-display text-white">{activeChallenge.title}</h3>
+              <p className="mt-1 text-sm text-slate-300">{activeChallenge.prompt}</p>
+              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-indigo-300">{activeChallenge.setup}</p>
+            </div>
+            <div className={`shrink-0 rounded-2xl px-3 py-2 text-center font-black ${challengeStats.timeLeftSec > 30 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+              <div className="text-[9px] uppercase tracking-[0.25em]">Clock</div>
+              <div className="text-lg">{formatTimeLeft(challengeStats.timeLeftSec)}</div>
+            </div>
           </div>
-          <button onClick={finishChallenge} title="Complete Challenge!" className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg ml-4">
-            <Check size={18} /> Done!
-          </button>
+
+          <div className="mt-4 grid gap-2">
+            {activeChallenge.goals.map(goal => {
+              const progress = getGoalProgress(goal, challengeStats);
+              return (
+                <div
+                  key={goal.label}
+                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-sm ${progress.done ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-slate-800/80 text-slate-300'}`}
+                >
+                  <span>{progress.label}</span>
+                  <span className="font-mono text-xs">{progress.current}/{progress.target}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+            <span>Colors {challengeStats.colorsUsed.length}</span>
+            <span>Tools {challengeStats.toolsUsed.length}</span>
+            <span>Moves {challengeStats.strokes}</span>
+            <span>Stickers {challengeStats.stickersPlaced}</span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={finishChallenge} title="Score this challenge" className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg">
+              <Check size={18} /> Score It
+            </button>
+            <button onClick={startChallengeMode} title="Try a new challenge" className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg">
+              <RefreshCcw size={18} /> Reroll
+            </button>
+            <button onClick={() => { setActiveChallenge(null); setChallengeStats(null); }} title="End challenge" className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105">
+              End
+            </button>
+          </div>
         </div>
       )}
 
@@ -851,7 +1244,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
             <button onClick={undo} data-tooltip="Undo Last Stroke" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Undo2 size={18} /></button>
             <button onClick={() => { }} data-tooltip="Redo Action" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Redo2 size={18} /></button>
             <div className="w-px bg-slate-600 mx-1"></div>
-            <button onClick={() => handleClearCanvas(true)} data-tooltip="Clear Canvas" className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg"><Trash2 size={18} /></button>
+            <button onClick={() => handleClearCanvas(true, Boolean(activeChallenge))} data-tooltip="Clear Canvas" className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg"><Trash2 size={18} /></button>
             <button onClick={() => setIsSymmetry(!isSymmetry)} data-tooltip="Mirror Symmetry" className={`p-2 rounded-lg ${isSymmetry ? 'bg-indigo-600 text-white shadow-glow' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}><Split size={18} /></button>
           </div>
 
@@ -860,10 +1253,10 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
             {/* CHALLENGE BUTTON */}
             <button
               onClick={startChallengeMode}
-              data-tooltip="Get a Random Challenge!"
+              data-tooltip={activeChallenge ? "Start a fresh challenge" : "Start a real art mission"}
               className="flex items-center gap-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-black shadow-lg hover:brightness-110"
             >
-              <Trophy size={14} className="animate-pulse" /> Challenge!
+              <Trophy size={14} className="animate-pulse" /> {activeChallenge ? 'New Challenge' : 'Challenge!'}
             </button>
             <button onClick={() => setShowLibrary(true)} data-tooltip="Open Coloring Library" className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-600">
               <ImageIcon size={14} /> {t('drawing.templatesLabel')}
