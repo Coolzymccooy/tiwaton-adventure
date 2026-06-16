@@ -1,476 +1,52 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
 import { AudioService } from '../services/audio';
 import { View } from '../types';
 import {
-  Loader2, BrainCircuit, Trophy, Star, Music, Book,
-  ArrowRight, Check, X, ArrowLeft, Zap, ScrollText, Music2, Goal,
-  AlertCircle, RefreshCcw, Flame, Crown, Sparkles, Lock, Home
+  BrainCircuit, Trophy, Star,
+  ArrowRight, X, ArrowLeft, Zap, ScrollText, Music2, Goal,
+  Flame, Crown, Sparkles, Lock, Home, Timer, Infinity, ChevronRight
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
+import { BIBLE_BANK, type WorldId } from '../data/bible-questions';
+import {
+  getQuestions, markAnswered, SCROLL_TIERS,
+  getWorldTierProgress, completeWorldTier, getEternalHighScore, setEternalHighScore,
+  cacheAIQuestions, type PlayableQuestion, type ScrollTier
+} from '../services/question-engine';
 
 interface ActivitiesPageProps {
   onNavigate?: (view: View) => void;
 }
 
-interface Question {
-  question: string;
-  options: string[];
-  correctIndex: number;
-  explanation: string;
-  funnyComment?: string;
-}
-
-type LocalBibleQuestion = {
-  question: { en: string; de: string };
-  options: { en: string[]; de: string[] };
-  correctIndex: number;
-  explanation: { en: string; de: string };
-  funnyComment?: { en: string; de: string };
-};
-
-const LOCAL_BIBLE_BANK: Record<string, LocalBibleQuestion[]> = {
-  creation: [
-    {
-      question: {
-        en: 'Who built the ark to survive the flood?',
-        de: 'Wer baute die Arche, um die Sintflut zu überstehen?'
-      },
-      options: {
-        en: ['Noah', 'Abraham', 'Moses', 'Isaac'],
-        de: ['Noah', 'Abraham', 'Mose', 'Isaak']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Noah obeyed God and built the ark exactly as instructed.',
-        de: 'Noah gehorchte Gott und baute die Arche genau nach Anweisung.'
-      },
-      funnyComment: {
-        en: 'Boat-building masterclass.',
-        de: 'Bootsbau-Meisterklasse.'
-      }
-    },
-    {
-      question: {
-        en: 'What did God create on the first day?',
-        de: 'Was schuf Gott am ersten Tag?'
-      },
-      options: {
-        en: ['Light', 'Animals', 'People', 'Plants'],
-        de: ['Licht', 'Tiere', 'Menschen', 'Pflanzen']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'God said, “Let there be light” before anything else.',
-        de: 'Gott sprach: „Es werde Licht“ noch bevor etwas anderes entstand.'
-      }
-    }
-  ],
-  patriarchs: [
-    {
-      question: {
-        en: 'Who received the promise of descendants as numerous as the stars?',
-        de: 'Wer erhielt das Versprechen zahlreicher Nachkommen wie die Sterne?'
-      },
-      options: {
-        en: ['Isaac', 'Jacob', 'Abraham', 'Moses'],
-        de: ['Isaak', 'Jakob', 'Abraham', 'Mose']
-      },
-      correctIndex: 2,
-      explanation: {
-        en: 'God made that covenant with Abraham.',
-        de: 'Gott schloss diesen Bund mit Abraham.'
-      }
-    },
-    {
-      question: {
-        en: 'Which wife became pregnant with Isaac after many years of waiting?',
-        de: 'Welche Frau wurde nach langer Wartezeit Mutter von Isaak?'
-      },
-      options: {
-        en: ['Sarah', 'Rebekah', 'Rachel', 'Leah'],
-        de: ['Sarah', 'Rebekka', 'Rachel', 'Lea']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Sarah finally trusted God and Isaac was born.',
-        de: 'Sarah vertraute Gott und Isaak wurde geboren.'
-      }
-    }
-  ],
-  exodus: [
-    {
-      question: {
-        en: 'Who led the Israelites out of Egypt?',
-        de: 'Wer führte die Israeliten aus Ägypten?'
-      },
-      options: {
-        en: ['Moses', 'Aaron', 'Joshua', 'Joseph'],
-        de: ['Mose', 'Aaron', 'Josua', 'Josef']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Moses trusted God and stood before Pharaoh.',
-        de: 'Mose vertraute Gott und trat vor den Pharao.'
-      }
-    },
-    {
-      question: {
-        en: 'Which sea did Moses part for the people to pass through?',
-        de: 'Welches Meer teilte Mose, damit das Volk hindurchziehen konnte?'
-      },
-      options: {
-        en: ['Red Sea', 'Dead Sea', 'Sea of Galilee', 'Mediterranean'],
-        de: ['Rotes Meer', 'Totes Meer', 'See Genezareth', 'Mittelmeer']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'God told Moses to stretch out his staff over the Red Sea.',
-        de: 'Gott sagte Mose, er solle seinen Stab über das Rote Meer halten.'
-      }
-    }
-  ],
-  judges: [
-    {
-      question: {
-        en: 'Which judge defeated the Midianites with just 300 men and torches?',
-        de: 'Welcher Richter besiegte die Midianiter mit nur 300 Männern und Fackeln?'
-      },
-      options: {
-        en: ['Gideon', 'Samson', 'Deborah', 'Samuel'],
-        de: ['Gideon', 'Simson', 'Debora', 'Samuel']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Gideon trusted God and surprised the enemy at night.',
-        de: 'Gideon vertraute Gott und überraschte den Feind nachts.'
-      }
-    },
-    {
-      question: {
-        en: 'Who was the prophetess judge that led Israel and sang a victory song?',
-        de: 'Welche Prophetin-Richterin führte Israel und sang einen Siegesgesang?'
-      },
-      options: {
-        en: ['Deborah', 'Ruth', 'Esther', 'Miriam'],
-        de: ['Debora', 'Rut', 'Esther', 'Mirjam']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Deborah led the people with courage and praised God after the win.',
-        de: 'Debora führte das Volk mutig und lobte Gott nach dem Sieg.'
-      }
-    }
-  ],
-  kings: [
-    {
-      question: {
-        en: 'Which shepherd boy was anointed to become king of Israel?',
-        de: 'Welcher Hirtenjunge wurde gesalbt, um König von Israel zu werden?'
-      },
-      options: {
-        en: ['David', 'Saul', 'Solomon', 'Hezekiah'],
-        de: ['David', 'Saul', 'Salomo', 'Hiskia']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'David was chosen by Samuel while tending sheep.',
-        de: 'David wurde von Samuel während der Schafhütung ausgewählt.'
-      }
-    },
-    {
-      question: {
-        en: 'Which king built the temple in Jerusalem?',
-        de: 'Welcher König ließ den Tempel in Jerusalem bauen?'
-      },
-      options: {
-        en: ['David', 'Solomon', 'Rehoboam', 'Uzziah'],
-        de: ['David', 'Salomo', 'Rehabeam', 'Usija']
-      },
-      correctIndex: 1,
-      explanation: {
-        en: 'Solomon built the temple to honor God with beautiful structure.',
-        de: 'Salomo baute den Tempel, um Gott mit einem prächtigen Bau zu ehren.'
-      }
-    }
-  ],
-  prophets: [
-    {
-      question: {
-        en: 'Which prophet saw dry bones come back to life in a vision?',
-        de: 'Welcher Prophet sah in einer Vision trockene Knochen wieder lebendig werden?'
-      },
-      options: {
-        en: ['Ezekiel', 'Isaiah', 'Daniel', 'Amos'],
-        de: ['Ezechiel', 'Jesaja', 'Daniel', 'Amos']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Ezekiel’s vision showed God bringing hope and new life.',
-        de: 'Ezechiels Vision zeigte, dass Gott Hoffnung und neues Leben schenkt.'
-      }
-    },
-    {
-      question: {
-        en: 'Which prophet reminded kings to act justly and love mercy?',
-        de: 'Welcher Prophet erinnerte Könige daran, gerecht zu handeln und Barmherzigkeit zu lieben?'
-      },
-      options: {
-        en: ['Micah', 'Jonah', 'Hosea', 'Nahum'],
-        de: ['Micha', 'Jona', 'Hosea', 'Nahum']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Micah wrote that God wants justice, mercy, and humility.',
-        de: 'Micha schrieb, dass Gott Gerechtigkeit, Barmherzigkeit und Demut möchte.'
-      }
-    }
-  ],
-  gospels: [
-    {
-      question: {
-        en: 'What did Jesus turn water into at the wedding in Cana?',
-        de: 'Wasserde Jesus bei der Hochzeit zu Kana verwandelt?'
-      },
-      options: {
-        en: ['Wine', 'Bread', 'Fish', 'Milk'],
-        de: ['Wein', 'Brot', 'Fisch', 'Milch']
-      },
-      correctIndex: 0,
-      explanation: {
-        en: 'Jesus turned water into wine to bless the celebration.',
-        de: 'Jesus verwandelte Wasser in Wein, um die Feier zu segnen.'
-      }
-    },
-    {
-      question: {
-        en: 'Which gospel writer described Jesus feeding 5,000 people?',
-        de: 'Welcher Evangelist beschrieb, wie Jesus 5.000 Menschen speiste?'
-      },
-      options: {
-        en: ['Matthew', 'Mark', 'Luke', 'John'],
-        de: ['Matthäus', 'Markus', 'Lukas', 'Johannes']
-      },
-      correctIndex: 3,
-      explanation: {
-        en: 'John wrote about the miracle beside the Sea of Galilee.',
-        de: 'Johannes berichtete von dem Wunder am See Genezareth.'
-      }
-    }
-  ],
-  earlyChurch: [
-    {
-      question: { en: 'Which apostle wrote many letters to the churches?', de: 'Welcher Apostel schrieb viele Briefe an die Gemeinden?' },
-      options: { en: ['Paul', 'Peter', 'James', 'John'], de: ['Paulus', 'Petrus', 'Jakobus', 'Johannes'] },
-      correctIndex: 0,
-      explanation: { en: 'Paul traveled widely and penned letters to believers.', de: 'Paulus reiste weit und schrieb Briefe an Gläubige.' }
-    },
-    {
-      question: { en: 'In which city were believers first called Christians?', de: 'In welcher Stadt nannte man die Gläubigen zuerst Christen?' },
-      options: { en: ['Jerusalem', 'Antioch', 'Rome', 'Corinth'], de: ['Jerusalem', 'Antiochia', 'Rom', 'Korinth'] },
-      correctIndex: 1,
-      explanation: { en: 'The believers in Antioch were the first to bear the name Christian.', de: 'In Antiochia wurden die Gläubigen erstmals Christen genannt.' }
-    }
-  ],
-  wisdom: [
-    {
-      question: { en: 'Which book is filled with wise sayings from Solomon?', de: 'Welches Buch ist voll von weisen Sprüchen Salomos?' },
-      options: { en: ['Proverbs', 'Psalms', 'Job', 'Ecclesiastes'], de: ['Sprüche', 'Psalmen', 'Hiob', 'Prediger'] },
-      correctIndex: 0,
-      explanation: { en: 'Proverbs is known as the book of wisdom.', de: 'Sprüche ist als das Buch der Weisheit bekannt.' }
-    },
-    {
-      question: { en: 'Which man remained faithful to God even after losing everything?', de: 'Welcher Mann blieb Gott treu, auch nachdem er alles verloren hatte?' },
-      options: { en: ['Job', 'David', 'Saul', 'Solomon'], de: ['Hiob', 'David', 'Saul', 'Salomo'] },
-      correctIndex: 0,
-      explanation: { en: 'Job trusted God through immense suffering.', de: 'Hiob vertraute Gott in großem Leid.' }
-    }
-  ],
-  exile: [
-    {
-      question: { en: 'Which prophet was thrown into the lions den?', de: 'Welcher Prophet wurde in die Löwengrube geworfen?' },
-      options: { en: ['Daniel', 'Ezekiel', 'Jeremiah', 'Isaiah'], de: ['Daniel', 'Ezechiel', 'Jeremia', 'Jesaja'] },
-      correctIndex: 0,
-      explanation: { en: 'Daniel prayed faithfully despite the kings decree.', de: 'Daniel betete treu trotz des Erlasses des Königs.' }
-    },
-    {
-      question: { en: 'Which three men were thrown into the fiery furnace?', de: 'Welche drei Männer wurden in den Feuerofen geworfen?' },
-      options: { en: ['Shadrach, Meshach, Abednego', 'Peter, James, John', 'Abraham, Isaac, Jacob', 'Moses, Aaron, Miriam'], de: ['Schadrach, Meschach, Abednego', 'Petrus, Jakobus, Johannes', 'Abraham, Isaak, Jakob', 'Mose, Aaron, Mirjam'] },
-      correctIndex: 0,
-      explanation: { en: 'They refused to bow to the golden statue.', de: 'Sie weigerten sich, sich vor der goldenen Statue zu beugen.' }
-    }
-  ],
-  return: [
-    {
-      question: { en: 'Who led the rebuilding of the walls of Jerusalem?', de: 'Wer leitete den Wiederaufbau der Mauern von Jerusalem?' },
-      options: { en: ['Nehemiah', 'Ezra', 'Zerubbabel', 'Esther'], de: ['Nehemia', 'Esra', 'Serubbabel', 'Esther'] },
-      correctIndex: 0,
-      explanation: { en: 'Nehemiah prayed and acted boldly to rebuild the walls.', de: 'Nehemia betete und handelte mutig, um die Mauern wieder aufzubauen.' }
-    },
-    {
-      question: { en: 'Who read the Law to the people after they returned?', de: 'Wer las dem Volk nach ihrer Rückkehr das Gesetz vor?' },
-      options: { en: ['Ezra', 'Nehemiah', 'Malachi', 'Haggai'], de: ['Esra', 'Nehemia', 'Maleachi', 'Haggai'] },
-      correctIndex: 0,
-      explanation: { en: 'Ezra the priest brought the Book of the Law of Moses.', de: 'Esra, der Priester, brachte das Buch des Gesetzes des Mose.' }
-    }
-  ],
-  parables: [
-    {
-      question: { en: 'In the parable of the sower, what does the seed represent?', de: 'Was stellt der Same im Gleichnis vom Sämann dar?' },
-      options: { en: ['The Word of God', 'Money', 'Faith', 'Love'], de: ['Das Wort Gottes', 'Geld', 'Glaube', 'Liebe'] },
-      correctIndex: 0,
-      explanation: { en: 'Jesus explained that the seed is the word of God scattered into hearts.', de: 'Jesus erklärte, dass der Same das Wort Gottes ist, das in die Herzen gestreut wird.' }
-    },
-    {
-      question: { en: 'Which parable tells of a son who wastes his inheritance?', de: 'Welches Gleichnis erzählt von einem Sohn, der sein Erbe verschwendet?' },
-      options: { en: ['The Prodigal Son', 'The Good Samaritan', 'The Lost Sheep', 'The Ten Virgins'], de: ['Der verlorene Sohn', 'Der barmherzige Samariter', 'Das verlorene Schaf', 'Die zehn Jungfrauen'] },
-      correctIndex: 0,
-      explanation: { en: 'The father welcomes back the Prodigal Son with open arms.', de: 'Der Vater heißt den verlorenen Sohn mit offenen Armen willkommen.' }
-    }
-  ],
-  passion: [
-    {
-      question: { en: 'Which disciple betrayed Jesus with a kiss?', de: 'Welcher Jünger verriet Jesus mit einem Kuss?' },
-      options: { en: ['Judas Iscariot', 'Peter', 'Thomas', 'John'], de: ['Judas Iskariot', 'Petrus', 'Thomas', 'Johannes'] },
-      correctIndex: 0,
-      explanation: { en: 'Judas betrayed Jesus for 30 pieces of silver.', de: 'Judas verriet Jesus für 30 Silberlinge.' }
-    },
-    {
-      question: { en: 'Where did Jesus pray before his arrest?', de: 'Wo betete Jesus vor seiner Verhaftung?' },
-      options: { en: ['Garden of Gethsemane', 'Mount of Olives', 'Temple', 'Upper Room'], de: ['Garten Gethsemane', 'Ölberg', 'Tempel', 'Oberes Zimmer'] },
-      correctIndex: 0,
-      explanation: { en: 'Jesus faced enormous agony submitting to the Fathers will.', de: 'Jesus erlitt enorme Qualen, als er sich dem Willen des Vaters unterwarf.' }
-    }
-  ],
-  resurrection: [
-    {
-      question: { en: 'Who was the first person to see the risen Jesus?', de: 'Wer war die erste Person, die den auferstandenen Jesus sah?' },
-      options: { en: ['Mary Magdalene', 'Peter', 'John', 'Thomas'], de: ['Maria Magdalena', 'Petrus', 'Johannes', 'Thomas'] },
-      correctIndex: 0,
-      explanation: { en: 'Mary stayed crying at the tomb until Jesus spoke to her.', de: 'Maria blieb weinend am Grab, bis Jesus mit ihr sprach.' }
-    },
-    {
-      question: { en: 'Which disciple doubted until he touched Jesus scars?', de: 'Welcher Jünger zweifelte, bis er die Narben Jesu berührte?' },
-      options: { en: ['Thomas', 'Peter', 'Andrew', 'Philip'], de: ['Thomas', 'Petrus', 'Andreas', 'Philippus'] },
-      correctIndex: 0,
-      explanation: { en: 'Jesus said, "Blessed are those who have not seen and yet have believed."', de: 'Jesus sagte: "Selig, die nicht sehen und doch glauben."' }
-    }
-  ],
-  holySpirit: [
-    {
-      question: { en: 'On what day did the Holy Spirit descend as tongues of fire?', de: 'An welchem Tag kam der Heilige Geist wie Feuerzungen herab?' },
-      options: { en: ['Pentecost', 'Passover', 'Tabernacles', 'Atonement'], de: ['Pfingsten', 'Passah', 'Laubhüttenfest', 'Versöhnungstag'] },
-      correctIndex: 0,
-      explanation: { en: 'Pentecost marked the birth of the church with power.', de: 'Pfingsten markierte die Geburt der Gemeinde mit Kraft.' }
-    },
-    {
-      question: { en: 'What is listed as a fruit of the Spirit?', de: 'Was wird als Frucht des Geistes aufgeführt?' },
-      options: { en: ['Joy', 'Wealth', 'Power', 'Fame'], de: ['Freude', 'Reichtum', 'Macht', 'Ruhm'] },
-      correctIndex: 0,
-      explanation: { en: 'The fruit of the Spirit includes love, joy, peace, patience...', de: 'Die Frucht des Geistes umfasst Liebe, Freude, Friede, Geduld...' }
-    }
-  ],
-  revelation: [
-    {
-      question: { en: 'Who wrote the book of Revelation while exiled?', de: 'Wer schrieb das Buch der Offenbarung im Exil?' },
-      options: { en: ['John', 'Paul', 'Peter', 'James'], de: ['Johannes', 'Paulus', 'Petrus', 'Jakobus'] },
-      correctIndex: 0,
-      explanation: { en: 'John was exiled to the island of Patmos when he received the visions.', de: 'Johannes befand sich im Exil auf der Insel Patmos, als er die Visionen erhielt.' }
-    },
-    {
-      question: { en: 'What name is Jesus called in Revelation that signifies the end?', de: 'Wie wird Jesus in der Offenbarung genannt, was das Ende bedeutet?' },
-      options: { en: ['The Omega', 'The Alpha', 'The Lion', 'The Lamb'], de: ['Das Omega', 'Das Alpha', 'Der Löwe', 'Das Lamm'] },
-      correctIndex: 0,
-      explanation: { en: 'He is the Alpha and the Omega, the First and the Last.', de: 'Er ist das Alpha und das Omega, der Erste und der Letzte.' }
-    }
-  ],
-  heroes: [
-    {
-      question: { en: 'Which boy defeated the heavily armed Goliath?', de: 'Welcher Junge besiegte den schwer bewaffneten Goliath?' },
-      options: { en: ['David', 'Jonathan', 'Saul', 'Absalom'], de: ['David', 'Jonathan', 'Saul', 'Absalom'] },
-      correctIndex: 0,
-      explanation: { en: 'David defeated Goliath with a sling and God’s power.', de: 'David besiegte Goliath mit einer Schleuder und Gottes Kraft.' }
-    },
-    {
-      question: { en: 'Who was swallowed by a great fish when running from God?', de: 'Wer wurde von einem großen Fisch verschluckt, als er vor Gott floh?' },
-      options: { en: ['Jonah', 'Noah', 'Moses', 'Elijah'], de: ['Jona', 'Noah', 'Mose', 'Elia'] },
-      correctIndex: 0,
-      explanation: { en: 'Jonah stayed in the belly of the fish for three days and three nights.', de: 'Jona blieb drei Tage und drei Nächte im Bauch des Fisches.' }
-    }
-  ],
-  womenOfFaith: [
-    {
-      question: { en: 'Which queen risked her life to save the Jewish people?', de: 'Welche Königin riskierte ihr Leben, um das jüdische Volk zu retten?' },
-      options: { en: ['Esther', 'Ruth', 'Mary', 'Naomi'], de: ['Esther', 'Ruth', 'Maria', 'Naomi'] },
-      correctIndex: 0,
-      explanation: { en: 'Esther bravely approached the king without an invitation.', de: 'Esther näherte sich mutig dem König ohne Einladung.' }
-    },
-    {
-      question: { en: 'Who stayed loyal to her mother-in-law, Naomi?', de: 'Wer blieb ihrer Schwiegermutter Naomi treu?' },
-      options: { en: ['Ruth', 'Orpah', 'Rachel', 'Leah'], de: ['Ruth', 'Orpa', 'Rahel', 'Lea'] },
-      correctIndex: 0,
-      explanation: { en: 'Ruth said, "Your people will be my people, and your God my God."', de: 'Ruth sagte: "Dein Volk ist mein Volk, und dein Gott ist mein Gott."' }
-    }
-  ]
-};
-
-const getOfflineQuestions = (worldId: string, locale: 'en' | 'de'): Question[] => {
-  const bucket = LOCAL_BIBLE_BANK[worldId] || [];
-
-  // Clone the bucket before shuffling so we don't mutate the global state
-  const bucketClone = [...bucket].sort(() => Math.random() - 0.5);
-
-  return bucketClone.map((entry) => {
-    // We must shuffle the options while keeping track of the correct answer string 
-    // to determine its new `correctIndex` in the randomized array.
-    const opts = [...entry.options[locale]];
-    const correctAnswerString = opts[entry.correctIndex];
-
-    // Fisher-Yates approach for option shuffling
-    for (let i = opts.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [opts[i], opts[j]] = [opts[j], opts[i]];
-    }
-
-    const newCorrectIndex = opts.indexOf(correctAnswerString);
-
-    return {
-      question: entry.question[locale],
-      options: opts,
-      correctIndex: newCorrectIndex,
-      explanation: entry.explanation[locale],
-      funnyComment: entry.funnyComment ? entry.funnyComment[locale] : undefined,
-    };
-  });
-};
+// Re-use the PlayableQuestion type as our Question interface
+type Question = PlayableQuestion;
 
 const BIBLE_WORLDS = [
-  { id: 'creation', label: 'The Beginning', icon: '🌅', desc: 'Creation & Eden', badge: 'Genesis Star' },
-  { id: 'patriarchs', label: 'Patriarch Promise', icon: '🛕', desc: 'Abraham & Sarah', badge: 'Promise Keeper' },
-  { id: 'exodus', label: 'Exodus Trail', icon: '🔥', desc: 'Moses & the Wilderness', badge: 'Desert Guide' },
-  { id: 'judges', label: 'Judges & Courage', icon: '🛡️', desc: 'Deborah to Samson', badge: 'Courage Shield' },
-  { id: 'kings', label: 'Kingdom Builders', icon: '👑', desc: 'David, Solomon & the Temple', badge: 'Royal Honor' },
-  { id: 'prophets', label: 'Voice of Prophets', icon: '📜', desc: 'Isaiah, Jeremiah & Hope', badge: 'Prophet Quill' },
-  { id: 'gospels', label: 'Good News', icon: '✝️', desc: 'Jesus & Miracles', badge: 'Good News Badge' },
-  { id: 'earlyChurch', label: 'Early Church', icon: '✨', desc: 'Acts & Letters', badge: 'Faith Flame' },
-  { id: 'wisdom', label: 'Proverbs & Wisdom', icon: '🧠', desc: 'Solomon & Job', badge: 'Wisdom Owl' },
-  { id: 'exile', label: 'Exile & Lions', icon: '🦁', desc: 'Daniel & The Furnace', badge: 'Lion Tamer' },
-  { id: 'return', label: 'The Wall Builder', icon: '🧱', desc: 'Nehemiah & Ezra', badge: 'Master Builder' },
-  { id: 'parables', label: 'Parables', icon: '🌾', desc: 'Stories of Jesus', badge: 'Story Sower' },
-  { id: 'passion', label: 'The Passion', icon: '🍷', desc: 'The Garden & Cross', badge: 'Atonement Cup' },
-  { id: 'resurrection', label: 'He is Risen', icon: '🕊️', desc: 'The Empty Tomb', badge: 'Risen Glory' },
-  { id: 'holySpirit', label: 'Pentecost Fire', icon: '🌪️', desc: 'The Holy Spirit', badge: 'Spirit Wind' },
-  { id: 'revelation', label: 'The Revelation', icon: '👁️', desc: 'Alpha & Omega', badge: 'Omega Crown' },
-  { id: 'heroes', label: 'Heroes of Faith', icon: '🦸', desc: 'David vs Goliath', badge: 'Hero Shield' },
-  { id: 'womenOfFaith', label: 'Women of Faith', icon: '👸', desc: 'Esther & Ruth', badge: 'Faith Queen' }
+  { id: 'creation' as WorldId, label: 'The Beginning', icon: '🌅', desc: 'Creation & Eden', badge: 'Genesis Star' },
+  { id: 'patriarchs' as WorldId, label: 'Patriarch Promise', icon: '🛕', desc: 'Abraham & Sarah', badge: 'Promise Keeper' },
+  { id: 'exodus' as WorldId, label: 'Exodus Trail', icon: '🔥', desc: 'Moses & the Wilderness', badge: 'Desert Guide' },
+  { id: 'judges' as WorldId, label: 'Judges & Courage', icon: '🛡️', desc: 'Deborah to Samson', badge: 'Courage Shield' },
+  { id: 'kings' as WorldId, label: 'Kingdom Builders', icon: '👑', desc: 'David, Solomon & the Temple', badge: 'Royal Honor' },
+  { id: 'prophets' as WorldId, label: 'Voice of Prophets', icon: '📜', desc: 'Isaiah, Jeremiah & Hope', badge: 'Prophet Quill' },
+  { id: 'gospels' as WorldId, label: 'Good News', icon: '✝️', desc: 'Jesus & Miracles', badge: 'Good News Badge' },
+  { id: 'earlyChurch' as WorldId, label: 'Early Church', icon: '✨', desc: 'Acts & Letters', badge: 'Faith Flame' },
+  { id: 'wisdom' as WorldId, label: 'Proverbs & Wisdom', icon: '🧠', desc: 'Solomon & Job', badge: 'Wisdom Owl' },
+  { id: 'exile' as WorldId, label: 'Exile & Lions', icon: '🦁', desc: 'Daniel & The Furnace', badge: 'Lion Tamer' },
+  { id: 'return' as WorldId, label: 'The Wall Builder', icon: '🧱', desc: 'Nehemiah & Ezra', badge: 'Master Builder' },
+  { id: 'parables' as WorldId, label: 'Parables', icon: '🌾', desc: 'Stories of Jesus', badge: 'Story Sower' },
+  { id: 'passion' as WorldId, label: 'The Passion', icon: '🍷', desc: 'The Garden & Cross', badge: 'Atonement Cup' },
+  { id: 'resurrection' as WorldId, label: 'He is Risen', icon: '🕊️', desc: 'The Empty Tomb', badge: 'Risen Glory' },
+  { id: 'holySpirit' as WorldId, label: 'Pentecost Fire', icon: '🌪️', desc: 'The Holy Spirit', badge: 'Spirit Wind' },
+  { id: 'revelation' as WorldId, label: 'The Revelation', icon: '👁️', desc: 'Alpha & Omega', badge: 'Omega Crown' },
+  { id: 'heroes' as WorldId, label: 'Heroes of Faith', icon: '🦸', desc: 'David vs Goliath', badge: 'Hero Shield' },
+  { id: 'womenOfFaith' as WorldId, label: 'Women of Faith', icon: '👸', desc: 'Esther & Ruth', badge: 'Faith Queen' }
 ];
 
 const CATEGORY_META = {
   Bible: { label: 'Bible Quest', color: 'from-amber-600 to-orange-800', accent: 'text-amber-400', icon: ScrollText, music: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3' },
-  Music: { label: 'Melody Master', color: 'from-pink-600 to-rose-800', accent: 'text-pink-400', icon: Music2, music: 'https://cdn.pixabay.com/download/audio/2022/11/22/audio_febc508520.mp3' },
-  Football: { label: 'Football Pro', color: 'from-emerald-600 to-teal-800', accent: 'text-emerald-400', icon: Goal, music: 'https://cdn.pixabay.com/download/audio/2022/02/12/audio_f5f661d431.mp3' }
 };
 
 const CorrectionCard: React.FC<{
@@ -492,41 +68,112 @@ const CorrectionCard: React.FC<{
           <X size={32} className="bg-rose-500/20 p-1.5 rounded-xl" />
           <h3 className="text-3xl font-black italic uppercase tracking-tighter">{t('activities.incorrectTitle')}</h3>
         </div>
-
         <p className="text-white text-lg mb-6 font-medium leading-tight opacity-90">
-          {incorrectText}
-          {funny}
+          {incorrectText}{funny}
         </p>
-
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-4">
           <p className="text-emerald-400 font-black text-[9px] uppercase tracking-[0.3em] mb-2">{t('activities.correctionPrompt')}</p>
           <h4 className="text-2xl font-black text-white mb-2 italic tracking-tight">{question.options[question.correctIndex]}</h4>
           <p className="text-slate-300 text-sm leading-relaxed font-sans">{question.explanation}</p>
         </div>
       </div>
-
-      <button
-        onClick={onNext}
-        className="w-full py-5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(159,18,57)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3"
-      >
+      <button onClick={onNext} className="w-full py-5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xl rounded-2xl shadow-[0_6px_0_rgb(159,18,57)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3">
         {t('activities.correctionButton')} <ArrowRight size={22} />
       </button>
     </div>
   );
 };
 
+/* ─── Tier Selection Modal ─── */
+const TierSelector: React.FC<{
+  worldId: WorldId;
+  worldLabel: string;
+  worldIcon: string;
+  onSelect: (tier: ScrollTier) => void;
+  onClose: () => void;
+  locale: 'en' | 'de';
+}> = ({ worldId, worldLabel, worldIcon, onSelect, onClose, locale }) => {
+  const completedTier = getWorldTierProgress(worldId);
+  const eternalBest = getEternalHighScore(worldId);
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-[#0b1120] rounded-[2.5rem] border border-white/5 p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-5 right-5 p-2 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-xl">
+          <X size={20} />
+        </button>
+
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-3">{worldIcon}</div>
+          <h3 className="text-2xl font-display text-white italic tracking-tighter uppercase">{worldLabel}</h3>
+          <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mt-1">
+            {locale === 'de' ? 'Wähle deine Schriftrolle' : 'Choose Your Scroll'}
+          </p>
+        </div>
+
+        <div className="space-y-2.5">
+          {SCROLL_TIERS.map((tierDef) => {
+            const isUnlocked = tierDef.tier === 1 || completedTier >= tierDef.tier - 1;
+            const isCompleted = completedTier >= tierDef.tier;
+            const isEternal = tierDef.tier === 5;
+
+            return (
+              <button
+                key={tierDef.tier}
+                disabled={!isUnlocked}
+                onClick={() => onSelect(tierDef.tier)}
+                className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left ${
+                  !isUnlocked
+                    ? 'bg-slate-950/50 border-slate-900/50 opacity-40 grayscale'
+                    : isEternal
+                      ? 'bg-gradient-to-r from-purple-900/40 to-indigo-900/40 border-purple-500/30 hover:border-purple-400/50 hover:scale-[1.02]'
+                      : isCompleted
+                        ? 'bg-emerald-900/20 border-emerald-500/20 hover:border-emerald-400/40 hover:scale-[1.02]'
+                        : 'bg-slate-900/60 border-white/10 hover:border-indigo-500 hover:scale-[1.02]'
+                }`}
+              >
+                <span className="text-2xl shrink-0">{tierDef.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-black text-white uppercase tracking-tight">{tierDef.name[locale]}</p>
+                    {isCompleted && !isEternal && <Star size={12} className="text-yellow-400 fill-yellow-400" />}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {isEternal
+                      ? (locale === 'de' ? `Endlos-Modus · Bestleistung: ${eternalBest}` : `Endless Mode · Best: ${eternalBest}`)
+                      : `${tierDef.questionCount} ${locale === 'de' ? 'Fragen' : 'questions'} · ${Math.round(tierDef.passPct * 100)}% ${locale === 'de' ? 'zum Bestehen' : 'to pass'}`
+                    }
+                  </p>
+                </div>
+                {!isUnlocked ? (
+                  <Lock size={16} className="text-slate-700 shrink-0" />
+                ) : (
+                  <ChevronRight size={18} className="text-slate-600 shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Main Component ─── */
 const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
   const profile = StorageService.getCurrentProfile();
-  const [mode, setMode] = useState<'MENU' | 'PLAYING'>('MENU');
+  const [mode, setMode] = useState<'MENU' | 'TIER_SELECT' | 'PLAYING'>('MENU');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showCorrection, setShowCorrection] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
-  const [selectedWorldId, setSelectedWorldId] = useState('creation');
+  const [selectedWorldId, setSelectedWorldId] = useState<WorldId>('creation');
+  const [selectedTier, setSelectedTier] = useState<ScrollTier>(1);
+  const [eternalTimer, setEternalTimer] = useState(15);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stats = StorageService.getGameStats();
@@ -535,19 +182,40 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
-  const startLevel = async (worldId: string) => {
-    const world = BIBLE_WORLDS.find(w => w.id === worldId);
-    const fallbackQuestions = getOfflineQuestions(worldId, locale);
+  // Background AI prefetch: silently cache fresh questions for later
+  const prefetchAI = useCallback((worldId: string, worldLabel: string) => {
+    AIService.generateQuiz('Bible', 1, worldLabel, profile?.age || 6)
+      .then(aiQuestions => {
+        if (aiQuestions && aiQuestions.length > 0) {
+          // Convert AI format to BibleQuestion format for caching
+          const converted = aiQuestions.map((q: any) => ({
+            q: { en: q.question, de: q.question },
+            o: { en: q.options, de: q.options },
+            ci: q.correctIndex,
+            ex: { en: q.explanation, de: q.explanation },
+            d: 2 as const, // AI questions are medium difficulty
+          }));
+          cacheAIQuestions(worldId, converted);
+        }
+      })
+      .catch(() => { /* silent fail */ });
+  }, [profile?.age]);
+
+  const openTierSelect = (worldId: WorldId) => {
     setSelectedWorldId(worldId);
-    setLoading(true);
-    setMode('PLAYING');
+    setMode('TIER_SELECT');
+  };
+
+  // INSTANT start — no loading spinner, no await
+  const startLevel = (worldId: WorldId, tier: ScrollTier) => {
+    const world = BIBLE_WORLDS.find(w => w.id === worldId);
+    setSelectedWorldId(worldId);
+    setSelectedTier(tier);
     setCurrentIndex(0);
     setScore(0);
     setStreak(0);
@@ -555,58 +223,85 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
     setSelectedOption(null);
     setShowVictory(false);
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    // INSTANT: get questions from local bank — zero network calls
+    const q = getQuestions(BIBLE_BANK, worldId, tier, locale);
+    setQuestions(q);
+    setMode('PLAYING');
+
+    // Start music
+    if (audioRef.current) audioRef.current.pause();
     audioRef.current = new Audio(CATEGORY_META.Bible.music);
     audioRef.current.loop = true;
     audioRef.current.volume = 0.05;
-    audioRef.current.play().catch(() => { });
+    audioRef.current.play().catch(() => {});
 
-    AudioService.speak(`${world?.label} Tournament. Let's find out how much you know!`);
+    const tierName = SCROLL_TIERS[tier - 1].name[locale];
+    AudioService.speak(`${world?.label} — ${tierName}. Let's go!`);
+    setTimeout(() => q.length > 0 && AudioService.speak(q[0].question), 800);
 
-    try {
-      const q = await AIService.generateQuiz('Bible', 1, world?.label, profile?.age || 6);
-      if (q && q.length > 0) {
-        setQuestions(q);
-        setLoading(false);
-        setTimeout(() => AudioService.speak(q[0].question), 800);
-      } else {
-        throw new Error("No questions generated.");
-      }
-    } catch (e) {
-      console.error("Failed to load quiz", e);
-      setLoading(false);
-      if (fallbackQuestions.length > 0) {
-        setQuestions(fallbackQuestions);
-        setTimeout(() => AudioService.speak(fallbackQuestions[0].question), 800);
-        AudioService.speak(t('activities.offlineNote'));
-      } else {
-        setMode('MENU');
-      }
-      alert(t('activities.fallbackAlert'));
+    // Eternal scroll: start countdown timer
+    if (tier === 5) {
+      setEternalTimer(15);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setEternalTimer(prev => {
+          if (prev <= 1) return 0; // will be caught in effect
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     }
+
+    // Background: prefetch AI questions for NEXT session (silent, non-blocking)
+    if (world) prefetchAI(worldId, world.label);
   };
+
+  // Eternal timer timeout → game over
+  useEffect(() => {
+    if (selectedTier === 5 && eternalTimer === 0 && mode === 'PLAYING') {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setEternalHighScore(selectedWorldId, score);
+      setShowVictory(true);
+      AudioService.speak(`Time's up! Your streak: ${score} questions.`);
+    }
+  }, [eternalTimer, selectedTier, mode, score, selectedWorldId]);
 
   const handleAnswer = (index: number) => {
     if (selectedOption !== null || questions.length === 0) return;
     setSelectedOption(index);
-    const isCorrect = index === questions[currentIndex].correctIndex;
+    const currentQ = questions[currentIndex];
+    const isCorrect = index === currentQ.correctIndex;
+
+    // Mark this question as answered (for no-repeat tracking)
+    markAnswered(selectedWorldId, currentQ.hash);
 
     if (isCorrect) {
       AudioService.playEffect('correct');
       setScore(s => s + 1);
       setStreak(s => s + 1);
-      const currentQ = questions[currentIndex];
       AudioService.speak(currentQ.funnyComment || "Brilliant! Correct!");
 
-      setTimeout(() => {
-        advanceToNext();
-      }, 1500);
+      // Reset eternal timer on correct answer
+      if (selectedTier === 5) setEternalTimer(15);
+
+      setTimeout(() => advanceToNext(), 1500);
     } else {
       AudioService.playEffect('wrong');
       setStreak(0);
       setShowCorrection(true);
+
+      // Eternal scroll: wrong answer = game over
+      if (selectedTier === 5) {
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        setTimeout(() => {
+          setShowCorrection(false);
+          setEternalHighScore(selectedWorldId, score);
+          setShowVictory(true);
+          AudioService.speak(`Game over! Your score: ${score}`);
+        }, 2500);
+        return;
+      }
     }
   };
 
@@ -617,25 +312,45 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
       const nextIdx = currentIndex + 1;
       setCurrentIndex(nextIdx);
       setTimeout(() => AudioService.speak(questions[nextIdx].question), 500);
+      // Reset timer for eternal
+      if (selectedTier === 5) setEternalTimer(15);
+    } else if (selectedTier === 5) {
+      // Eternal scroll: ran out of batch — game over (won!)
+      setEternalHighScore(selectedWorldId, score);
+      setShowVictory(true);
+      AudioService.speak(`Incredible! You answered every question! Score: ${score}`);
     } else {
-      const minRequired = Math.max(1, Math.ceil(questions.length * 0.6));
+      // Normal tier: evaluate pass/fail
+      const tierDef = SCROLL_TIERS[selectedTier - 1];
+      const minRequired = Math.max(1, Math.ceil(questions.length * tierDef.passPct));
       const passed = score >= minRequired;
       if (passed) {
+        completeWorldTier(selectedWorldId, selectedTier);
         const newStats = { ...stats };
         const bibleIdx = newStats.quizProgress.findIndex(p => p.category === 'Bible');
         const currentWorldIdx = BIBLE_WORLDS.findIndex(w => w.id === selectedWorldId);
 
         if (bibleIdx >= 0) {
-          newStats.quizProgress[bibleIdx].bibleWorldLevel = Math.max(newStats.quizProgress[bibleIdx].bibleWorldLevel || 0, currentWorldIdx + 1);
+          newStats.quizProgress[bibleIdx].bibleWorldLevel = Math.max(
+            newStats.quizProgress[bibleIdx].bibleWorldLevel || 0,
+            currentWorldIdx + 1
+          );
         }
 
-        newStats.xp += 150;
-        const badge = BIBLE_WORLDS[currentWorldIdx].badge;
-        if (!newStats.badges.includes(badge)) newStats.badges.push(badge);
+        const xpReward = selectedTier * 50 + 100; // tier 1=150, tier 2=200, etc.
+        newStats.xp += xpReward;
+        const badge = BIBLE_WORLDS[currentWorldIdx]?.badge;
+        if (badge && !newStats.badges.includes(badge)) newStats.badges.push(badge);
+
+        // Streak badges for eternal scroll
+        if (selectedTier >= 3) {
+          const tierBadge = `${BIBLE_WORLDS[currentWorldIdx]?.label} ${SCROLL_TIERS[selectedTier - 1].name.en}`;
+          if (!newStats.badges.includes(tierBadge)) newStats.badges.push(tierBadge);
+        }
 
         StorageService.saveGameStats(newStats);
         setShowVictory(true);
-        AudioService.speak(`Masterful! You earned the ${badge} badge!`);
+        AudioService.speak(badge ? `Masterful! You earned the ${badge} badge!` : 'Well done!');
       } else {
         setMode('MENU');
         AudioService.speak("Tough round! Let's study more and try again.");
@@ -643,54 +358,102 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
     }
   };
 
-  if (loading) return (
-    <div className="h-full flex flex-col items-center justify-center p-10 text-center space-y-8 animate-fade-in bg-[#050810]">
-      <div className="relative">
-        <Loader2 className="w-24 h-24 text-indigo-400 animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center text-3xl">📜</div>
-      </div>
-      <div>
-        <h2 className="text-3xl font-display text-white mb-2 animate-pulse tracking-tight">{t('activities.loadingTitle')}</h2>
-        <p className="text-indigo-400 font-black uppercase tracking-widest text-[10px]">{t('activities.loadingSubtitle')}</p>
-      </div>
-    </div>
-  );
+  const exitToMenu = () => {
+    setMode('MENU');
+    if (audioRef.current) audioRef.current.pause();
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
 
+  /* ─── Tier Selection Screen ─── */
+  if (mode === 'TIER_SELECT') {
+    const world = BIBLE_WORLDS.find(w => w.id === selectedWorldId);
+    return (
+      <TierSelector
+        worldId={selectedWorldId}
+        worldLabel={world?.label || ''}
+        worldIcon={world?.icon || '📜'}
+        onSelect={(tier) => startLevel(selectedWorldId, tier)}
+        onClose={() => setMode('MENU')}
+        locale={locale}
+      />
+    );
+  }
+
+  /* ─── Playing Screen ─── */
   if (mode === 'PLAYING' && questions.length > 0) {
     const q = questions[currentIndex];
     const world = BIBLE_WORLDS.find(w => w.id === selectedWorldId);
+    const tierDef = SCROLL_TIERS[selectedTier - 1];
+    const isEternal = selectedTier === 5;
+    const xpReward = isEternal ? score * 25 : selectedTier * 50 + 100;
 
     return (
       <div className="min-h-full flex flex-col relative animate-fade-in bg-[#050810] pb-24">
         {showVictory && (
           <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 p-6 backdrop-blur-3xl animate-fade-in fixed">
             <div className="text-center max-w-sm animate-float">
-              <div className="text-6xl sm:text-7xl mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{world?.icon}</div>
-              <h2 className="text-4xl sm:text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">{t('activities.victoryTitle')}</h2>
-              <p className="text-white text-base font-bold mb-4">{t('activities.victorySubtitle')}</p>
+              <div className="text-6xl sm:text-7xl mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{isEternal ? '♾️' : world?.icon}</div>
+              <h2 className="text-4xl sm:text-5xl font-display text-yellow-400 mb-2 italic tracking-tighter uppercase">
+                {isEternal ? (locale === 'de' ? 'Ewige Legende!' : 'Eternal Legend!') : t('activities.victoryTitle')}
+              </h2>
+              {isEternal && (
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="text-center">
+                    <p className="text-3xl font-black text-white">{score}</p>
+                    <p className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{locale === 'de' ? 'Ergebnis' : 'Score'}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-black text-amber-400">{getEternalHighScore(selectedWorldId)}</p>
+                    <p className="text-[8px] text-amber-400/70 font-black uppercase tracking-widest">{locale === 'de' ? 'Bestleistung' : 'Best'}</p>
+                  </div>
+                </div>
+              )}
+              {!isEternal && <p className="text-white text-base font-bold mb-4">{t('activities.victorySubtitle')}</p>}
               <div className="bg-indigo-600/30 p-5 rounded-3xl border border-white/10 mb-6">
                 <div className="flex items-center justify-center gap-2 text-white font-black text-2xl mb-1">
-                  <Zap className="text-yellow-300" size={24} /> +150
+                  <Zap className="text-yellow-300" size={24} /> +{xpReward}
                 </div>
                 <p className="text-indigo-300 font-black uppercase text-[8px] sm:text-[9px] tracking-widest">{t('activities.victoryXpLabel')}</p>
               </div>
-              <button onClick={() => setMode('MENU')} className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-lg rounded-xl shadow-[0_4px_0_rgb(161,98,7)] transition-all active:scale-95">{t('activities.retryButton')}</button>
+              <div className="flex gap-3">
+                <button onClick={exitToMenu} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white font-black text-base rounded-xl transition-all">
+                  {locale === 'de' ? 'Menü' : 'Menu'}
+                </button>
+                <button onClick={() => startLevel(selectedWorldId, selectedTier)} className="flex-1 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-base rounded-xl shadow-[0_4px_0_rgb(161,98,7)] transition-all active:scale-95">
+                  {locale === 'de' ? 'Nochmal' : 'Replay'}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {showCorrection && q && (
+        {showCorrection && q && !isEternal && (
           <CorrectionCard question={q} selectedIndex={selectedOption!} onNext={advanceToNext} />
         )}
 
-        {/* HUD - Compact */}
+        {/* HUD */}
         <div className="flex justify-between items-center p-4 pt-2 z-10 shrink-0">
-          <button onClick={() => { setMode('MENU'); if (audioRef.current) audioRef.current.pause(); }} className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-white hover:bg-slate-800 transition-all shadow-xl"><ArrowLeft size={20} /></button>
+          <button onClick={exitToMenu} className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-white hover:bg-slate-800 transition-all shadow-xl">
+            <ArrowLeft size={20} />
+          </button>
           <div className="text-center">
             <h3 className="font-display text-2xl text-white italic tracking-tighter">{world?.label}</h3>
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              <div className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-indigo-500/20">Quest {currentIndex + 1}/{questions.length}</div>
-              {streak > 1 && <div className="px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-orange-500/20 flex items-center gap-1"><Flame size={8} /> {streak} Streak</div>}
+              <div className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-indigo-500/20">
+                {tierDef.icon} {isEternal ? `#${currentIndex + 1}` : `${currentIndex + 1}/${questions.length}`}
+              </div>
+              {streak > 1 && (
+                <div className="px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-orange-500/20 flex items-center gap-1">
+                  <Flame size={8} /> {streak}
+                </div>
+              )}
+              {isEternal && (
+                <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border flex items-center gap-1 ${
+                  eternalTimer <= 5 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                }`}>
+                  <Timer size={8} /> {eternalTimer}s
+                </div>
+              )}
             </div>
           </div>
           <div className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-yellow-400 font-black flex items-center gap-1.5 shadow-xl text-sm">
@@ -698,14 +461,16 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="px-6 flex gap-1.5 mb-4 shrink-0">
-          {questions.map((_, i) => (
-            <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-700 ${i < currentIndex ? 'bg-emerald-400' : i === currentIndex ? 'bg-white animate-pulse' : 'bg-slate-900'}`} />
-          ))}
-        </div>
+        {/* Progress Bar (non-eternal only) */}
+        {!isEternal && (
+          <div className="px-6 flex gap-1.5 mb-4 shrink-0">
+            {questions.map((_, i) => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-700 ${i < currentIndex ? 'bg-emerald-400' : i === currentIndex ? 'bg-white animate-pulse' : 'bg-slate-900'}`} />
+            ))}
+          </div>
+        )}
 
-        {/* Question Area - True to View */}
+        {/* Question Area */}
         <div className="flex-1 px-4 pb-6 flex flex-col justify-center items-center gap-4 max-w-xl mx-auto w-full overflow-hidden">
           <div className="relative shrink-0">
             <div className={`text-5xl sm:text-6xl transition-all duration-500 drop-shadow-xl ${selectedOption !== null ? (selectedOption === q.correctIndex ? 'animate-bounce scale-110' : 'animate-shake opacity-40') : 'animate-float'}`}>
@@ -744,9 +509,9 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
     );
   }
 
+  /* ─── World Selection Menu ─── */
   return (
     <div className="h-full flex flex-col p-4 animate-fade-in custom-scrollbar overflow-y-auto bg-[#050810]">
-      {/* Top Controls */}
       <div className="flex justify-between items-center mb-4">
         <button
           onClick={() => onNavigate && onNavigate(View.HOME)}
@@ -764,16 +529,16 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
         <p className="text-slate-500 text-sm font-medium tracking-tight px-4">{t('activities.description')}</p>
       </header>
 
-      {/* World Selection Grid - Optimized */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-20 max-w-5xl mx-auto w-full">
         {BIBLE_WORLDS.map((world, idx) => {
           const isUnlocked = idx <= bibleProgress;
           const isCurrent = idx === bibleProgress;
+          const tierProgress = getWorldTierProgress(world.id);
           return (
             <button
               key={world.id}
               disabled={!isUnlocked}
-              onClick={() => startLevel(world.id)}
+              onClick={() => openTierSelect(world.id)}
               className={`group relative p-3 sm:p-4 rounded-[1.5rem] border transition-all flex flex-col items-center text-center overflow-hidden shadow-lg ${isUnlocked
                 ? (isCurrent ? 'bg-indigo-600 border-indigo-400 hover:scale-[1.03]' : 'bg-slate-900 border-white/10 hover:border-indigo-500 hover:-translate-y-1')
                 : 'bg-slate-950/50 border-slate-900/50 opacity-50 grayscale pointer-events-none'
@@ -786,8 +551,18 @@ const ActivitiesPage: React.FC<ActivitiesPageProps> = ({ onNavigate }) => {
               <h3 className="text-xs sm:text-sm font-black text-white italic tracking-tight mb-1 uppercase leading-tight">{world.label}</h3>
               <p className="text-indigo-400 font-bold text-[7px] sm:text-[8px] uppercase tracking-widest opacity-70 group-hover:opacity-100 leading-tight">{world.desc}</p>
 
+              {/* Tier progress dots */}
+              {isUnlocked && (
+                <div className="flex gap-1 mt-2">
+                  {SCROLL_TIERS.slice(0, 4).map((td) => (
+                    <div key={td.tier} className={`w-2 h-2 rounded-full ${tierProgress >= td.tier ? 'bg-yellow-400' : 'bg-slate-700'}`} />
+                  ))}
+                  <div className={`w-2 h-2 rounded-full ${tierProgress >= 5 ? 'bg-purple-400' : 'bg-slate-800'}`} />
+                </div>
+              )}
+
               {isUnlocked && stats.badges.includes(world.badge) && (
-                <div className="mt-2 px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded-full text-[7px] font-black uppercase tracking-[0.2em] border border-yellow-400/30 flex items-center gap-1">
+                <div className="mt-1.5 px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded-full text-[7px] font-black uppercase tracking-[0.2em] border border-yellow-400/30 flex items-center gap-1">
                   <Crown size={8} /> {world.badge}
                 </div>
               )}

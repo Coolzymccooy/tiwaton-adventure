@@ -2,6 +2,13 @@
 // Frontend AI client: calls your backend (NOT Gemini directly)
 
 type StoryResult = { title: string; content: string };
+type ChallengeJudgeResult = {
+  matchedPrompt: boolean;
+  creativityScore: number;
+  missionScore: number;
+  feedback: string;
+  highlights: string[];
+};
 
 import { apiUrl, postJson } from './api';
 /**
@@ -142,6 +149,32 @@ export const AIService = {
           correctIndex: 0
         }
       ];
+    }
+  },
+
+  async judgeChallengeDrawing(
+    imageBase64: string,
+    challenge: { title: string; prompt: string; setup: string; goals: string[] }
+  ): Promise<ChallengeJudgeResult | null> {
+    try {
+      const optimized = await optimizeImage(imageBase64);
+      const data = await postJson<ChallengeJudgeResult>("/api/ai/judge-challenge", {
+        imageDataUrl: optimized,
+        challenge,
+      });
+
+      if (!data?.feedback) return null;
+
+      return {
+        matchedPrompt: Boolean(data.matchedPrompt),
+        creativityScore: Number(data.creativityScore || 0),
+        missionScore: Number(data.missionScore || 0),
+        feedback: String(data.feedback || ''),
+        highlights: Array.isArray(data.highlights) ? data.highlights.map(String) : [],
+      };
+    } catch (e) {
+      console.error("judgeChallengeDrawing error", e);
+      return null;
     }
   },
 };

@@ -16,6 +16,18 @@ import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
 import { AIService } from '../services/ai';
 import { MathPlanet, GameStat } from '../types';
+import {
+  generateMountainQuestion,
+  generateSummitQuestion,
+  MOUNTAIN_CAMPS,
+  getMountainProgress,
+  saveMountainStage,
+  completeMountain,
+  saveSummitHighScore,
+  markMathAnswered,
+  type MathQuestion,
+} from '../services/math-engine';
+import { useI18n } from '../i18n/I18nProvider';
 
 // --- SHARED COMPONENTS ---
 
@@ -1734,12 +1746,12 @@ const GamesPage: React.FC = () => {
   if (activeGame === 'MOUNTAIN') return <MultiplicationMountain onQuit={() => setActiveGame(null)} onComplete={() => setActiveGame(null)} />;
   if (activeGame === 'ENGLISH') return <EnglishLearningQuest onBack={() => setActiveGame(null)} />;
   return (
-    <div className="h-full flex flex-col px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
+    <div className="w-full px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
       <div className="text-center mb-6">
-        <h2 className="font-display text-4xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
+        <h2 className="font-display text-3xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
         <p className="text-slate-400 text-sm font-medium tracking-tight">Level up and earn Star Treasures!</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
         <GameCard onClick={() => setActiveGame('ENGLISH')} icon="📚" title="English Quest AI" tag="AI Reading" color="from-sky-600 to-indigo-700" />
         <GameCard onClick={() => setActiveGame('MATH')} icon="🌌" title="Math Galaxy" tag="Logic" color="from-indigo-600 to-blue-700" />
         <GameCard onClick={() => setActiveGame('MOUNTAIN')} icon="🏔️" title="Multiplication Mountain" tag="Math" color="from-amber-600 to-orange-700" />
@@ -1763,166 +1775,466 @@ type GameCardProps = {
 const GameCard: React.FC<GameCardProps> = ({ icon, title, tag, color, onClick }) => (
   <button
     onClick={onClick}
-    className="group relative bg-slate-900/70 backdrop-blur-xl p-5 sm:p-6 rounded-[1.5rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-hidden flex flex-col items-center shadow-lg"
+    className="group relative bg-slate-900/70 backdrop-blur-xl p-4 sm:p-6 rounded-[1.5rem] border border-white/10 hover:border-indigo-500/50 transition-all hover:-translate-y-1 overflow-visible flex flex-col items-center shadow-lg active:scale-95"
   >
-    <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`} />
+    <div className={`absolute inset-0 rounded-[1.5rem] bg-gradient-to-br ${color} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`} />
 
-    <div className="relative text-4xl sm:text-5xl mb-4 group-hover:scale-105 transition-transform duration-500 group-hover:rotate-3">
+    <div className="relative text-4xl sm:text-5xl mb-3 group-hover:scale-110 transition-transform duration-300 leading-none select-none">
       {icon}
     </div>
 
-    <h3 className="relative text-lg sm:text-xl font-black text-white uppercase italic tracking-tight mb-1">
+    <h3 className="relative text-sm sm:text-base font-black text-white uppercase italic tracking-tight mb-1.5 text-center leading-tight">
       {title}
     </h3>
 
-    <p className="relative text-indigo-300 font-bold text-[9px] uppercase tracking-widest bg-indigo-400/10 px-2 py-0.5 rounded-full border border-indigo-400/20">
+    <p className="relative text-indigo-300 font-bold text-[8px] sm:text-[9px] uppercase tracking-widest bg-indigo-400/10 px-2 py-0.5 rounded-full border border-indigo-400/20">
       {tag} Challenge
     </p>
   </button>
 );
 
-// --- MULTIPLICATION MOUNTAIN ---
+// --- MULTIPLICATION MOUNTAIN (Enhanced with endless Summit Challenge) ---
 
 const MultiplicationMountain: React.FC<{
   onComplete: (xp: number, coins: number) => void;
   onQuit: () => void;
 }> = ({ onComplete, onQuit }) => {
+  const { locale } = useI18n();
+  const loc = (locale === 'de' ? 'de' : 'en') as 'en' | 'de';
+
+  // Mode: CLIMB = normal 5-stage mountain, SUMMIT = endless challenge after conquering
+  const [mode, setMode] = useState<'MENU' | 'CLIMB' | 'SUMMIT'>('MENU');
   const [stage, setStage] = useState(1);
-  const [num1, setNum1] = useState(0);
-  const [num2, setNum2] = useState(0);
+  const [question, setQuestion] = useState<MathQuestion | null>(null);
   const [answer, setAnswer] = useState('');
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
   const [showVictory, setShowVictory] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [shake, setShake] = useState(false);
+  const [summitScore, setSummitScore] = useState(0);
+  const [summitLives, setSummitLives] = useState(3);
+  const [summitGameOver, setSummitGameOver] = useState(false);
 
-  const camps = [
-    { id: 1, name: "Base Camp", tables: [2, 10], color: "text-emerald-400" },
-    { id: 2, name: "Pine Forest", tables: [5, 3], color: "text-green-500" },
-    { id: 3, name: "Rocky Cliff", tables: [4, 6], color: "text-slate-400" },
-    { id: 4, name: "Snowy Slope", tables: [7, 8, 9], color: "text-blue-200" },
-    { id: 5, name: "The Summit", tables: [11, 12], color: "text-amber-400" },
-  ];
+  const progress = getMountainProgress();
 
-  const generateQuestion = () => {
-    const currentCamp = camps[stage - 1];
-    const table = currentCamp.tables[Math.floor(Math.random() * currentCamp.tables.length)];
-    const other = Math.floor(Math.random() * 12) + 1;
-    setNum1(table);
-    setNum2(other);
+  const nextClimbQuestion = (s: number, st: number) => {
+    const q = generateMountainQuestion(s, st, loc);
+    setQuestion(q);
     setAnswer('');
     setFeedback('');
   };
 
-  useEffect(() => {
-    generateQuestion();
-    AudioService.speak(`Welcome to ${camps[0].name}! Let's start climbing.`, 'excited');
-  }, []);
+  const nextSummitQuestion = (sc: number) => {
+    const q = generateSummitQuestion(sc, loc);
+    setQuestion(q);
+    setAnswer('');
+    setFeedback('');
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const startClimb = () => {
+    setMode('CLIMB');
+    setStage(1);
+    setScore(0);
+    setStreak(0);
+    setBestStreak(0);
+    setShowVictory(false);
+    nextClimbQuestion(1, 0);
+    const campName = MOUNTAIN_CAMPS[0].name[loc];
+    AudioService.speak(loc === 'de' ? `Willkommen im ${campName}! Los geht's!` : `Welcome to ${campName}! Let's start climbing.`, 'excited');
+  };
+
+  const startSummit = () => {
+    setMode('SUMMIT');
+    setSummitScore(0);
+    setSummitLives(3);
+    setSummitGameOver(false);
+    setStreak(0);
+    setBestStreak(0);
+    setShowVictory(false);
+    nextSummitQuestion(0);
+    AudioService.speak(loc === 'de' ? 'Gipfel-Herausforderung! Wie weit kommst du?' : 'Summit Challenge! How far can you go?', 'excited');
+  };
+
+  const handleClimbSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const correct = num1 * num2;
-    if (parseInt(answer) === correct) {
+    if (!question) return;
+    if (parseInt(answer) === question.answer) {
       const newScore = score + 1;
       const newStreak = streak + 1;
       setScore(newScore);
       setStreak(newStreak);
-      setFeedback('Great climb! 🏔️');
+      if (newStreak > bestStreak) setBestStreak(newStreak);
+      setFeedback(loc === 'de' ? 'Gut geklettert! 🏔️' : 'Great climb! 🏔️');
+      markMathAnswered(question.hash);
 
       if (newStreak % 5 === 0) {
-        AudioService.speak(`Incredible! A ${newStreak} answer streak! You're racing up the mountain!`, 'excited');
+        AudioService.speak(
+          loc === 'de' ? `Unglaublich! ${newStreak}er Serie!` : `Incredible! A ${newStreak} answer streak!`,
+          'excited'
+        );
       }
 
       if (newScore >= stage * 5) {
         if (stage < 5) {
-          const nextCamp = camps[stage];
-          AudioService.speak(`Camp ${stage} reached! Moving to ${nextCamp.name}. Keep going!`, 'excited');
+          const nextCamp = MOUNTAIN_CAMPS[stage];
+          saveMountainStage(stage + 1);
+          AudioService.speak(
+            loc === 'de' ? `Lager ${stage} erreicht! Weiter zum ${nextCamp.name[loc]}!` : `Camp ${stage} reached! Moving to ${nextCamp.name[loc]}!`,
+            'excited'
+          );
           setStage(stage + 1);
           setScore(0);
+          setTimeout(() => nextClimbQuestion(stage + 1, newStreak), 600);
         } else {
+          completeMountain();
           setShowVictory(true);
-          AudioService.speak("Congratulations! You've conquered Multiplication Mountain! You are a math champion!", 'excited');
+          AudioService.speak(
+            loc === 'de' ? 'Glückwunsch! Du hast den Berg bezwungen!' : "Congratulations! You've conquered the Mountain!",
+            'excited'
+          );
         }
+      } else {
+        setTimeout(() => nextClimbQuestion(stage, newStreak), 600);
       }
-      setTimeout(generateQuestion, 600);
     } else {
       setShake(true);
       setStreak(0);
-      setFeedback('Slip! Try again.');
-      AudioService.speak('Careful! Watch your footing.', 'soft');
+      setFeedback(loc === 'de' ? 'Ausgerutscht! Nochmal.' : 'Slip! Try again.');
+      AudioService.speak(loc === 'de' ? 'Vorsichtig! Halt dich fest.' : 'Careful! Watch your footing.', 'soft');
       setTimeout(() => setShake(false), 500);
     }
   };
 
+  const handleSummitSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question) return;
+    if (parseInt(answer) === question.answer) {
+      const newScore = summitScore + 1;
+      const newStreak = streak + 1;
+      setSummitScore(newScore);
+      setStreak(newStreak);
+      if (newStreak > bestStreak) setBestStreak(newStreak);
+      markMathAnswered(question.hash);
+      setFeedback(loc === 'de' ? 'Richtig! ⚡' : 'Correct! ⚡');
+      AudioService.playEffect('correct');
+
+      if (newStreak % 10 === 0) {
+        AudioService.speak(
+          loc === 'de' ? `Wahnsinn! ${newStreak}er Serie! Unaufhaltbar!` : `Insane! ${newStreak} streak! Unstoppable!`,
+          'excited'
+        );
+      }
+
+      setTimeout(() => nextSummitQuestion(newScore), 500);
+    } else {
+      const newLives = summitLives - 1;
+      setSummitLives(newLives);
+      setStreak(0);
+      setShake(true);
+      setFeedback(loc === 'de' ? `Falsch! ${question.answer} war richtig.` : `Wrong! ${question.answer} was correct.`);
+      AudioService.playEffect('wrong');
+      setTimeout(() => setShake(false), 500);
+
+      if (newLives <= 0) {
+        saveSummitHighScore(summitScore);
+        setSummitGameOver(true);
+        AudioService.speak(
+          loc === 'de' ? `Gipfel-Herausforderung vorbei! Punkte: ${summitScore}` : `Summit Challenge over! Score: ${summitScore}`,
+          'sarcastic'
+        );
+      } else {
+        setTimeout(() => nextSummitQuestion(summitScore), 1000);
+      }
+    }
+  };
+
+  // ─── MENU ───
+  if (mode === 'MENU') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] p-6 bg-slate-900 rounded-3xl border-4 border-slate-800 shadow-2xl relative overflow-hidden mx-auto max-w-xl my-10">
+        <button onClick={onQuit} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+
+        <div className="text-6xl mb-4">🏔️</div>
+        <h2 className="font-display text-3xl text-white italic tracking-tighter mb-2">
+          {loc === 'de' ? 'Multiplikations-Berg' : 'Multiplication Mountain'}
+        </h2>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">
+          {progress.completed
+            ? (loc === 'de' ? 'Berg bezwungen! Gipfel-Rekord: ' : 'Mountain conquered! Summit record: ') + progress.summitHighScore
+            : (loc === 'de' ? 'Lager ' : 'Camp ') + progress.stage + '/5'}
+        </p>
+
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            onClick={startClimb}
+            className="w-full py-4 text-white font-black text-lg rounded-xl shadow-[0_4px_0_rgb(5,46,22)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 border border-emerald-400/30"
+          >
+            {loc === 'de' ? '⛺ Berg besteigen' : '⛺ Climb the Mountain'}
+          </button>
+
+          {progress.completed && (
+            <button
+              onClick={startSummit}
+              className="w-full py-4 text-white font-black text-lg rounded-xl shadow-[0_4px_0_rgb(120,53,15)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 border border-amber-400/30"
+            >
+              {loc === 'de' ? '⚡ Gipfel-Herausforderung' : '⚡ Summit Challenge'}
+            </button>
+          )}
+
+          {!progress.completed && (
+            <p className="text-center text-[10px] text-slate-500 font-bold mt-2">
+              {loc === 'de' ? 'Bezwinge den Berg, um die endlose Gipfel-Herausforderung freizuschalten!' : 'Conquer the mountain to unlock the endless Summit Challenge!'}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── VICTORY (Climb complete) ───
   if (showVictory) {
     return (
       <VictoryOverlay
-        title="Mountain Conqueror"
+        title={loc === 'de' ? 'Berg Bezwungen!' : 'Mountain Conqueror!'}
         xp={500}
         coins={250}
         badge="Summit Master"
         onNext={() => {
           onComplete(500, 250);
-          onQuit();
+          setMode('MENU');
+          setShowVictory(false);
         }}
         onQuit={onQuit}
       />
     );
   }
 
+  // ─── SUMMIT GAME OVER ───
+  if (summitGameOver) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] p-6 bg-slate-900 rounded-3xl border-4 border-slate-800 shadow-2xl relative overflow-hidden mx-auto max-w-xl my-10">
+        <button onClick={onQuit} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+
+        <div className="text-6xl mb-4">⚡</div>
+        <h2 className="font-display text-3xl text-amber-400 italic tracking-tighter mb-2">
+          {loc === 'de' ? 'Gipfel-Herausforderung Vorbei!' : 'Summit Challenge Over!'}
+        </h2>
+
+        <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-6">
+          <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+            <p className="text-[10px] text-slate-500 uppercase font-black">{loc === 'de' ? 'Punkte' : 'Score'}</p>
+            <p className="text-3xl font-display text-white">{summitScore}</p>
+          </div>
+          <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+            <p className="text-[10px] text-slate-500 uppercase font-black">{loc === 'de' ? 'Beste Serie' : 'Best Streak'}</p>
+            <p className="text-3xl font-display text-amber-500">{bestStreak} 🔥</p>
+          </div>
+        </div>
+
+        {summitScore > progress.summitHighScore && (
+          <div className="px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-full text-amber-400 font-black text-xs uppercase tracking-widest mb-4 animate-pulse">
+            {loc === 'de' ? '🏆 Neuer Rekord!' : '🏆 New High Score!'}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          <button
+            onClick={startSummit}
+            className="w-full py-3 text-white font-black text-base rounded-xl shadow-[0_4px_0_rgb(120,53,15)] active:translate-y-1 active:shadow-none transition-all uppercase italic tracking-tighter bg-gradient-to-r from-amber-600 to-orange-700 border border-amber-400/30"
+          >
+            {loc === 'de' ? 'Nochmal spielen' : 'Play Again'}
+          </button>
+          <button
+            onClick={() => setMode('MENU')}
+            className="w-full py-2 text-slate-500 font-black text-[10px] uppercase tracking-[0.3em] hover:text-white transition-colors"
+          >
+            {loc === 'de' ? 'Zurück zum Menü' : 'Back to Menu'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PLAYING (Climb or Summit) ───
+  const isSummit = mode === 'SUMMIT';
+  const currentCamp = !isSummit ? MOUNTAIN_CAMPS[Math.min(stage - 1, 4)] : null;
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[500px] p-4 bg-slate-900 rounded-3xl border-4 border-slate-800 shadow-2xl relative overflow-hidden mx-auto max-w-xl my-10">
-      <div className="w-full max-w-md mb-8 px-4">
-        <div className="flex justify-between mb-2">
-          {camps.map((c) => (
-            <div key={c.id} className={`flex flex-col items-center group`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${stage >= c.id ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-700 text-slate-500'}`}>
-                {stage > c.id ? <CheckCircle2 size={16} /> : c.id}
+      {/* Header */}
+      {!isSummit && (
+        <div className="w-full max-w-md mb-8 px-4">
+          <div className="flex justify-between mb-2">
+            {MOUNTAIN_CAMPS.map((c) => (
+              <div key={c.id} className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${stage >= c.id ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-700 text-slate-500'}`}>
+                  {stage > c.id ? <CheckCircle2 size={16} /> : <span className="text-sm">{c.emoji}</span>}
+                </div>
+                <span className={`text-[7px] mt-1 font-bold uppercase tracking-tighter ${stage === c.id ? 'text-amber-400' : 'text-slate-500'}`}>{c.name[loc]}</span>
               </div>
-              <span className={`text-[8px] mt-1 font-bold uppercase tracking-tighter ${stage === c.id ? 'text-amber-400' : 'text-slate-500'}`}>{c.name}</span>
+            ))}
+          </div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+            <div className="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-1000" style={{ width: `${(stage / 5) * 100}%` }}></div>
+          </div>
+        </div>
+      )}
+
+      {isSummit && (
+        <div className="w-full max-w-md mb-6 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 font-black text-lg">⚡</span>
+            <div>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{loc === 'de' ? 'Gipfel' : 'Summit'}</p>
+              <p className="text-xl font-display text-white">{summitScore}</p>
             </div>
-          ))}
+          </div>
+          <div className="flex gap-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <span key={i} className={`text-lg ${i < summitLives ? 'opacity-100' : 'opacity-20'}`}>❤️</span>
+            ))}
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{loc === 'de' ? 'Rekord' : 'Best'}</p>
+            <p className="text-lg font-display text-amber-400">{progress.summitHighScore}</p>
+          </div>
         </div>
-        <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-          <div className="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-1000" style={{ width: `${(stage / 5) * 100}%` }}></div>
-        </div>
-      </div>
+      )}
 
-      <div className={`text-center transition-transform ${shake ? 'animate-shake' : ''}`}>
-        <div className="text-6xl sm:text-7xl font-display mb-8 text-white flex items-center justify-center gap-4">
-          <span className="bg-slate-800 px-6 py-4 rounded-2xl border-2 border-slate-700 shadow-lg">{num1}</span>
-          <span className="text-4xl text-amber-500">×</span>
-          <span className="bg-slate-800 px-6 py-4 rounded-2xl border-2 border-slate-700 shadow-lg">{num2}</span>
-        </div>
+      {/* Question */}
+      {question && (
+        <div className={`text-center transition-transform ${shake ? 'animate-shake' : ''}`}>
+          {/* Show question type badge for summit */}
+          {isSummit && question.type !== 'multiply' && (
+            <div className="mb-3">
+              <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-indigo-500/20">
+                {question.type.replace('_', ' ')}
+              </span>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="relative max-w-[200px] mx-auto">
-          <input
-            autoFocus
-            type="number"
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            className="w-full bg-slate-900 border-4 border-slate-700 rounded-2xl py-6 text-4xl text-center text-white outline-none focus:border-amber-500 transition-all shadow-inner"
-            placeholder="?"
-          />
-          <p className={`mt-4 font-bold text-lg animate-bounce ${feedback.includes('Slip') ? 'text-red-400' : 'text-emerald-400'}`}>
+          <div className="text-3xl sm:text-4xl font-display mb-8 text-white px-6 py-4 bg-slate-800 rounded-2xl border-2 border-slate-700 shadow-lg max-w-sm mx-auto">
+            {question.text}
+          </div>
+
+          {/* Multiple choice for non-basic types, input for basic multiply */}
+          {(question.type === 'multiply' || question.type === 'missing_factor' || question.type === 'reverse_divide' || question.type === 'square') && !isSummit ? (
+            <form onSubmit={isSummit ? handleSummitSubmit : handleClimbSubmit} className="relative max-w-[200px] mx-auto">
+              <input
+                autoFocus
+                type="number"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                className="w-full bg-slate-900 border-4 border-slate-700 rounded-2xl py-6 text-4xl text-center text-white outline-none focus:border-amber-500 transition-all shadow-inner"
+                placeholder="?"
+              />
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
+              {question.options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    setAnswer(String(opt));
+                    // Auto-submit for multiple choice
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                    if (isSummit) {
+                      // Inline summit logic
+                      if (opt === question.answer) {
+                        const newScore = summitScore + 1;
+                        const newStreak = streak + 1;
+                        setSummitScore(newScore);
+                        setStreak(newStreak);
+                        if (newStreak > bestStreak) setBestStreak(newStreak);
+                        markMathAnswered(question.hash);
+                        setFeedback(loc === 'de' ? 'Richtig! ⚡' : 'Correct! ⚡');
+                        AudioService.playEffect('correct');
+                        if (newStreak % 10 === 0) {
+                          AudioService.speak(loc === 'de' ? `${newStreak}er Serie!` : `${newStreak} streak!`, 'excited');
+                        }
+                        setTimeout(() => nextSummitQuestion(newScore), 500);
+                      } else {
+                        const newLives = summitLives - 1;
+                        setSummitLives(newLives);
+                        setStreak(0);
+                        setShake(true);
+                        setFeedback(loc === 'de' ? `Falsch! ${question.answer}` : `Wrong! ${question.answer}`);
+                        AudioService.playEffect('wrong');
+                        setTimeout(() => setShake(false), 500);
+                        if (newLives <= 0) {
+                          saveSummitHighScore(summitScore);
+                          setSummitGameOver(true);
+                        } else {
+                          setTimeout(() => nextSummitQuestion(summitScore), 1000);
+                        }
+                      }
+                    } else {
+                      // Climb mode with multiple choice
+                      if (opt === question.answer) {
+                        const newScore = score + 1;
+                        const newStreak = streak + 1;
+                        setScore(newScore);
+                        setStreak(newStreak);
+                        if (newStreak > bestStreak) setBestStreak(newStreak);
+                        setFeedback(loc === 'de' ? 'Gut geklettert! 🏔️' : 'Great climb! 🏔️');
+                        markMathAnswered(question.hash);
+                        if (newScore >= stage * 5) {
+                          if (stage < 5) {
+                            saveMountainStage(stage + 1);
+                            setStage(stage + 1);
+                            setScore(0);
+                            setTimeout(() => nextClimbQuestion(stage + 1, newStreak), 600);
+                          } else {
+                            completeMountain();
+                            setShowVictory(true);
+                          }
+                        } else {
+                          setTimeout(() => nextClimbQuestion(stage, newStreak), 600);
+                        }
+                      } else {
+                        setShake(true);
+                        setStreak(0);
+                        setFeedback(loc === 'de' ? 'Ausgerutscht!' : 'Slip!');
+                        AudioService.playEffect('wrong');
+                        setTimeout(() => setShake(false), 500);
+                      }
+                    }
+                  }}
+                  className="bg-slate-800 border-b-2 border-slate-950 hover:bg-indigo-600 hover:border-indigo-800 transition-all active:translate-y-[1px] active:border-b-0 rounded-xl py-3 text-white font-black text-base sm:text-lg"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className={`mt-4 font-bold text-lg ${feedback.includes('Slip') || feedback.includes('Falsch') || feedback.includes('Wrong') || feedback.includes('Ausgerutscht') ? 'text-red-400 animate-bounce' : 'text-emerald-400 animate-bounce'}`}>
             {feedback}
           </p>
-        </form>
+        </div>
+      )}
 
-        <div className="mt-8 flex gap-4 justify-center">
+      {/* Stats */}
+      <div className="mt-8 flex gap-4 justify-center">
+        {!isSummit && (
           <div className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
-            <p className="text-[10px] text-slate-500 uppercase font-black">Score</p>
+            <p className="text-[10px] text-slate-500 uppercase font-black">{loc === 'de' ? 'Punkte' : 'Score'}</p>
             <p className="text-2xl font-display text-white">{score}/{stage * 5}</p>
           </div>
-          <div className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
-            <p className="text-[10px] text-slate-500 uppercase font-black">Streak</p>
-            <p className="text-2xl font-display text-amber-500">{streak} 🔥</p>
-          </div>
+        )}
+        <div className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+          <p className="text-[10px] text-slate-500 uppercase font-black">{loc === 'de' ? 'Serie' : 'Streak'}</p>
+          <p className="text-2xl font-display text-amber-500">{streak} 🔥</p>
         </div>
       </div>
 
-      <button onClick={onQuit} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors">
+      <button onClick={() => setMode('MENU')} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors">
         <X size={24} />
       </button>
     </div>

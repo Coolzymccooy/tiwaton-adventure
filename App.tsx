@@ -38,7 +38,9 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<FamilyProfile | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
-  const [sessionReady, setSessionReady] = useState(false);
+  // sessionReady starts as TRUE so we show the landing page instantly.
+  // Firebase auth resolves in the background and may redirect the user silently.
+  const [sessionReady, setSessionReady] = useState(true);
   const authEventVersion = useRef(0);
 
   const resolveView = (candidate?: string | null): View => {
@@ -87,18 +89,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const mountedRef = { current: true };
-    let receivedAuthEvent = false;
 
-    const fallbackTimer = window.setTimeout(() => {
-      if (!mountedRef.current || receivedAuthEvent) return;
-      setSessionReady(true);
-      setCurrentView(View.LANDING);
-    }, 4000);
+    // If local cache says we have profiles, resolve immediately without waiting
+    // for Firebase — the user sees their hub in < 100ms.
+    const cachedProfile = StorageService.getCurrentProfile();
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+      setIsAdminMode(cachedProfile.role === 'PARENT' || cachedProfile.role === 'TEACHER');
+      setCurrentView(resolveView(StorageService.getLastView()));
+      // Still subscribe to auth to keep session in sync, but don't block render
+    }
 
     const handleAuthState = async (user: User | null) => {
       const eventId = ++authEventVersion.current;
-      receivedAuthEvent = true;
-      clearTimeout(fallbackTimer);
 
       if (!mountedRef.current) return;
 
@@ -139,14 +142,12 @@ const App: React.FC = () => {
         if (mountedRef.current && eventId === authEventVersion.current) {
           setSessionReady(true);
         }
-      }
     };
 
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
 
     return () => {
       mountedRef.current = false;
-      clearTimeout(fallbackTimer);
       authEventVersion.current += 1;
       unsubscribe();
     };
@@ -187,7 +188,6 @@ const App: React.FC = () => {
       setCurrentView(View.HOME);
       return;
     }
-
     if (action === 'LOGIN') {
       setLoginInitialView('SIGN_IN_ENTRY');
     } else if (action === 'SETUP') {
@@ -198,21 +198,25 @@ const App: React.FC = () => {
     setCurrentView(View.LOGIN);
   };
 
+  // Detect mobile/low-power devices to disable heavy animations
   const isMobileLikeDevice = useMemo(() => {
     if (typeof window === 'undefined') return false;
-
     const width = window.innerWidth || document.documentElement.clientWidth || 0;
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const ua = navigator.userAgent || '';
     const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
-
     return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
   }, []);
 
   const renderView = () => {
     if (currentView === View.LANDING) {
-      return <Landing onAction={handleLandingAction} activeProfile={profile} disableHeavyEffects={isMobileLikeDevice} sessionReady={sessionReady} />;
+      return <Landing
+        onAction={handleLandingAction}
+        activeProfile={profile}
+        disableHeavyEffects={isMobileLikeDevice}
+        sessionReady={sessionReady}
+      />;
     }
 
     if (currentView === View.LOGIN) {

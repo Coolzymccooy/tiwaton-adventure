@@ -13,9 +13,9 @@ const STORAGE_KEYS = {
 };
 
 const safeStorage = {
-  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
-  setItem: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { } },
-  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { } }
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch (_e) { return null; } },
+  setItem: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch (_e) { } },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch (_e) { } }
 };
 
 let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
@@ -43,6 +43,7 @@ const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
   guardianUids: profile.guardianUids ?? [],
   active: profile.active ?? true
 });
+
 
 const normalizeChildIndexKey = (name: string) =>
   name.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -121,6 +122,14 @@ const getPreviousDateKey = () => {
   return d.toISOString().slice(0, 10);
 };
 
+// Strip sensitive fields before writing to localStorage
+function stripSensitiveForStorage(profiles: FamilyProfile[]): object[] {
+  return profiles.map(p => {
+    const { pin, password, recoveryKey, ...safe } = p as any;
+    return safe;
+  });
+}
+
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
   if (currentTenantId) return currentTenantId;
@@ -146,7 +155,8 @@ export const StorageService = {
 
   setCachedProfiles: (profiles: FamilyProfile[]) => {
     cachedProfiles = profiles;
-    safeStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+    // Only store non-sensitive fields in localStorage — PINs/passwords stay in memory only
+    safeStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(stripSensitiveForStorage(profiles)));
   },
 
   getProfiles: (): FamilyProfile[] => {
@@ -185,11 +195,20 @@ export const StorageService = {
           // Fire-and-forget indexing (won't throw or block the load)
           const indexRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
           setDoc(indexRef, {
+          const indexData = {
             tenantId: uid,
             childId: childData.id,
             password: childData.password || '123',
             profile: buildIndexProfile(childData)
           }, { merge: true });
+          };
+          // Fire-and-forget indexing (won't throw or block the load)
+          if (childData.classId) {
+            const scopedRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}_${childData.classId.toLowerCase()}`);
+            setDoc(scopedRef, indexData, { merge: true });
+          }
+          const plainRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
+          setDoc(plainRef, indexData, { merge: true });
         } catch (e) {
           console.warn("Could not index child", childData.name, e);
         }
@@ -212,6 +231,32 @@ export const StorageService = {
 
     const docRef = doc(db, `tenants/${tenantId}/${collectionName}/${updated.id}`);
     await setDoc(docRef, updated, { merge: true });
+
+    // Keep children_index in sync when student password or name changes
+    if (updated.role === 'STUDENT' && updated.name) {
+      try {
+        const indexKey = updated.classId
+          ? normalizeChildIndexKey(updated.name) + '_' + updated.classId.toLowerCase()
+          : normalizeChildIndexKey(updated.name);
+        const indexRef = doc(db, `children_index/${indexKey}`);
+        await setDoc(indexRef, {
+          tenantId,
+          childId: updated.id,
+          password: updated.password || '123',
+          profile: buildIndexProfile(updated)
+        }, { merge: true });
+        // Also update the plain-name key for backward compat
+        const plainRef = doc(db, `children_index/${normalizeChildIndexKey(updated.name)}`);
+        await setDoc(plainRef, {
+          tenantId,
+          childId: updated.id,
+          password: updated.password || '123',
+          profile: buildIndexProfile(updated)
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Could not sync children_index on update', e);
+      }
+    }
 
     const index = cachedProfiles.findIndex(p => p.id === updated.id);
     if (index !== -1) {
@@ -295,14 +340,25 @@ export const StorageService = {
     await setDoc(docRef, newProfile);
 
     // Save lightweight index for global sign in
+    // Use classId-scoped key to prevent name collisions across tenants
     try {
       const indexRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
       await setDoc(indexRef, {
+      const indexData = {
         tenantId,
         childId,
         password: password || '123',
         profile: buildIndexProfile(newProfile)
       }, { merge: true });
+      };
+      // Primary key: name + classId (unique per classroom)
+      if (classId) {
+        const scopedRef = doc(db, `children_index/${normalizeChildIndexKey(name)}_${classId.toLowerCase()}`);
+        await setDoc(scopedRef, indexData, { merge: true });
+      }
+      // Fallback key: plain name (for backward compat & families without classId)
+      const plainRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
+      await setDoc(plainRef, indexData, { merge: true });
     } catch (e) {
       console.warn("Could not save to children_index", e);
     }
@@ -312,11 +368,20 @@ export const StorageService = {
     return newProfile;
   },
 
-  findChildGlobal: async (name: string, pin: string): Promise<FamilyProfile | null> => {
+  findChildGlobal: async (name: string, pin: string, classCode?: string): Promise<FamilyProfile | null> => {
     try {
       const normalizedName = normalizeChildIndexKey(name);
-      const indexRef = doc(db, `children_index/${normalizedName}`);
-      const indexSnap = await getDoc(indexRef);
+      // Try classCode-scoped key first (more specific = fewer collisions)
+      let indexSnap;
+      if (classCode) {
+        const scopedRef = doc(db, `children_index/${normalizedName}_${classCode.trim().toLowerCase()}`);
+        indexSnap = await getDoc(scopedRef);
+      }
+      // Fall back to plain name key
+      if (!indexSnap?.exists()) {
+        const indexRef = doc(db, `children_index/${normalizedName}`);
+        indexSnap = await getDoc(indexRef);
+      }
       if (!indexSnap.exists()) return null;
 
       const data = indexSnap.data() as ChildIndexRecord;
@@ -374,6 +439,26 @@ export const StorageService = {
     const colRef = collection(db, `tenants/${tenantId}/children/${currentProfileId}/drawings`);
     const snapshot = await getDocs(colRef);
     return snapshot.docs.map(doc => doc.data() as Drawing).sort((a, b) => b.timestamp - a.timestamp);
+  },
+
+  /** Fetch drawings for ALL children under this tenant (for dashboards) */
+  getAllDrawings: async (): Promise<Drawing[]> => {
+    const tenantId = getTenantId();
+    if (!tenantId) return [];
+
+    const allDrawings: Drawing[] = [];
+    const childrenSnap = await getDocs(collection(db, `tenants/${tenantId}/children`));
+
+    for (const childDoc of childrenSnap.docs) {
+      try {
+        const drawingsSnap = await getDocs(collection(db, `tenants/${tenantId}/children/${childDoc.id}/drawings`));
+        for (const drawDoc of drawingsSnap.docs) {
+          allDrawings.push(drawDoc.data() as Drawing);
+        }
+      } catch (_e) { /* skip inaccessible */ }
+    }
+
+    return allDrawings.sort((a, b) => b.timestamp - a.timestamp);
   },
 
   saveDrawing: async (d: Drawing) => {
@@ -532,11 +617,11 @@ export const StorageService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as CountdownEvent));
   },
 
-  addEvent: async (name: string, date: string, email?: string): Promise<CountdownEvent[]> => {
+  addEvent: async (name: string, date: string, email?: string, category?: import('../types').EventCategory, emoji?: string): Promise<CountdownEvent[]> => {
     const tenantId = getTenantId();
     if (!tenantId) return [];
     const id = 'event-' + Date.now();
-    const newEvent: CountdownEvent = { id, name, date, notificationEmail: email };
+    const newEvent: CountdownEvent = { id, name, date, notificationEmail: email, category, emoji };
     const docRef = doc(db, `tenants/${tenantId}/events/${id}`);
     await setDoc(docRef, newEvent);
     return await StorageService.getEvents();

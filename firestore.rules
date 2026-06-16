@@ -7,12 +7,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Require verified email for all write operations by parents/teachers
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function memberDoc(tenantId) {
       return get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid));
     }
 
     function isActiveMember(tenantId) {
-      return signedIn()
+      return verified()
         && memberDoc(tenantId).exists()
         && memberDoc(tenantId).data.active == true;
     }
@@ -22,7 +27,7 @@ service cloud.firestore {
     }
 
     function isTenantOwner(tenantId) {
-      return signedIn() && request.auth.uid == tenantId;
+      return verified() && request.auth.uid == tenantId;
     }
 
     function isAdmin(tenantId) {
@@ -33,13 +38,20 @@ service cloud.firestore {
       return isTenantOwner(tenantId) || (isActiveMember(tenantId) && (role(tenantId) == "STAFF" || role(tenantId) == "ADMIN"));
     }
 
+    function isParentOrTeacher(tenantId) {
+      return isTenantOwner(tenantId) || (isActiveMember(tenantId) && (
+        role(tenantId) == "PARENT" || role(tenantId) == "TEACHER" || role(tenantId) == "ADMIN"
+      ));
+    }
+
     // Child can access if:
-    // - they are the child's loginUid
+    // - they are the tenant owner (parent/teacher)
     // OR - requester is in guardianUids
     // OR - requester is STAFF/ADMIN
     function canAccessChild(tenantId, childId) {
       return isTenantOwner(tenantId) || (isActiveMember(tenantId) && (
         isStaff(tenantId)
+        || isParentOrTeacher(tenantId)
         || request.auth.uid == get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.loginUid
         || request.auth.uid in get(/databases/$(database)/documents/tenants/$(tenantId)/children/$(childId)).data.guardianUids
       ));
@@ -50,74 +62,91 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── Global children index (cross-browser student login) ───
     match /children_index/{docId} {
+      // Anyone can read (students need this to log in from new devices)
       allow read: if true;
-      allow create, update: if signedIn()
+
+      // Only verified parents/teachers can write to the index
+      allow create, update: if verified()
         && request.resource.data.tenantId is string
-        && isStaff(request.resource.data.tenantId);
-      allow delete: if signedIn()
+        && request.auth.uid == request.resource.data.tenantId;
+      allow delete: if verified()
         && resource.data.tenantId is string
-        && isAdmin(resource.data.tenantId);
+        && request.auth.uid == resource.data.tenantId;
     }
 
-    // Tenants root (optional metadata)
+    // ─── Tenants root (optional metadata) ───
     match /tenants/{tenantId} {
-      allow read, write: if isTenantOwner(tenantId);
-      allow read: if isActiveMember(tenantId);
-      allow write: if isAdmin(tenantId);
+      allow read: if signedIn() && (request.auth.uid == tenantId || isActiveMember(tenantId));
+      allow write: if isTenantOwner(tenantId);
     }
 
-    // Membership management
+    // ─── Membership management ───
     match /tenants/{tenantId}/members {
-      allow list: if isTenantOwner(tenantId) || (signedIn() && isStaff(tenantId));
+      allow list: if isTenantOwner(tenantId) || (signedIn() && isParentOrTeacher(tenantId));
     }
     match /tenants/{tenantId}/members/{uid} {
-      // Users can read their own membership (helps UI decide role)
-      allow read: if signedIn() && (request.auth.uid == uid || isStaff(tenantId));
+      // Users can read their own membership
+      allow read: if signedIn() && (request.auth.uid == uid || isParentOrTeacher(tenantId));
 
-      // Initial Account Creation: Allow users to create their own initial Admin/Teacher profile
-      // storage.ts uses `uid` as the initial `tenantId`
-      allow create: if signedIn() && request.auth.uid == uid && tenantId == uid;
+      // Initial account creation: user creates their own profile during signup
+      // Allowed even before email verification so the profile is saved immediately
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && tenantId == uid
+        && request.resource.data.role in ["PARENT", "TEACHER"]
+        && request.resource.data.active == true;
 
-      // Admin can read/manage all memberships
-      allow read, create, update, delete: if isAdmin(tenantId);
+      // Updates require verification
+      allow update: if isTenantOwner(tenantId)
+        && request.resource.data.id == uid;
+
+      // Admin can manage all memberships
+      allow read, update, delete: if isAdmin(tenantId);
     }
 
-    // Child profiles
+    // ─── Child profiles ───
     match /tenants/{tenantId}/children {
-      allow list: if isTenantOwner(tenantId) || (signedIn() && isStaff(tenantId));
+      allow list: if isTenantOwner(tenantId) || (signedIn() && isParentOrTeacher(tenantId));
     }
     match /tenants/{tenantId}/children/{childId} {
       allow read: if canAccessChild(tenantId, childId);
 
-      // Create child: STAFF/ADMIN only
-      allow create: if isStaff(tenantId)
+      // Create child: verified parent/teacher only
+      allow create: if isParentOrTeacher(tenantId)
         && request.resource.data.tenantId == tenantId
-        && request.resource.data.guardianUids is list
         && request.resource.data.active == true;
 
-      // Update child: STAFF/ADMIN OR guardian (limited)
+      // Update child: verified parent/teacher or guardian
       allow update: if canAccessChild(tenantId, childId)
         && request.resource.data.tenantId == tenantId;
 
-      // Delete child: ADMIN only
-      allow delete: if isAdmin(tenantId);
+      // Delete child: tenant owner only
+      allow delete: if isTenantOwner(tenantId);
     }
 
-    // Everything under a child (paints/stories/games/etc)
+    // ─── Child sub-collections (drawings, stories, game data) ───
     match /tenants/{tenantId}/children/{childId}/{subcol}/{docId} {
       allow read: if canAccessChild(tenantId, childId);
 
-      // Writes: child/guardian/staff can create
+      // Writes: verified user who can access the child
       allow create: if canAccessChild(tenantId, childId)
         && request.resource.data.ownerChildId == childId
         && request.resource.data.createdByUid == request.auth.uid;
 
-      // Updates: allow same access (you can tighten later to “createdByUid only”)
+      // Updates: same access level
       allow update: if canAccessChild(tenantId, childId);
 
-      // Deletes: STAFF/ADMIN only (safer)
-      allow delete: if isStaff(tenantId);
+      // Deletes: parent/teacher only
+      allow delete: if isParentOrTeacher(tenantId);
+    }
+
+    // ─── Tenant-level events (countdown/calendar) ───
+    match /tenants/{tenantId}/events/{eventId} {
+      allow read: if signedIn() && (isTenantOwner(tenantId) || isActiveMember(tenantId));
+      allow create, update: if isTenantOwner(tenantId) || isParentOrTeacher(tenantId);
+      allow delete: if isTenantOwner(tenantId) || isParentOrTeacher(tenantId);
     }
   }
 }

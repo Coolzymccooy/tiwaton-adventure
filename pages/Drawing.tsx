@@ -13,6 +13,21 @@ import { AIService } from '../services/ai';
 import { AudioService } from '../services/audio';
 import { Drawing, AppMode, View } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
+import {
+  getRandomPrompt,
+  getStudioMissions,
+  markPromptCompleted,
+  markMissionCompleted,
+  getDrawingStats,
+  type DrawingTier,
+  DRAWING_TIERS,
+} from '../services/drawing-engine';
+import {
+  DRAWING_PROMPTS,
+  DRAWING_CATEGORIES,
+  type DrawingPrompt,
+  type DrawingCategory,
+} from '../data/drawing-challenges';
 
 // --- CONFIGURATION ---
 const COLORS = [
@@ -23,18 +38,8 @@ const COLORS = [
 
 const STICKERS = ["⭐", "❤️", "🦄", "🦁", "🚀", "REX", "👑", "🌈", "🔥", "⚽", "👀", "🎈", "🦋", "🍄", "🍦", "🎸", "🍕", "🚗", "👻", "🤖", "🐱", "🐶"];
 
-const CHALLENGES = [
-  "Draw a Flying Pig! 🐷✈️",
-  "Draw a Space Dinosaur! 🦖🚀",
-  "Draw your Dream Treehouse! 🌳🏡",
-  "Draw a Robot eating Ice Cream! 🤖🍦",
-  "Draw a Castle in the Clouds! ☁️🏰",
-  "Draw an Underwater City! 🌊🏙️",
-  "Draw a Superhero Cat! 🐱🦸",
-  "Draw a Banana wearing Sunglasses! 🍌😎",
-  "Draw a Pirate Ship! 🏴‍☠️⛵",
-  "Draw a Friendly Monster! 👾🎈"
-];
+// Simple prompts now come from data/drawing-challenges.ts (120+ bilingual prompts)
+// The old 10-item CHALLENGES array has been replaced by the DRAWING_PROMPTS bank.
 
 const LIBRARY_CATEGORIES = [
   { id: 'animals', label: 'Animals', emoji: '🦁', prompt: 'a cute baby animal', type: 'ai' },
@@ -93,13 +98,116 @@ const MUSIC_TRACKS = [
 
 type ToolType = 'brush' | 'pencil' | 'marker' | 'neon' | 'spray' | 'rainbow' | 'eraser' | 'fill' | 'rect' | 'circle' | 'star' | 'sticker' | 'watercolor' | 'pan';
 type StoryBuilderStep = 'NONE' | 'HERO' | 'VILLAIN' | 'SETTING' | 'GENERATING' | 'DONE';
+type ChallengeGoalKind = 'colors' | 'tools' | 'strokes' | 'sticker' | 'symmetry' | 'fill';
+
+interface ChallengeGoal {
+  kind: ChallengeGoalKind;
+  label: string;
+  count?: number;
+}
+
+interface StudioChallenge {
+  id: string;
+  title: string;
+  prompt: string;
+  setup: string;
+  reward: string;
+  difficulty: 'Rookie' | 'Brave' | 'Legend';
+  timeLimitSec: number;
+  goals: ChallengeGoal[];
+}
+
+interface ChallengeStats {
+  colorsUsed: string[];
+  toolsUsed: ToolType[];
+  strokes: number;
+  stickersPlaced: number;
+  symmetryMoves: number;
+  fillsUsed: number;
+  timeLeftSec: number;
+}
+
+interface ChallengeResult {
+  title: string;
+  reward: string;
+  stars: number;
+  beatClock: boolean;
+  completedGoals: number;
+  totalGoals: number;
+  aiMatchedPrompt?: boolean;
+  aiCreativityScore?: number;
+  aiMissionScore?: number;
+  aiFeedback?: string;
+  aiHighlights?: string[];
+}
 
 interface DrawingPageProps {
   onNavigate?: (view: View) => void;
 }
 
+// Studio challenges now come from data/drawing-challenges.ts (30 bilingual missions)
+// Served via services/drawing-engine.ts with no-repeat tracking.
+
+/** Convert a bilingual StudioMission to the local StudioChallenge format */
+function missionToChallenge(m: import('../data/drawing-challenges').StudioMission, locale: 'en' | 'de'): StudioChallenge {
+  return {
+    id: m.id,
+    title: m.title[locale],
+    prompt: m.prompt[locale],
+    setup: m.setup[locale],
+    reward: m.reward,
+    difficulty: m.difficulty,
+    timeLimitSec: m.timeLimitSec,
+    goals: m.goals.map(g => ({ kind: g.kind as ChallengeGoalKind, count: g.count, label: g.label[locale] })),
+  };
+}
+
+const formatTimeLeft = (totalSeconds: number) => {
+  const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const secs = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${mins}:${secs}`;
+};
+
+const addUnique = <T,>(items: T[], item: T) => (
+  items.includes(item) ? items : [...items, item]
+);
+
+const getGoalProgress = (goal: ChallengeGoal, stats: ChallengeStats) => {
+  switch (goal.kind) {
+    case 'colors': {
+      const target = goal.count || 0;
+      const current = stats.colorsUsed.length;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'tools': {
+      const target = goal.count || 0;
+      const current = stats.toolsUsed.length;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'strokes': {
+      const target = goal.count || 0;
+      const current = stats.strokes;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'sticker': {
+      const target = goal.count || 1;
+      const current = stats.stickersPlaced;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'fill': {
+      const target = goal.count || 1;
+      const current = stats.fillsUsed;
+      return { current, target, done: current >= target, label: goal.label };
+    }
+    case 'symmetry': {
+      const current = stats.symmetryMoves > 0 ? 1 : 0;
+      return { current, target: 1, done: current >= 1, label: goal.label };
+    }
+  }
+};
+
 const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const profile = StorageService.getCurrentProfile();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -152,7 +260,9 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [storyAssets, setStoryAssets] = useState<string[]>([]);
   const [storyResult, setStoryResult] = useState<{ title: string, content: string } | null>(null);
 
-  const [activeChallenge, setActiveChallenge] = useState<string | null>(null);
+  const [activeChallenge, setActiveChallenge] = useState<StudioChallenge | null>(null);
+  const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
+  const [challengeResult, setChallengeResult] = useState<ChallengeResult | null>(null);
 
   const draftKey = `${DRAWING_DRAFT_PREFIX}_${profile?.id || 'guest'}`;
   const queueKey = `${DRAWING_QUEUE_PREFIX}_${profile?.id || 'guest'}`;
@@ -309,6 +419,16 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
 
     return () => window.clearInterval(interval);
   }, [writeDraftBackup]);
+  useEffect(() => {
+    if (!activeChallenge || !challengeStats || challengeStats.timeLeftSec <= 0) return;
+    const timer = window.setInterval(() => {
+      setChallengeStats(prev => {
+        if (!prev) return prev;
+        return { ...prev, timeLeftSec: Math.max(0, prev.timeLeftSec - 1) };
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeChallenge, challengeStats]);
 
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -353,6 +473,34 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const loadGallery = async () => {
     const g = await StorageService.getDrawings();
     setGallery(g);
+  };
+
+  const resetChallengeStats = (challenge: StudioChallenge) => {
+    setChallengeStats({
+      colorsUsed: [],
+      toolsUsed: [],
+      strokes: 0,
+      stickersPlaced: 0,
+      symmetryMoves: 0,
+      fillsUsed: 0,
+      timeLeftSec: challenge.timeLimitSec,
+    });
+  };
+
+  const updateChallengeStats = (updates: Partial<ChallengeStats> & { toolUsed?: ToolType; colorUsed?: string }) => {
+    if (!activeChallenge) return;
+    setChallengeStats(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorsUsed: updates.colorUsed ? addUnique(prev.colorsUsed, updates.colorUsed) : prev.colorsUsed,
+        toolsUsed: updates.toolUsed ? addUnique(prev.toolsUsed, updates.toolUsed) : prev.toolsUsed,
+        strokes: prev.strokes + (updates.strokes || 0),
+        stickersPlaced: prev.stickersPlaced + (updates.stickersPlaced || 0),
+        symmetryMoves: prev.symmetryMoves + (updates.symmetryMoves || 0),
+        fillsUsed: prev.fillsUsed + (updates.fillsUsed || 0),
+      };
+    });
   };
 
   const handleSaveToGallery = async (customDataUrl?: string, isMagic = false) => {
@@ -403,24 +551,95 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   };
 
   const startChallengeMode = () => {
-    const random = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
-    setActiveChallenge(random);
-    AudioService.speak("Challenge accepted! " + random);
-    handleClearCanvas(false); // don't wipe history, just give blank slate
+    const missions = getStudioMissions(); // shuffled, no-repeat
+    const mission = missions[0];
+    if (!mission) return;
+    const challenge = missionToChallenge(mission, locale as 'en' | 'de');
+    setChallengeResult(null);
+    setActiveChallenge(challenge);
+    resetChallengeStats(challenge);
+    setTool('marker');
+    setBrushSize(10);
+    setIsSymmetry(false);
+    setTransform({ x: 0, y: 0, scale: 1 });
+    setShowGallery(false);
+    setShowLibrary(false);
+    setStoryStep('NONE');
+    setTransformedImage(null);
+    AudioService.speak(`Challenge accepted. ${challenge.title}. ${challenge.prompt}`);
+    handleClearCanvas(false);
   };
 
   const finishChallenge = async () => {
-    AudioService.playEffect('achievement');
-    AudioService.speak("Amazing job! Challenge completed!");
+    if (!activeChallenge || !challengeStats) return;
+
+    const totalMoves = challengeStats.strokes + challengeStats.stickersPlaced + challengeStats.fillsUsed;
+    if (totalMoves === 0) {
+      AudioService.speak("Add a few marks before you score this challenge.");
+      return;
+    }
+
+    const completedGoals = activeChallenge.goals.filter(goal => getGoalProgress(goal, challengeStats).done).length;
+    const beatClock = challengeStats.timeLeftSec > 0;
+    const clearedChallenge = completedGoals === activeChallenge.goals.length;
+    let aiJudgement: Awaited<ReturnType<typeof AIService.judgeChallengeDrawing>> = null;
+
+    if (canvasRef.current) {
+      setIsGenerating(true);
+      setLoadingText('AI judge is reviewing your mission...');
+      aiJudgement = await AIService.judgeChallengeDrawing(canvasRef.current.toDataURL('image/png'), {
+        title: activeChallenge.title,
+        prompt: activeChallenge.prompt,
+        setup: activeChallenge.setup,
+        goals: activeChallenge.goals.map(goal => goal.label),
+      });
+      setIsGenerating(false);
+    }
+
+    let stars = clearedChallenge ? (beatClock ? 3 : 2) : 1;
+    if (aiJudgement?.matchedPrompt && aiJudgement.creativityScore >= 7 && stars < 3) {
+      stars += 1;
+    }
+    if (aiJudgement && !aiJudgement.matchedPrompt && stars > 1) {
+      stars -= 1;
+    }
+
+    if (clearedChallenge && (aiJudgement?.matchedPrompt ?? true)) {
+      AudioService.playEffect('achievement');
+      AudioService.speak(beatClock ? "Brilliant. You beat the clock." : "Challenge cleared. Strong finish.");
+    } else if (aiJudgement && !aiJudgement.matchedPrompt) {
+      AudioService.playEffect('click');
+      AudioService.speak("Strong effort. The AI wants a closer match to the mission.");
+    } else {
+      AudioService.playEffect('click');
+      AudioService.speak("Nice try. You earned a practice star and saved your work.");
+    }
+
+    setChallengeResult({
+      title: activeChallenge.title,
+      reward: clearedChallenge && (aiJudgement?.matchedPrompt ?? true) ? activeChallenge.reward : 'Practice Star',
+      stars,
+      beatClock,
+      completedGoals,
+      totalGoals: activeChallenge.goals.length,
+      aiMatchedPrompt: aiJudgement?.matchedPrompt,
+      aiCreativityScore: aiJudgement?.creativityScore,
+      aiMissionScore: aiJudgement?.missionScore,
+      aiFeedback: aiJudgement?.feedback,
+      aiHighlights: aiJudgement?.highlights || [],
+    });
     await handleSaveToGallery(undefined, false); // Auto-save their challenge masterpiece
+    if (activeChallenge) markMissionCompleted(activeChallenge.id);
     setActiveChallenge(null);
+    setChallengeStats(null);
   };
 
-  const handleClearCanvas = (wipeHistory = true) => {
+  const handleClearCanvas = (wipeHistory = true, resetCurrentChallenge = false) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx && canvasRef.current) {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       if (wipeHistory) saveHistory();
+      if (resetCurrentChallenge && activeChallenge) resetChallengeStats(activeChallenge);
     }
   };
 
@@ -668,6 +887,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     if (tool === 'fill') {
       ctx.fillStyle = color;
       ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      updateChallengeStats({ toolUsed: 'fill', colorUsed: color, strokes: 1, fillsUsed: 1 });
       saveHistory();
       AudioService.playEffect('click');
       setIsDrawing(false);
@@ -680,10 +900,22 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
       ctx.fillText(selectedSticker, x, y);
       AudioService.playEffect('click');
       if (isSymmetry) ctx.fillText(selectedSticker, canvasRef.current.width - x, y);
+      updateChallengeStats({
+        toolUsed: 'sticker',
+        colorUsed: color,
+        strokes: 1,
+        stickersPlaced: 1,
+        symmetryMoves: isSymmetry ? 1 : 0
+      });
       saveHistory();
       setIsDrawing(false);
       return;
     }
+    updateChallengeStats({
+      toolUsed: tool,
+      colorUsed: tool === 'eraser' ? undefined : color,
+      symmetryMoves: isSymmetry ? 1 : 0
+    });
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineCap = 'round';
@@ -763,6 +995,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     }
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) ctx.closePath();
+    updateChallengeStats({ strokes: 1 });
     saveHistory();
   };
 
@@ -802,7 +1035,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="flex flex-col h-full relative select-none overflow-hidden bg-slate-100">
+    <div className="flex flex-1 min-h-0 flex-col relative select-none overflow-hidden bg-slate-100">
 
       {isGenerating && (
         <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
@@ -925,17 +1158,113 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         </div>
       )}
 
+      {challengeResult && (
+        <div className="absolute inset-0 z-50 bg-slate-900/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-amber-400/30 bg-slate-900 text-white p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="text-4xl mb-3">{'★'.repeat(challengeResult.stars)}{'☆'.repeat(3 - challengeResult.stars)}</div>
+              <p className="text-[10px] uppercase tracking-[0.35em] text-amber-300 font-black">Challenge Result</p>
+              <h3 className="mt-2 text-3xl font-display text-white">{challengeResult.title}</h3>
+              <p className="mt-3 text-amber-200 font-bold">{challengeResult.reward}</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Goals cleared: {challengeResult.completedGoals}/{challengeResult.totalGoals}
+                {challengeResult.beatClock ? ' | Clock bonus earned' : ''}
+              </p>
+            </div>
+            {challengeResult.aiFeedback && (
+              <div className="mt-5 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 p-4">
+                <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300">
+                  <span>AI Judge</span>
+                  <span>
+                    Mission {challengeResult.aiMissionScore}/10 | Creative {challengeResult.aiCreativityScore}/10
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-100">{challengeResult.aiFeedback}</p>
+                {challengeResult.aiHighlights && challengeResult.aiHighlights.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {challengeResult.aiHighlights.map((highlight) => (
+                      <span key={highlight} className="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-200 border border-white/10">
+                        {highlight}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {!challengeResult.aiFeedback && (
+              <p className="mt-5 text-center text-xs text-slate-400">AI judging was unavailable, so this score used the mission goals and timer only.</p>
+            )}
+            <div className="mt-6 flex gap-2 justify-center">
+              <button
+                onClick={startChallengeMode}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-slate-950 font-black hover:brightness-110"
+              >
+                <RefreshCcw size={16} /> Another
+              </button>
+              <button
+                onClick={() => setChallengeResult(null)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-white font-bold hover:bg-slate-600"
+              >
+                <Check size={16} /> Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* CHALLENGE BANNER OVERLAY */}
-      {activeChallenge && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border-4 border-amber-400 animate-slide-in-top">
-          <div className="flex flex-col">
-            <span className="text-yellow-300 font-bold text-xs uppercase tracking-widest">Active Challenge</span>
-            <span className="font-display text-xl">{activeChallenge}</span>
+      {activeChallenge && challengeStats && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[min(92vw,36rem)] rounded-3xl border-2 border-amber-400 bg-slate-900/95 text-white p-4 shadow-2xl animate-slide-in-top">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">
+                <Trophy size={12} />
+                <span>{activeChallenge.difficulty} Challenge</span>
+              </div>
+              <h3 className="mt-1 text-2xl font-display text-white">{activeChallenge.title}</h3>
+              <p className="mt-1 text-sm text-slate-300">{activeChallenge.prompt}</p>
+              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-indigo-300">{activeChallenge.setup}</p>
+            </div>
+            <div className={`shrink-0 rounded-2xl px-3 py-2 text-center font-black ${challengeStats.timeLeftSec > 30 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+              <div className="text-[9px] uppercase tracking-[0.25em]">Clock</div>
+              <div className="text-lg">{formatTimeLeft(challengeStats.timeLeftSec)}</div>
+            </div>
           </div>
-          <button onClick={finishChallenge} title="Complete Challenge!" className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg ml-4">
-            <Check size={18} /> Done!
-          </button>
+
+          <div className="mt-4 grid gap-2">
+            {activeChallenge.goals.map(goal => {
+              const progress = getGoalProgress(goal, challengeStats);
+              return (
+                <div
+                  key={goal.label}
+                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-sm ${progress.done ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-slate-800/80 text-slate-300'}`}
+                >
+                  <span>{progress.label}</span>
+                  <span className="font-mono text-xs">{progress.current}/{progress.target}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+            <span>Colors {challengeStats.colorsUsed.length}</span>
+            <span>Tools {challengeStats.toolsUsed.length}</span>
+            <span>Moves {challengeStats.strokes}</span>
+            <span>Stickers {challengeStats.stickersPlaced}</span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={finishChallenge} title="Score this challenge" className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg">
+              <Check size={18} /> Score It
+            </button>
+            <button onClick={startChallengeMode} title="Try a new challenge" className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-xl font-bold transition-all hover:scale-105 flex items-center gap-2 shadow-lg">
+              <RefreshCcw size={18} /> Reroll
+            </button>
+            <button onClick={() => { setActiveChallenge(null); setChallengeStats(null); }} title="End challenge" className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold transition-all hover:scale-105">
+              End
+            </button>
+          </div>
         </div>
       )}
 
@@ -1098,7 +1427,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
             <button onClick={undo} data-tooltip="Undo Last Stroke" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Undo2 size={18} /></button>
             <button onClick={() => { }} data-tooltip="Redo Action" className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-700"><Redo2 size={18} /></button>
             <div className="w-px bg-slate-600 mx-1"></div>
-            <button onClick={() => handleClearCanvas(true)} data-tooltip="Clear Canvas" className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg"><Trash2 size={18} /></button>
+            <button onClick={() => handleClearCanvas(true, Boolean(activeChallenge))} data-tooltip="Clear Canvas" className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg"><Trash2 size={18} /></button>
             <button onClick={() => setIsSymmetry(!isSymmetry)} data-tooltip="Mirror Symmetry" className={`p-2 rounded-lg ${isSymmetry ? 'bg-indigo-600 text-white shadow-glow' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}><Split size={18} /></button>
           </div>
 
@@ -1107,10 +1436,10 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
             {/* CHALLENGE BUTTON */}
             <button
               onClick={startChallengeMode}
-              data-tooltip="Get a Random Challenge!"
+              data-tooltip={activeChallenge ? "Start a fresh challenge" : "Start a real art mission"}
               className="flex items-center gap-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-black shadow-lg hover:brightness-110"
             >
-              <Trophy size={14} className="animate-pulse" /> Challenge!
+              <Trophy size={14} className="animate-pulse" /> {activeChallenge ? 'New Challenge' : 'Challenge!'}
             </button>
             <button onClick={() => setShowLibrary(true)} data-tooltip="Open Coloring Library" className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-600">
               <ImageIcon size={14} /> {t('drawing.templatesLabel')}

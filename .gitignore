@@ -15,6 +15,7 @@ node_modules/
 dist/
 .idea/
 server/data/
+!server/data/store.cjs
 build/
 out/
 coverage/

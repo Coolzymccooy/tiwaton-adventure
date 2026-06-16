@@ -30,20 +30,5 @@ router.post("/telemetry", (req, res) => {
   res.json({ ok: true });
 });
 
-router.post("/login", (req, res) => {
-  const { identity, secret, classCode } = req.body;
-
-  if (!identity || !secret) {
-    return res.status(400).json({ error: "Missing identity or secret" });
-  }
-
-  const snapshot = store.findSnapshotByCredentials(identity, secret, classCode);
-
-  if (snapshot) {
-    res.json({ ok: true, snapshot });
-  } else {
-    res.status(401).json({ error: "Account not found or invalid credentials" });
-  }
-});
-
 module.exports = router;
+

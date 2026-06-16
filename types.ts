@@ -140,10 +140,14 @@ export interface DailyLearningPath {
   updatedAt: number;
 }
 
+export type EventCategory = 'birthday' | 'holiday' | 'trip' | 'school' | 'church' | 'sports' | 'family' | 'custom';
+
 export interface CountdownEvent {
   id: string;
   name: string;
   date: string;
+  category?: EventCategory;
+  emoji?: string;
   notificationEmail?: string;
 }
 

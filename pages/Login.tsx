@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import { FamilyProfile } from '../types';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, updatePassword } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import {
@@ -110,6 +110,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                 const userCredential = await withTimeout(signInWithEmailAndPassword(auth, loginIdentifier, passwordToUse));
                 const uid = userCredential.user.uid;
 
+                // Enforce email verification — block unverified accounts
+                if (!userCredential.user.emailVerified) {
+                    setAdminEmail(loginIdentifier);
+                    // Re-send verification email in case the old one expired
+                    try { await sendEmailVerification(userCredential.user); } catch (_e) { /* ignore */ }
+                    setViewMode('VERIFY_ACCOUNT');
+                    return;
+                }
+
                 StorageService.setTenantContext(uid);
                 const loadedProfiles = await withTimeout(StorageService.syncFromFirestore(uid));
 
@@ -133,7 +142,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
                         setError('Incorrect password');
                     }
                 } else {
-                    const globalProfile = await withTimeout(StorageService.findChildGlobal(loginIdentifier, authInput));
+                    const globalProfile = await withTimeout(
+                        StorageService.findChildGlobal(loginIdentifier, authInput, classCode || undefined)
+                    );
                     if (globalProfile) {
                         onLogin(globalProfile);
                     } else {
@@ -244,7 +255,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
     };
 
     const handleResetVerify = () => {
-        const admin = profiles.find(p => p.mode === 'PARENT');
+        const admin = profiles.find(p => p.mode === 'PARENT' || p.mode === 'TEACHER');
         if (!admin) {
             setError(t('login.errorResetNoAdmin'));
             return;
@@ -264,15 +275,26 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialViewMode
         }
     };
 
-    const handleSaveNewCreds = () => {
+    const handleSaveNewCreds = async () => {
         if (!resetInput) {
             setError(t('login.errorEnterPin'));
             return;
         }
-        const admin = profiles.find(p => p.mode === 'PARENT');
+        const admin = profiles.find(p => p.mode === 'PARENT' || p.mode === 'TEACHER');
         if (!admin) return;
 
         StorageService.updateProfile({ ...admin, pin: resetInput });
+
+        // Also update Firebase Auth password so the new PIN works for cross-browser login
+        if (auth.currentUser) {
+          try {
+            const paddedNewPin = resetInput.padEnd(6, '0');
+            await updatePassword(auth.currentUser, paddedNewPin);
+          } catch (e) {
+            console.warn('Could not update Firebase Auth password:', e);
+          }
+        }
+
         alert(t('login.alertPinSaved'));
         setViewMode('SIGN_IN_ENTRY');
         setResetStep('CHOICE');

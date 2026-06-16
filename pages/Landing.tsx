@@ -7,7 +7,8 @@ import {
   ShieldCheck, ArrowRight, LogIn, RefreshCcw,
   UserCheck, BrainCircuit, Star, Zap, Trophy,
   Target, GraduationCap, Heart, Clock, ChevronDown,
-  MousePointer2, Lightbulb, LayoutDashboard
+  MousePointer2, Lightbulb, LayoutDashboard,
+  Users, School, CheckCircle2, Mail, KeyRound, UserPlus, Monitor
 } from 'lucide-react';
 
 import { useI18n } from '../i18n/I18nProvider';
@@ -147,6 +148,77 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile, disableHeavy
               {t('landing.resetButton')}
             </button>
           </div>
+
+          {/* Mobile Signup Guide */}
+          <div className="mt-6 space-y-4">
+            <h3 className="text-lg font-black text-white text-center">{t('landing.guideTitle')}</h3>
+            <p className="text-xs text-slate-400 text-center">{t('landing.guideSubtitle')}</p>
+
+            {/* Parent Path */}
+            <div className="bg-white/5 border border-indigo-500/20 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white shrink-0">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white">{t('landing.guideParentTitle')}</h4>
+                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{t('landing.guideParentTag')}</p>
+                </div>
+              </div>
+              <ol className="space-y-2 text-xs text-slate-300 pl-1">
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">1.</span>{t('landing.guideP1Title')} — <span className="text-slate-500">{t('landing.guideP1Desc')}</span></li>
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">2.</span>{t('landing.guideP2Title')}</li>
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">3.</span>{t('landing.guideP3Title')}</li>
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">4.</span>{t('landing.guideP4Title')}</li>
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">5.</span>{t('landing.guideP5Title')} — <span className="text-slate-500">{t('landing.guideP5Desc')}</span></li>
+                <li className="flex gap-2"><span className="text-indigo-400 font-black shrink-0">6.</span>{t('landing.guideP6Title')}</li>
+              </ol>
+              <button onClick={() => onAction('SETUP')} className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white font-bold text-xs uppercase tracking-widest">
+                {t('landing.guideParentCta')}
+              </button>
+            </div>
+
+            {/* School Path */}
+            <div className="bg-white/5 border border-teal-500/20 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center text-white shrink-0">
+                  <School size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white">{t('landing.guideSchoolTitle')}</h4>
+                  <p className="text-[10px] text-teal-400 font-bold uppercase tracking-widest">{t('landing.guideSchoolTag')}</p>
+                </div>
+              </div>
+              <ol className="space-y-2 text-xs text-slate-300 pl-1">
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">1.</span>{t('landing.guideS1Title')}</li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">2.</span>{t('landing.guideS2Title')}</li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">3.</span>{t('landing.guideS3Title')}</li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">4.</span>{t('landing.guideS4Title')}</li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">5.</span>{t('landing.guideS5Title')} — <span className="text-slate-500">{t('landing.guideS5Desc')}</span></li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">6.</span>{t('landing.guideS6Title')}</li>
+                <li className="flex gap-2"><span className="text-teal-400 font-black shrink-0">7.</span>{t('landing.guideS7Title')}</li>
+              </ol>
+              <button onClick={() => onAction('SETUP')} className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 rounded-xl text-white font-bold text-xs uppercase tracking-widest">
+                {t('landing.guideSchoolCta')}
+              </button>
+            </div>
+
+            {/* Tips row */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="text-center p-2">
+                <ShieldCheck size={16} className="text-emerald-400 mx-auto mb-1" />
+                <p className="text-[10px] text-slate-500 font-bold">{t('landing.guideTip1Title')}</p>
+              </div>
+              <div className="text-center p-2">
+                <Gamepad2 size={16} className="text-indigo-400 mx-auto mb-1" />
+                <p className="text-[10px] text-slate-500 font-bold">{t('landing.guideTip2Title')}</p>
+              </div>
+              <div className="text-center p-2">
+                <Star size={16} className="text-amber-400 mx-auto mb-1" />
+                <p className="text-[10px] text-slate-500 font-bold">{t('landing.guideTip3Title')}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -177,6 +249,7 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile, disableHeavy
           <button onClick={() => scrollToSection('vision')} data-tooltip="App Purpose & Vision" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">The Vision</button>
           <button onClick={() => scrollToSection('features')} data-tooltip="Explore Hub Features" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">Features</button>
           <button onClick={() => scrollToSection('events')} data-tooltip="Family Event Tracker" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">Events</button>
+          <button onClick={() => scrollToSection('signup-guide')} data-tooltip="How to Get Started" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors hidden md:block">Guide</button>
 
           {activeProfile ? (
             <button
@@ -424,6 +497,127 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile, disableHeavy
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- SIGNUP GUIDE SECTION --- */}
+      <section id="signup-guide" className="relative px-4 sm:px-6 py-20 sm:py-32 z-10 bg-slate-950/40 backdrop-blur-xl border-y border-white/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-20 space-y-4">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+              <Rocket size={14} /> {t('landing.guideTag')}
+            </div>
+            <h3 className="font-display text-4xl sm:text-6xl text-white italic tracking-tighter leading-tight">{t('landing.guideTitle')}</h3>
+            <p className="text-slate-400 text-base sm:text-lg font-medium max-w-2xl mx-auto">{t('landing.guideSubtitle')}</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-10">
+            {/* Parent / Family Path */}
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl sm:rounded-[3rem] border border-indigo-500/20 p-6 sm:p-10 space-y-6 sm:space-y-8 group hover:border-indigo-500/40 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white shadow-xl shrink-0">
+                  <Users size={28} />
+                </div>
+                <div>
+                  <h4 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">{t('landing.guideParentTitle')}</h4>
+                  <p className="text-indigo-400 text-xs font-bold uppercase tracking-widest">{t('landing.guideParentTag')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { icon: <Rocket size={18} />, step: '1', title: t('landing.guideP1Title'), desc: t('landing.guideP1Desc'), color: 'text-indigo-400' },
+                  { icon: <Mail size={18} />, step: '2', title: t('landing.guideP2Title'), desc: t('landing.guideP2Desc'), color: 'text-sky-400' },
+                  { icon: <CheckCircle2 size={18} />, step: '3', title: t('landing.guideP3Title'), desc: t('landing.guideP3Desc'), color: 'text-emerald-400' },
+                  { icon: <KeyRound size={18} />, step: '4', title: t('landing.guideP4Title'), desc: t('landing.guideP4Desc'), color: 'text-amber-400' },
+                  { icon: <UserPlus size={18} />, step: '5', title: t('landing.guideP5Title'), desc: t('landing.guideP5Desc'), color: 'text-pink-400' },
+                  { icon: <Monitor size={18} />, step: '6', title: t('landing.guideP6Title'), desc: t('landing.guideP6Desc'), color: 'text-purple-400' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 sm:gap-4 items-start">
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 ${s.color}`}>
+                      {s.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Step {s.step}</span>
+                      </div>
+                      <h5 className="text-white font-bold text-sm sm:text-base leading-snug">{s.title}</h5>
+                      <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => onAction('SETUP')}
+                className="w-full py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl sm:rounded-2xl text-white font-black uppercase text-xs sm:text-sm tracking-widest transition-all active:scale-95 shadow-lg"
+              >
+                {t('landing.guideParentCta')}
+              </button>
+            </div>
+
+            {/* School / Teacher Path */}
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl sm:rounded-[3rem] border border-teal-500/20 p-6 sm:p-10 space-y-6 sm:space-y-8 group hover:border-teal-500/40 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white shadow-xl shrink-0">
+                  <School size={28} />
+                </div>
+                <div>
+                  <h4 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">{t('landing.guideSchoolTitle')}</h4>
+                  <p className="text-teal-400 text-xs font-bold uppercase tracking-widest">{t('landing.guideSchoolTag')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { icon: <Rocket size={18} />, step: '1', title: t('landing.guideS1Title'), desc: t('landing.guideS1Desc'), color: 'text-teal-400' },
+                  { icon: <Mail size={18} />, step: '2', title: t('landing.guideS2Title'), desc: t('landing.guideS2Desc'), color: 'text-sky-400' },
+                  { icon: <CheckCircle2 size={18} />, step: '3', title: t('landing.guideS3Title'), desc: t('landing.guideS3Desc'), color: 'text-emerald-400' },
+                  { icon: <KeyRound size={18} />, step: '4', title: t('landing.guideS4Title'), desc: t('landing.guideS4Desc'), color: 'text-amber-400' },
+                  { icon: <UserPlus size={18} />, step: '5', title: t('landing.guideS5Title'), desc: t('landing.guideS5Desc'), color: 'text-pink-400' },
+                  { icon: <GraduationCap size={18} />, step: '6', title: t('landing.guideS6Title'), desc: t('landing.guideS6Desc'), color: 'text-purple-400' },
+                  { icon: <Monitor size={18} />, step: '7', title: t('landing.guideS7Title'), desc: t('landing.guideS7Desc'), color: 'text-cyan-400' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 sm:gap-4 items-start">
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 ${s.color}`}>
+                      {s.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Step {s.step}</span>
+                      </div>
+                      <h5 className="text-white font-bold text-sm sm:text-base leading-snug">{s.title}</h5>
+                      <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => onAction('SETUP')}
+                className="w-full py-3 sm:py-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 rounded-xl sm:rounded-2xl text-white font-black uppercase text-xs sm:text-sm tracking-widest transition-all active:scale-95 shadow-lg"
+              >
+                {t('landing.guideSchoolCta')}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Tips */}
+          <div className="mt-10 sm:mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            {[
+              { icon: <ShieldCheck size={20} />, title: t('landing.guideTip1Title'), desc: t('landing.guideTip1Desc'), color: 'text-emerald-400' },
+              { icon: <Gamepad2 size={20} />, title: t('landing.guideTip2Title'), desc: t('landing.guideTip2Desc'), color: 'text-indigo-400' },
+              { icon: <Star size={20} />, title: t('landing.guideTip3Title'), desc: t('landing.guideTip3Desc'), color: 'text-amber-400' },
+            ].map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 p-4 sm:p-5 bg-slate-900/40 rounded-2xl border border-white/5">
+                <div className={`shrink-0 ${tip.color}`}>{tip.icon}</div>
+                <div>
+                  <h5 className="text-white font-bold text-sm">{tip.title}</h5>
+                  <p className="text-slate-500 text-xs leading-relaxed">{tip.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
