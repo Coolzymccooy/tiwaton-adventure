@@ -348,7 +348,7 @@ export const StorageService = {
           password: password || '123',
           profile: buildIndexProfile(newProfile)
         };
-        await setDoc(indexRef, indexData, { merge: true });      };
+        await setDoc(indexRef, indexData, { merge: true });  
       // Primary key: name + classId (unique per classroom)
       if (classId) {
         const scopedRef = doc(db, `children_index/${normalizeChildIndexKey(name)}_${classId.toLowerCase()}`);
