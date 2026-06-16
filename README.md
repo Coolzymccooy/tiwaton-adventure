@@ -34,6 +34,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1T7G0hxnyDfG2Y9G39VmbD8
 
 ## Deployment notes
 
+## Agent handoff memory
+
+Future agents should start with [`docs/AGENT_MEMORY.md`](docs/AGENT_MEMORY.md) before changing the production feature bundle. It records what is already complete, the production deploy checklist, and the remaining non-blocking moat-feature to-dos.
+
 ### Render (API/backend)
 - Environment: Web Service
 - Root directory: `.`

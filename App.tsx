@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import { View } from './types';
 import type { FamilyProfile } from './types';
 import { StorageService } from './services/storage';
 import { I18nProvider } from './i18n/I18nProvider';
 import { auth } from './services/firebase';
+import type { User } from 'firebase/auth';
 
 // Pages
 import Home from './pages/Home';
@@ -19,11 +20,26 @@ import Landing from './pages/Landing';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ParentDashboard from './pages/ParentDashboard';
 
+const EXPLICIT_LOGOUT_MARKER = 'tiwaton_explicit_logout';
+
 const App: React.FC = () => {
+  const safeStorage = {
+    getItem: (key: string) => {
+      try { return window.localStorage.getItem(key); } catch { return null; }
+    },
+    setItem: (key: string, value: string) => {
+      try { window.localStorage.setItem(key, value); } catch { }
+    },
+    removeItem: (key: string) => {
+      try { window.localStorage.removeItem(key); } catch { }
+    }
+  };
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [profile, setProfile] = useState<FamilyProfile | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [loginInitialView, setLoginInitialView] = useState<ViewMode>('SIGN_IN_ENTRY');
+  const [sessionReady, setSessionReady] = useState(false);
+  const authEventVersion = useRef(0);
 
   const resolveView = (candidate?: string | null): View => {
     if (candidate && Object.values(View).includes(candidate as View)) {
@@ -32,53 +48,108 @@ const App: React.FC = () => {
     return View.HOME;
   };
 
-  useEffect(() => {
-    const initSession = async () => {
-      // Check if we have local cache
-      const hasProfiles = StorageService.hasProfiles();
 
-      // If no local cache, check if Firebase is signed in
-      if (!hasProfiles) {
-        // Wait for auth to initialize
-        auth.onAuthStateChanged(async (user) => {
-          if (user) {
-            const profiles = await StorageService.syncFromFirestore(user.uid);
-            if (profiles.length > 0) {
-              const activeId = StorageService.getCurrentProfile()?.id;
-              if (activeId) {
-                const active = profiles.find(p => p.id === activeId);
-                if (active) {
-                  setProfile(active);
-                  setCurrentView(resolveView(StorageService.getLastView()));
-                  if (active.role === 'PARENT' || active.role === 'TEACHER') setIsAdminMode(true);
-                } else {
-                  setCurrentView(View.LOGIN);
-                  setLoginInitialView('USER_GRID');
-                }
-              } else {
-                setCurrentView(View.LOGIN);
-                setLoginInitialView('USER_GRID');
-              }
-            } else {
-              setCurrentView(View.LANDING);
-            }
-          } else {
-            setCurrentView(View.LANDING);
-          }
-        });
-      } else {
-        const active = StorageService.getCurrentProfile();
-        if (active) {
-          setProfile(active);
-          setCurrentView(resolveView(StorageService.getLastView()));
-          if (active.role === 'PARENT' || active.role === 'TEACHER') setIsAdminMode(true);
-        } else {
-          setCurrentView(View.LOGIN);
-          setLoginInitialView('USER_GRID');
+  const restoreCachedLocalSession = () => {
+    const cachedActive = StorageService.getCurrentProfile();
+    if (!cachedActive) return false;
+
+    setProfile(cachedActive);
+    setIsAdminMode(cachedActive.role === 'PARENT' || cachedActive.role === 'TEACHER');
+    setCurrentView(resolveView(StorageService.getLastView()));
+    return true;
+  };
+
+  const bootstrapAuthenticatedSession = async (user: User, eventId: number, mountedRef: { current: boolean }) => {
+    const profiles = await StorageService.syncFromFirestore(user.uid);
+    if (!mountedRef.current || eventId !== authEventVersion.current) return;
+
+    if (profiles.length === 0) {
+      setProfile(null);
+      setIsAdminMode(false);
+      setCurrentView(View.LANDING);
+      setSessionReady(true);
+      return;
+    }
+
+    const active = StorageService.getCurrentProfile();
+    if (active) {
+      setProfile(active);
+      setCurrentView(resolveView(StorageService.getLastView()));
+      setIsAdminMode(active.role === 'PARENT' || active.role === 'TEACHER');
+      return;
+    }
+
+    setProfile(null);
+    setIsAdminMode(false);
+    setCurrentView(View.LOGIN);
+    setLoginInitialView('USER_GRID');
+  };
+
+  useEffect(() => {
+    const mountedRef = { current: true };
+    let receivedAuthEvent = false;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!mountedRef.current || receivedAuthEvent) return;
+      setSessionReady(true);
+      setCurrentView(View.LANDING);
+    }, 4000);
+
+    const handleAuthState = async (user: User | null) => {
+      const eventId = ++authEventVersion.current;
+      receivedAuthEvent = true;
+      clearTimeout(fallbackTimer);
+
+      if (!mountedRef.current) return;
+
+      if (!user) {
+        const explicitLogout = safeStorage.getItem(EXPLICIT_LOGOUT_MARKER) === '1';
+
+        if (explicitLogout) {
+          safeStorage.removeItem(EXPLICIT_LOGOUT_MARKER);
+          StorageService.clearSession();
+          setProfile(null);
+          setIsAdminMode(false);
+          setCurrentView(View.LANDING);
+          setSessionReady(true);
+          return;
+        }
+
+        const resumed = restoreCachedLocalSession();
+        if (!resumed) {
+          StorageService.clearSession();
+          setProfile(null);
+          setIsAdminMode(false);
+          setCurrentView(View.LANDING);
+        }
+
+        setSessionReady(true);
+        return;
+      }
+
+      try {
+        await bootstrapAuthenticatedSession(user, eventId, mountedRef);
+      } catch (error) {
+        console.error('Session bootstrap failed', error);
+        if (!mountedRef.current || eventId !== authEventVersion.current) return;
+        setProfile(null);
+        setIsAdminMode(false);
+        setCurrentView(View.LANDING);
+      } finally {
+        if (mountedRef.current && eventId === authEventVersion.current) {
+          setSessionReady(true);
         }
       }
     };
-    initSession();
+
+    const unsubscribe = auth.onAuthStateChanged(handleAuthState);
+
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(fallbackTimer);
+      authEventVersion.current += 1;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -90,15 +161,25 @@ const App: React.FC = () => {
     StorageService.setCurrentProfile(p.id);
     const active = StorageService.getCurrentProfile() || p;
     setProfile(active);
-    setIsAdminMode(active.mode === 'PARENT');
+    setIsAdminMode(active.mode === 'PARENT' || active.mode === 'TEACHER');
     setCurrentView(resolveView(StorageService.getLastView()));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfile(null);
     setIsAdminMode(false);
-    StorageService.setCurrentProfile('');
+    safeStorage.setItem(EXPLICIT_LOGOUT_MARKER, '1');
+    StorageService.clearSession();
+
+    try {
+      await auth.signOut();
+    } catch (error) {
+      console.error('Sign out error', error);
+      safeStorage.removeItem(EXPLICIT_LOGOUT_MARKER);
+    }
+
     setCurrentView(View.LANDING);
+    setSessionReady(true);
   };
 
   const handleLandingAction = (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => {
@@ -117,9 +198,21 @@ const App: React.FC = () => {
     setCurrentView(View.LOGIN);
   };
 
+  const isMobileLikeDevice = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+
+    const width = window.innerWidth || document.documentElement.clientWidth || 0;
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const ua = navigator.userAgent || '';
+    const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+
+    return width <= 1024 || coarsePointer || reducedMotion || mobileUA;
+  }, []);
+
   const renderView = () => {
     if (currentView === View.LANDING) {
-      return <Landing onAction={handleLandingAction} activeProfile={profile} />;
+      return <Landing onAction={handleLandingAction} activeProfile={profile} disableHeavyEffects={isMobileLikeDevice} sessionReady={sessionReady} />;
     }
 
     if (currentView === View.LOGIN) {
@@ -127,10 +220,11 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         initialViewMode={loginInitialView}
         onBackToLanding={() => setCurrentView(View.LANDING)}
+        compactMode={isMobileLikeDevice}
       />;
     }
 
-    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} />;
+    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} />;
 
     switch (currentView) {
       case View.HOME:

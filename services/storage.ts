@@ -1,12 +1,15 @@
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import type { Story, Drawing, GameStat, PlanetProgress, MathPlanet, CountdownEvent, FamilyProfile } from '../types';
+import type { Story, Drawing, GameStat, PlanetProgress, MathPlanet, CountdownEvent, FamilyProfile, EnglishProgress, DailyLearningPath } from '../types';
 
 const STORAGE_KEYS = {
   TENANT: 'tiwaton_tenant_id',
   PROFILE: 'tiwaton_profile_id',
   PROFILES: 'tiwaton_profiles_cache',
-  LAST_VIEW: 'tiwaton_last_view'
+  LAST_VIEW: 'tiwaton_last_view',
+  ENGLISH_PROGRESS: 'tiwaton_english_progress_cache',
+  DAILY_PATH: 'tiwaton_daily_learning_path_cache',
+  LEARNING_STREAK: 'tiwaton_learning_streak_cache'
 };
 
 const safeStorage = {
@@ -18,6 +21,105 @@ const safeStorage = {
 let currentTenantId: string | null = safeStorage.getItem(STORAGE_KEYS.TENANT);
 let currentProfileId: string | null = safeStorage.getItem(STORAGE_KEYS.PROFILE);
 let cachedProfiles: FamilyProfile[] = JSON.parse(safeStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+
+type ChildIndexRecord = {
+  tenantId: string;
+  childId: string;
+  password: string;
+  profile?: FamilyProfile;
+};
+
+const buildIndexProfile = (profile: FamilyProfile): FamilyProfile => ({
+  id: profile.id,
+  name: profile.name,
+  role: profile.role,
+  schoolId: profile.schoolId,
+  classId: profile.classId ?? null,
+  avatar: profile.avatar,
+  mode: profile.mode,
+  age: profile.age,
+  password: profile.password,
+  tenantId: profile.tenantId,
+  guardianUids: profile.guardianUids ?? [],
+  active: profile.active ?? true
+});
+
+const normalizeChildIndexKey = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const buildFallbackChildProfile = (name: string, data: ChildIndexRecord): FamilyProfile => ({
+  id: data.childId,
+  name: name.trim(),
+  role: 'STUDENT',
+  avatar: '🧒',
+  mode: 'KIDS',
+  age: 8,
+  password: data.password || '123',
+  tenantId: data.tenantId,
+  guardianUids: [],
+  active: true
+});
+
+const getLocalEnglishProgress = (childId: string): EnglishProgress[] => {
+  try {
+    const all = JSON.parse(safeStorage.getItem(STORAGE_KEYS.ENGLISH_PROGRESS) || '{}');
+    return Array.isArray(all[childId]) ? all[childId] : [];
+  } catch {
+    return [];
+  }
+};
+
+const setLocalEnglishProgress = (childId: string, entries: EnglishProgress[]) => {
+  try {
+    const all = JSON.parse(safeStorage.getItem(STORAGE_KEYS.ENGLISH_PROGRESS) || '{}');
+    all[childId] = entries.slice(0, 100);
+    safeStorage.setItem(STORAGE_KEYS.ENGLISH_PROGRESS, JSON.stringify(all));
+  } catch {
+    // Ignore local cache write limits; Firestore write can still succeed.
+  }
+};
+
+const getTodayKey = () => new Date().toISOString().slice(0, 10);
+
+const getLocalDailyPaths = (): Record<string, DailyLearningPath> => {
+  try {
+    return JSON.parse(safeStorage.getItem(STORAGE_KEYS.DAILY_PATH) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const setLocalDailyPaths = (paths: Record<string, DailyLearningPath>) => {
+  try {
+    safeStorage.setItem(STORAGE_KEYS.DAILY_PATH, JSON.stringify(paths));
+  } catch {
+    // Ignore cache quota/storage restrictions; the path can be rebuilt on next load.
+  }
+};
+
+const getDailyPathCacheKey = (childId: string, date = getTodayKey()) => `${childId}:${date}`;
+
+const getLocalLearningStreaks = (): Record<string, { lastCompletedDate: string; count: number }> => {
+  try {
+    return JSON.parse(safeStorage.getItem(STORAGE_KEYS.LEARNING_STREAK) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const setLocalLearningStreaks = (streaks: Record<string, { lastCompletedDate: string; count: number }>) => {
+  try {
+    safeStorage.setItem(STORAGE_KEYS.LEARNING_STREAK, JSON.stringify(streaks));
+  } catch {
+    // Ignore local cache quota/storage restrictions.
+  }
+};
+
+const getPreviousDateKey = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
 
 // Helper to ensure auth/tenant context
 const getTenantId = () => {
@@ -55,6 +157,16 @@ export const StorageService = {
     return cachedProfiles.length > 0;
   },
 
+  clearSession: () => {
+    currentTenantId = null;
+    currentProfileId = null;
+    cachedProfiles = [];
+    safeStorage.removeItem(STORAGE_KEYS.TENANT);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILE);
+    safeStorage.removeItem(STORAGE_KEYS.PROFILES);
+    safeStorage.removeItem(STORAGE_KEYS.LAST_VIEW);
+  },
+
   syncFromFirestore: async (uid: string) => {
     try {
       StorageService.setTenantContext(uid);
@@ -71,11 +183,12 @@ export const StorageService = {
         const childData = d.data() as FamilyProfile;
         try {
           // Fire-and-forget indexing (won't throw or block the load)
-          const indexRef = doc(db, `children_index/${childData.name.toLowerCase()}`);
+          const indexRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
           setDoc(indexRef, {
             tenantId: uid,
             childId: childData.id,
-            password: childData.password || '123'
+            password: childData.password || '123',
+            profile: buildIndexProfile(childData)
           }, { merge: true });
         } catch (e) {
           console.warn("Could not index child", childData.name, e);
@@ -183,11 +296,12 @@ export const StorageService = {
 
     // Save lightweight index for global sign in
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const indexRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
       await setDoc(indexRef, {
         tenantId,
         childId,
-        password: password || '123'
+        password: password || '123',
+        profile: buildIndexProfile(newProfile)
       }, { merge: true });
     } catch (e) {
       console.warn("Could not save to children_index", e);
@@ -200,22 +314,25 @@ export const StorageService = {
 
   findChildGlobal: async (name: string, pin: string): Promise<FamilyProfile | null> => {
     try {
-      const indexRef = doc(db, `children_index/${name.toLowerCase()}`);
+      const normalizedName = normalizeChildIndexKey(name);
+      const indexRef = doc(db, `children_index/${normalizedName}`);
       const indexSnap = await getDoc(indexRef);
-      if (indexSnap.exists()) {
-        const data = indexSnap.data();
-        if (data.password.toLowerCase() === pin.toLowerCase()) {
-          const profileRef = doc(db, `tenants/${data.tenantId}/children/${data.childId}`);
-          const profileSnap = await getDoc(profileRef);
-          if (profileSnap.exists()) {
-            const p = profileSnap.data() as FamilyProfile;
-            StorageService.setTenantContext(data.tenantId);
-            StorageService.setCachedProfiles([p]); // Cache this profile locally
-            return p;
-          }
-        }
+      if (!indexSnap.exists()) return null;
+
+      const data = indexSnap.data() as ChildIndexRecord;
+      if ((data.password || '').toLowerCase() !== pin.toLowerCase()) return null;
+
+      const resolvedProfile = data.profile ?? buildFallbackChildProfile(name, data);
+
+      StorageService.setTenantContext(data.tenantId);
+      StorageService.setCachedProfiles([resolvedProfile]);
+      StorageService.setCurrentProfile(resolvedProfile.id);
+
+      if (!data.profile) {
+        console.warn('Child index profile snapshot missing; using fallback profile for', normalizedName);
       }
-      return null;
+
+      return resolvedProfile;
     } catch (e) {
       console.error("Global child fetch error", e);
       return null;
@@ -292,6 +409,111 @@ export const StorageService = {
     const { deleteDoc } = await import('firebase/firestore');
     const docRef = doc(db, `tenants/${tenantId}/children/${currentProfileId}/stories/${storyId}`);
     await deleteDoc(docRef);
+  },
+
+  saveEnglishProgress: async (entry: Omit<EnglishProgress, 'id' | 'childId' | 'childName' | 'createdAt'> & Partial<Pick<EnglishProgress, 'id' | 'childId' | 'childName' | 'createdAt'>>) => {
+    const tenantId = getTenantId();
+    const profile = StorageService.getCurrentProfile();
+    const childId = entry.childId || currentProfileId;
+    if (!childId) return;
+
+    const payload: EnglishProgress = {
+      id: entry.id || `english-${Date.now()}`,
+      childId,
+      childName: entry.childName || profile?.name || 'Student',
+      mode: entry.mode,
+      score: entry.score,
+      attempts: entry.attempts,
+      accuracy: entry.accuracy,
+      wordsPracticed: entry.wordsPracticed || [],
+      summary: entry.summary,
+      xpEarned: entry.xpEarned,
+      coinsEarned: entry.coinsEarned,
+      createdAt: entry.createdAt || Date.now()
+    };
+
+    const localEntries = [payload, ...getLocalEnglishProgress(childId).filter(item => item.id !== payload.id)]
+      .sort((a, b) => b.createdAt - a.createdAt);
+    setLocalEnglishProgress(childId, localEntries);
+
+    if (!tenantId) return;
+
+    const docRef = doc(db, `tenants/${tenantId}/children/${childId}/englishProgress/${payload.id}`);
+    await setDoc(docRef, { ...payload, ownerChildId: childId, createdByUid: auth.currentUser?.uid || childId });
+  },
+
+  getEnglishProgress: async (childId?: string): Promise<EnglishProgress[]> => {
+    const tenantId = getTenantId();
+    const targetChildId = childId || currentProfileId;
+    if (!targetChildId) return [];
+    const localEntries = getLocalEnglishProgress(targetChildId);
+    if (!tenantId) return localEntries.sort((a, b) => b.createdAt - a.createdAt);
+
+    const colRef = collection(db, `tenants/${tenantId}/children/${targetChildId}/englishProgress`);
+    try {
+      const snapshot = await getDocs(colRef);
+      const remoteEntries = snapshot.docs.map(doc => doc.data() as EnglishProgress);
+      const merged = [...remoteEntries, ...localEntries]
+        .filter((item, index, all) => all.findIndex(other => other.id === item.id) === index)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setLocalEnglishProgress(targetChildId, merged);
+      return merged;
+    } catch (error) {
+      console.warn('Using local English progress cache', error);
+      return localEntries.sort((a, b) => b.createdAt - a.createdAt);
+    }
+  },
+
+  getDailyLearningPath: (childId?: string): DailyLearningPath | null => {
+    const targetChildId = childId || currentProfileId;
+    if (!targetChildId) return null;
+    return getLocalDailyPaths()[getDailyPathCacheKey(targetChildId)] || null;
+  },
+
+  saveDailyLearningPath: (path: DailyLearningPath) => {
+    const paths = getLocalDailyPaths();
+    const streak = getLocalLearningStreaks()[path.childId];
+    paths[getDailyPathCacheKey(path.childId, path.date)] = {
+      ...path,
+      streakDay: path.streakDay || streak?.count || 0,
+      updatedAt: Date.now()
+    };
+    setLocalDailyPaths(paths);
+  },
+
+  completeDailyLearningTask: (taskId: string, childId?: string): DailyLearningPath | null => {
+    const targetChildId = childId || currentProfileId;
+    if (!targetChildId) return null;
+
+    const paths = getLocalDailyPaths();
+    const key = getDailyPathCacheKey(targetChildId);
+    const path = paths[key];
+    if (!path) return null;
+
+    const updatedPath: DailyLearningPath = {
+      ...path,
+      tasks: path.tasks.map(task => task.id === taskId ? { ...task, completed: true } : task),
+      updatedAt: Date.now()
+    };
+
+    const allComplete = updatedPath.tasks.every(task => task.completed);
+    if (allComplete) {
+      const streaks = getLocalLearningStreaks();
+      const current = streaks[targetChildId];
+      const alreadyCountedToday = current?.lastCompletedDate === updatedPath.date;
+      const count = alreadyCountedToday
+        ? current.count
+        : current?.lastCompletedDate === getPreviousDateKey()
+          ? current.count + 1
+          : 1;
+      streaks[targetChildId] = { lastCompletedDate: updatedPath.date, count };
+      updatedPath.streakDay = count;
+      setLocalLearningStreaks(streaks);
+    }
+
+    paths[key] = updatedPath;
+    setLocalDailyPaths(paths);
+    return updatedPath;
   },
 
   getComments: async () => {

@@ -51,7 +51,13 @@ service cloud.firestore {
     }
 
     match /children_index/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.tenantId is string
+        && isStaff(request.resource.data.tenantId);
+      allow delete: if signedIn()
+        && resource.data.tenantId is string
+        && isAdmin(resource.data.tenantId);
     }
 
     // Tenants root (optional metadata)
