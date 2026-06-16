@@ -194,14 +194,13 @@ export const StorageService = {
         try {
           // Fire-and-forget indexing (won't throw or block the load)
           const indexRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}`);
-          setDoc(indexRef, {
           const indexData = {
             tenantId: uid,
             childId: childData.id,
             password: childData.password || '123',
             profile: buildIndexProfile(childData)
-          }, { merge: true });
           };
+          setDoc(indexRef, indexData, { merge: true });          };
           // Fire-and-forget indexing (won't throw or block the load)
           if (childData.classId) {
             const scopedRef = doc(db, `children_index/${normalizeChildIndexKey(childData.name)}_${childData.classId.toLowerCase()}`);
@@ -343,14 +342,13 @@ export const StorageService = {
     // Use classId-scoped key to prevent name collisions across tenants
     try {
       const indexRef = doc(db, `children_index/${normalizeChildIndexKey(name)}`);
-      await setDoc(indexRef, {
-      const indexData = {
-        tenantId,
-        childId,
-        password: password || '123',
-        profile: buildIndexProfile(newProfile)
-      }, { merge: true });
-      };
+        const indexData = {
+          tenantId,
+          childId,
+          password: password || '123',
+          profile: buildIndexProfile(newProfile)
+        };
+        await setDoc(indexRef, indexData, { merge: true });      };
       // Primary key: name + classId (unique per classroom)
       if (classId) {
         const scopedRef = doc(db, `children_index/${normalizeChildIndexKey(name)}_${classId.toLowerCase()}`);
