@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import { View } from './types';
@@ -20,7 +19,21 @@ import Landing from './pages/Landing';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ParentDashboard from './pages/ParentDashboard';
 
+const EXPLICIT_LOGOUT_MARKER = 'tiwaton_explicit_logout';
+
 const App: React.FC = () => {
+  const safeStorage = {
+    getItem: (key: string) => {
+      try { return window.localStorage.getItem(key); } catch { return null; }
+    },
+    setItem: (key: string, value: string) => {
+      try { window.localStorage.setItem(key, value); } catch { }
+    },
+    removeItem: (key: string) => {
+      try { window.localStorage.removeItem(key); } catch { }
+    }
+  };
+
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [profile, setProfile] = useState<FamilyProfile | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -37,11 +50,48 @@ const App: React.FC = () => {
     return View.HOME;
   };
 
+
+  const restoreCachedLocalSession = () => {
+    const cachedActive = StorageService.getCurrentProfile();
+    if (!cachedActive) return false;
+
+    setProfile(cachedActive);
+    setIsAdminMode(cachedActive.role === 'PARENT' || cachedActive.role === 'TEACHER');
+    setCurrentView(resolveView(StorageService.getLastView()));
+    return true;
+  };
+
+  const bootstrapAuthenticatedSession = async (user: User, eventId: number, mountedRef: { current: boolean }) => {
+    const profiles = await StorageService.syncFromFirestore(user.uid);
+    if (!mountedRef.current || eventId !== authEventVersion.current) return;
+
+    if (profiles.length === 0) {
+      setProfile(null);
+      setIsAdminMode(false);
+      setCurrentView(View.LANDING);
+      setSessionReady(true);
+      return;
+    }
+
+    const active = StorageService.getCurrentProfile();
+    if (active) {
+      setProfile(active);
+      setCurrentView(resolveView(StorageService.getLastView()));
+      setIsAdminMode(active.role === 'PARENT' || active.role === 'TEACHER');
+      return;
+    }
+
+    setProfile(null);
+    setIsAdminMode(false);
+    setCurrentView(View.LOGIN);
+    setLoginInitialView('USER_GRID');
+  };
+
   useEffect(() => {
     const mountedRef = { current: true };
 
     // If local cache says we have profiles, resolve immediately without waiting
-    // for Firebase — the user sees their hub in < 100ms.
+    // for Firebase - the user sees their hub in < 100ms.
     const cachedProfile = StorageService.getCurrentProfile();
     if (cachedProfile) {
       setProfile(cachedProfile);
@@ -56,36 +106,11 @@ const App: React.FC = () => {
       if (!mountedRef.current) return;
 
       if (!user) {
-        // Only clear if we didn't get anything from the cache
-        if (!cachedProfile) {
+        const explicitLogout = safeStorage.getItem(EXPLICIT_LOGOUT_MARKER) === '1';
+
+        if (explicitLogout) {
+          safeStorage.removeItem(EXPLICIT_LOGOUT_MARKER);
           StorageService.clearSession();
-          setProfile(null);
-          setIsAdminMode(false);
-          setCurrentView(View.LANDING);
-        }
-        setSessionReady(true);
-        return;
-      }
-
-      // Block unverified email accounts from auto-resuming
-      if (!user.emailVerified) {
-        if (!cachedProfile) {
-          StorageService.clearSession();
-          setProfile(null);
-          setIsAdminMode(false);
-          setCurrentView(View.LOGIN);
-          setLoginInitialView('SIGN_IN_ENTRY');
-        }
-        setSessionReady(true);
-        return;
-      }
-
-      // Sync from Firestore in the background — don't block the UI
-      try {
-        const profiles = await StorageService.syncFromFirestore(user.uid);
-        if (!mountedRef.current || eventId !== authEventVersion.current) return;
-
-        if (profiles.length === 0) {
           setProfile(null);
           setIsAdminMode(false);
           setCurrentView(View.LANDING);
@@ -93,19 +118,25 @@ const App: React.FC = () => {
           return;
         }
 
-        const active = StorageService.getCurrentProfile();
-        if (active) {
-          setProfile(active);
-          setCurrentView(resolveView(StorageService.getLastView()));
-          setIsAdminMode(active.role === 'PARENT' || active.role === 'TEACHER');
-        } else {
+        const resumed = restoreCachedLocalSession();
+        if (!resumed) {
+          StorageService.clearSession();
           setProfile(null);
           setIsAdminMode(false);
-          setCurrentView(View.LOGIN);
-          setLoginInitialView('USER_GRID');
+          setCurrentView(View.LANDING);
         }
+        setSessionReady(true);
+        return;
+      }
+
+      try {
+        await bootstrapAuthenticatedSession(user, eventId, mountedRef);
       } catch (error) {
         console.error('Session bootstrap failed', error);
+        if (!mountedRef.current || eventId !== authEventVersion.current) return;
+        setProfile(null);
+        setIsAdminMode(false);
+        setCurrentView(View.LANDING);
       } finally {
         if (mountedRef.current && eventId === authEventVersion.current) {
           setSessionReady(true);
@@ -114,7 +145,6 @@ const App: React.FC = () => {
     };
 
     const unsubscribe = auth.onAuthStateChanged(handleAuthState);
-
     return () => {
       mountedRef.current = false;
       authEventVersion.current += 1;
@@ -138,15 +168,16 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     setProfile(null);
     setIsAdminMode(false);
+    safeStorage.setItem(EXPLICIT_LOGOUT_MARKER, '1');
     StorageService.clearSession();
-
     try {
       await auth.signOut();
     } catch (error) {
       console.error('Sign out error', error);
+      safeStorage.removeItem(EXPLICIT_LOGOUT_MARKER);
     }
-
     setCurrentView(View.LANDING);
+    setSessionReady(true);
   };
 
   const handleLandingAction = (action: 'LOGIN' | 'SETUP' | 'RESET' | 'CONTINUE') => {
@@ -177,69 +208,28 @@ const App: React.FC = () => {
 
   const renderView = () => {
     if (currentView === View.LANDING) {
-      return <Landing
-        onAction={handleLandingAction}
-        activeProfile={profile}
-        disableHeavyEffects={isMobileLikeDevice}
-        sessionReady={sessionReady}
-      />;
+      return <Landing onAction={handleLandingAction} profile={profile} />;
     }
-
     if (currentView === View.LOGIN) {
-      return <Login
-        onLogin={handleLogin}
-        initialViewMode={loginInitialView}
-        onBackToLanding={() => setCurrentView(View.LANDING)}
-        compactMode={isMobileLikeDevice}
-      />;
+      return <Login onLogin={handleLogin} onBack={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} initialView={loginInitialView} />;
     }
-
-    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} />;
-
+    if (!profile) return <Login onLogin={handleLogin} onBack={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} initialView={loginInitialView} />;
     switch (currentView) {
-      case View.HOME:
-        return <Home
-          onNavigate={setCurrentView}
-          profile={profile}
-          setProfile={setProfile}
-          onLogout={handleLogout}
-          isAdminMode={isAdminMode}
-          setIsAdminMode={setIsAdminMode}
-        />;
-      case View.TEACHER_DASHBOARD:
-        return <TeacherDashboard onBack={() => setCurrentView(View.HOME)} />;
-      case View.PARENT_DASHBOARD:
-        return <ParentDashboard onBack={() => setCurrentView(View.HOME)} />;
-      case View.STORIES:
-        return <StoriesPage onNavigate={setCurrentView} />;
-      case View.DRAWING:
-        return <DrawingPage onNavigate={setCurrentView} />;
-      case View.ACTIVITIES:
-        return <ActivitiesPage onNavigate={setCurrentView} />;
-      case View.GAMES:
-        return <GamesPage />;
-      case View.COUNTDOWN:
-        return <CountdownPage />;
-      default:
-        return <Home
-          onNavigate={setCurrentView}
-          profile={profile}
-          setProfile={setProfile}
-          onLogout={handleLogout}
-          isAdminMode={isAdminMode}
-          setIsAdminMode={setIsAdminMode}
-        />;
+      case View.HOME: return <Home profile={profile} onLogout={handleLogout} onNavigate={setCurrentView} isAdminMode={isAdminMode} />;
+      case View.TEACHER_DASHBOARD: return <TeacherDashboard profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.PARENT_DASHBOARD: return <ParentDashboard profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.STORIES: return <StoriesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.DRAWING: return <DrawingPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.ACTIVITIES: return <ActivitiesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.GAMES: return <GamesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      case View.COUNTDOWN: return <CountdownPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
+      default: return <Home profile={profile} onLogout={handleLogout} onNavigate={setCurrentView} isAdminMode={isAdminMode} />;
     }
   };
 
   return (
     <I18nProvider>
-      <Layout
-        currentView={currentView}
-        onNavigate={setCurrentView}
-        name={profile?.name || ''}
-        onLogout={handleLogout}
-      >
+      <Layout>
         {renderView()}
       </Layout>
     </I18nProvider>

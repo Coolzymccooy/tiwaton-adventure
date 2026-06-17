@@ -34,6 +34,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1T7G0hxnyDfG2Y9G39VmbD8
 
 ## Deployment notes
 
+## Agent handoff memory
+
+Future agents should start with [`docs/AGENT_MEMORY.md`](docs/AGENT_MEMORY.md) before changing the production feature bundle. It records what is already complete, the production deploy checklist, and the remaining non-blocking moat-feature to-dos.
+
 ### Render (API/backend)
 - Environment: Web Service
 - Root directory: `.`
@@ -55,5 +59,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1T7G0hxnyDfG2Y9G39VmbD8
   - Make sure the CORS origins above include every Vercel preview URL you plan to use.
 
 ## Health check
+
+<!-- Trigger clean build -->
 - Backend health: `GET /api/health` (returns `{ ok: true }`)
 - Make sure `VITE_API_BASE_URL` aligns with the deployed backend so the quiz, story, and coloring routes work on the production UI.

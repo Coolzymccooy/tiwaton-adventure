@@ -120,6 +120,10 @@ const Landing: React.FC<LandingProps> = ({ onAction, activeProfile, disableHeavy
           <h1 className="text-3xl font-display text-center">Adventure Hub</h1>
           <p className="text-sm text-slate-300 text-center">{heroFullSubtitle}</p>
 
+          {!sessionReady && (
+            <p className="text-center text-xs text-slate-400">Preparing your session...</p>
+          )}
+
           <button
             onClick={() => {
               if (activeProfile) onAction('CONTINUE');

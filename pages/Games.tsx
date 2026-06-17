@@ -9,10 +9,12 @@ import {
   Globe, Trees, Waves, Ghost, Gift, Award,
   Keyboard, Type, Grid, Wand2, MousePointer2,
   Shapes, Ruler, Infinity, X, Divide, CircleDot,
-  Percent, Variable, BookOpen, Shuffle, Link2, Scan
+  Percent, Variable, BookOpen, Shuffle, Link2, Scan,
+  Volume2, Loader2, Home
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AudioService } from '../services/audio';
+import { AIService } from '../services/ai';
 import { MathPlanet, GameStat } from '../types';
 import {
   generateMountainQuestion,
@@ -792,6 +794,7 @@ const MathGalaxy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [question, setQuestion] = useState<any>(null);
   const [options, setOptions] = useState<any[]>([]);
   const [score, setScore] = useState(0);
+  const [missionAttempts, setMissionAttempts] = useState(0);
   const [missionTarget] = useState(5);
   const [showVictory, setShowVictory] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'CORRECT' | 'WRONG', msg: string } | null>(null);
@@ -1389,20 +1392,367 @@ const EmojiRiddle: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+type EnglishMissionMode = 'DAILY' | 'VOCAB' | 'SPELL' | 'READ';
+
+type EnglishWord = {
+  word: string;
+  meaning: string;
+  sentence: string;
+  options: string[];
+};
+
+const ENGLISH_WORD_BANK: EnglishWord[] = [
+  {
+    word: 'curious',
+    meaning: 'wanting to learn or know more',
+    sentence: 'The curious child asked how the rainbow formed.',
+    options: ['wanting to learn', 'very sleepy', 'moving quickly', 'full of water']
+  },
+  {
+    word: 'brave',
+    meaning: 'ready to face something scary or hard',
+    sentence: 'Maya was brave when she read aloud to the class.',
+    options: ['ready to face fear', 'very tiny', 'made of glass', 'not telling the truth']
+  },
+  {
+    word: 'observe',
+    meaning: 'to look carefully and notice details',
+    sentence: 'Scientists observe the moon through telescopes.',
+    options: ['look carefully', 'run away', 'forget quickly', 'paint red']
+  },
+  {
+    word: 'protect',
+    meaning: 'to keep safe',
+    sentence: 'A helmet can protect your head when you ride a bike.',
+    options: ['keep safe', 'make louder', 'throw away', 'turn around']
+  },
+  {
+    word: 'compare',
+    meaning: 'to find what is alike and different',
+    sentence: 'We compare two stories to see how they are similar.',
+    options: ['find alike and different', 'hide under a table', 'sing quietly', 'count backward']
+  },
+  {
+    word: 'invent',
+    meaning: 'to create something new',
+    sentence: 'The team worked together to invent a helpful robot.',
+    options: ['create something new', 'sleep outside', 'walk in circles', 'eat breakfast']
+  }
+];
+
+const READING_PASSAGES = [
+  {
+    title: 'The Garden Scientist',
+    passage: 'Zara planted two beans in soft soil. Each morning, she observed the leaves and measured the stems. One plant grew near the sunny window. The other stayed in a dark corner. Zara learned that plants need light to grow strong.',
+    question: 'What did Zara learn?',
+    options: ['Plants need light to grow strong.', 'Plants grow best in dark corners.', 'Beans do not need soil.', 'Measuring plants stops them growing.'],
+    answer: 0
+  },
+  {
+    title: 'The Helpful Map',
+    passage: 'Leo and Amara visited a museum. They used a map to compare the animal room, space room, and art room. The map helped them plan the shortest path. They reached every room before lunch and still had time to sketch their favorite exhibit.',
+    question: 'Why was the map helpful?',
+    options: ['It helped them plan a short path.', 'It cooked their lunch.', 'It turned into a spaceship.', 'It hid the art room.'],
+    answer: 0
+  }
+];
+
+const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
+
+const EnglishLearningQuest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const profile = StorageService.getCurrentProfile();
+  const [stats, setStats] = useState<GameStat>(StorageService.getGameStats());
+  const [mode, setMode] = useState<EnglishMissionMode>('DAILY');
+  const [activeWord, setActiveWord] = useState(() => shuffle(ENGLISH_WORD_BANK)[0]);
+  const [passage, setPassage] = useState(() => shuffle(READING_PASSAGES)[0]);
+  const [spellInput, setSpellInput] = useState('');
+  const [score, setScore] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [aiQuestions, setAiQuestions] = useState<any[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showVictory, setShowVictory] = useState(false);
+  const [missionAttempts, setMissionAttempts] = useState(0);
+  const wordLevel = stats.wordQuestProgress?.level || 1;
+
+  const awardEnglishXp = (xp: number, coins: number, modeType: 'VOCAB' | 'SPELL' | 'READ' | 'AI', words: string[], summary: string) => {
+    const attempts = Math.max(missionAttempts + 1, score + 1, 1);
+    const finalScore = modeType === 'READ' ? Math.max(score + 1, 2) : Math.max(score + 1, 3);
+    const nextStats: GameStat = {
+      ...stats,
+      xp: stats.xp + xp,
+      coins: stats.coins + coins,
+      wordQuestProgress: { level: wordLevel + 1, unlocked: true }
+    };
+    if (!nextStats.badges?.includes('English Explorer') && wordLevel >= 2) {
+      nextStats.badges = [...(nextStats.badges || []), 'English Explorer'];
+    }
+    StorageService.saveGameStats(nextStats);
+    StorageService.saveEnglishProgress({
+      mode: modeType,
+      score: finalScore,
+      attempts,
+      accuracy: Math.round((finalScore / attempts) * 100),
+      wordsPracticed: words,
+      summary,
+      xpEarned: xp,
+      coinsEarned: coins
+    }).catch(error => console.error('English progress save failed', error));
+    setStats(nextStats);
+  };
+
+  const nextWord = () => {
+    setActiveWord(shuffle(ENGLISH_WORD_BANK)[0]);
+    setSpellInput('');
+    setFeedback('');
+  };
+
+  const startAiMission = async () => {
+    setAiLoading(true);
+    setFeedback('');
+    const generated = await AIService.generateQuiz('English', wordLevel, 'vocabulary, spelling, reading comprehension', profile?.age || 7);
+    setAiQuestions(generated.slice(0, 3));
+    setAiLoading(false);
+    if (!generated.length) {
+      setFeedback('AI is warming up. Practice with the daily missions below.');
+      AudioService.speak('AI is warming up. Try the daily English missions.');
+    } else {
+      StorageService.saveEnglishProgress({
+        mode: 'AI',
+        score: 0,
+        attempts: generated.length,
+        accuracy: 0,
+        wordsPracticed: ['AI Mission'],
+        summary: `Generated ${generated.length} AI English practice questions.`,
+        xpEarned: 0,
+        coinsEarned: 0
+      }).catch(error => console.error('AI English progress save failed', error));
+      AudioService.speak('AI English mission ready. Answer the coach questions.');
+    }
+  };
+
+  const handleVocabAnswer = (choice: string) => {
+    setMissionAttempts(prev => prev + 1);
+    const correct = choice === activeWord.options[0];
+    if (correct) {
+      setScore(prev => prev + 1);
+      setFeedback(`Correct! ${activeWord.word} means ${activeWord.meaning}.`);
+      AudioService.playEffect('correct');
+      AudioService.speak(`Correct. ${activeWord.word} means ${activeWord.meaning}.`);
+      if (score + 1 >= 3) {
+        awardEnglishXp(180, 45, 'VOCAB', [activeWord.word], 'Completed Vocabulary Quest practice.');
+        setShowVictory(true);
+      } else {
+        setTimeout(nextWord, 900);
+      }
+    } else {
+      setFeedback(`Almost. Listen: ${activeWord.sentence}`);
+      AudioService.playEffect('wrong');
+      AudioService.speak(activeWord.sentence);
+    }
+  };
+
+  const handleSpellSubmit = () => {
+    setMissionAttempts(prev => prev + 1);
+    const correct = spellInput.trim().toLowerCase() === activeWord.word.toLowerCase();
+    if (correct) {
+      setScore(prev => prev + 1);
+      setFeedback('Spelling star! New word coming up.');
+      AudioService.playEffect('correct');
+      AudioService.speak('Spelling star!');
+      if (score + 1 >= 3) {
+        awardEnglishXp(200, 50, 'SPELL', [activeWord.word], 'Completed Spelling Bee practice.');
+        setShowVictory(true);
+      } else {
+        setTimeout(nextWord, 700);
+      }
+    } else {
+      setFeedback(`Try again. The word sounds like: ${activeWord.word.split('').join(' - ')}`);
+      AudioService.playEffect('wrong');
+      AudioService.speak(activeWord.word);
+    }
+  };
+
+  const handleReadingAnswer = (idx: number) => {
+    setMissionAttempts(prev => prev + 1);
+    if (idx === passage.answer) {
+      setScore(prev => prev + 1);
+      setFeedback('Great reading detective work!');
+      AudioService.playEffect('correct');
+      AudioService.speak('Great reading detective work!');
+      if (score + 1 >= 2) {
+        awardEnglishXp(220, 60, 'READ', [passage.title], 'Completed Reading Coach comprehension practice.');
+        setShowVictory(true);
+      } else {
+        setPassage(shuffle(READING_PASSAGES)[0]);
+      }
+    } else {
+      setFeedback('Read the passage again and look for the key detail.');
+      AudioService.playEffect('wrong');
+    }
+  };
+
+  const renderMission = () => {
+    if (mode === 'VOCAB') {
+      return (
+        <div className="space-y-4">
+          <div className="text-center">
+            <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.25em]">Vocabulary Quest</p>
+            <h3 className="text-5xl font-display text-white italic">{activeWord.word}</h3>
+            <p className="text-slate-300 mt-2">{activeWord.sentence}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {shuffle(activeWord.options).map(choice => (
+              <button key={choice} onClick={() => handleVocabAnswer(choice)} className="bg-slate-800 hover:bg-emerald-600 border-b-4 border-slate-950 rounded-2xl p-4 text-white font-black active:translate-y-1 active:border-b-0">
+                {choice}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === 'SPELL') {
+      return (
+        <div className="space-y-5 text-center">
+          <p className="text-[10px] font-black text-amber-300 uppercase tracking-[0.25em]">Spelling Bee Arena</p>
+          <button onClick={() => AudioService.speak(activeWord.word)} className="mx-auto bg-amber-500 text-slate-950 px-5 py-3 rounded-full font-black flex items-center gap-2">
+            <Volume2 size={18} /> Hear Word
+          </button>
+          <p className="text-slate-300">{activeWord.meaning}</p>
+          <input value={spellInput} onChange={e => setSpellInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSpellSubmit()} autoFocus className="w-full bg-slate-950 border-2 border-slate-700 focus:border-amber-400 rounded-2xl p-5 text-center text-3xl text-white font-black outline-none" placeholder="type word" />
+          <button onClick={handleSpellSubmit} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl py-4 font-black">Check Spelling</button>
+        </div>
+      );
+    }
+
+    if (mode === 'READ') {
+      return (
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] font-black text-sky-300 uppercase tracking-[0.25em]">Reading Coach</p>
+            <h3 className="text-3xl font-display text-white italic">{passage.title}</h3>
+            <p className="text-slate-200 bg-slate-950/60 rounded-2xl p-4 leading-relaxed mt-3">{passage.passage}</p>
+          </div>
+          <button onClick={() => AudioService.speak(passage.passage)} className="bg-sky-500/20 text-sky-200 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
+            <Volume2 size={16} /> Read aloud
+          </button>
+          <p className="text-white font-black">{passage.question}</p>
+          <div className="grid gap-2">
+            {passage.options.map((opt, idx) => (
+              <button key={opt} onClick={() => handleReadingAnswer(idx)} className="text-left bg-slate-800 hover:bg-sky-600 rounded-xl p-3 text-white font-bold">
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-5">
+        <div className="grid sm:grid-cols-3 gap-3">
+          <button onClick={() => { setMode('VOCAB'); setScore(0); setMissionAttempts(0); nextWord(); }} className="bg-emerald-600/20 border border-emerald-400/30 rounded-3xl p-5 text-left hover:bg-emerald-600/30">
+            <Languages className="text-emerald-300 mb-3" />
+            <h3 className="font-black text-white">Vocabulary Quest</h3>
+            <p className="text-xs text-slate-300 mt-1">Meaning, context, and sentence power.</p>
+          </button>
+          <button onClick={() => { setMode('SPELL'); setScore(0); setMissionAttempts(0); nextWord(); }} className="bg-amber-600/20 border border-amber-400/30 rounded-3xl p-5 text-left hover:bg-amber-600/30">
+            <Keyboard className="text-amber-300 mb-3" />
+            <h3 className="font-black text-white">Spelling Bee</h3>
+            <p className="text-xs text-slate-300 mt-1">Hear words and spell them correctly.</p>
+          </button>
+          <button onClick={() => { setMode('READ'); setScore(0); setMissionAttempts(0); setPassage(shuffle(READING_PASSAGES)[0]); }} className="bg-sky-600/20 border border-sky-400/30 rounded-3xl p-5 text-left hover:bg-sky-600/30">
+            <BookOpen className="text-sky-300 mb-3" />
+            <h3 className="font-black text-white">Reading Coach</h3>
+            <p className="text-xs text-slate-300 mt-1">Read, listen, and answer comprehension.</p>
+          </button>
+        </div>
+
+        <div className="bg-indigo-600/10 border border-indigo-400/20 rounded-3xl p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.25em]">AI Daily Path</p>
+              <h3 className="font-black text-white text-xl">Personal English Coach</h3>
+              <p className="text-slate-300 text-sm">Generate age-aware English questions for vocabulary, spelling, and comprehension.</p>
+            </div>
+            <button onClick={startAiMission} disabled={aiLoading} className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 text-white px-4 py-3 rounded-2xl font-black flex items-center gap-2">
+              {aiLoading ? <Loader2 className="animate-spin" /> : <Wand2 />} AI Mission
+            </button>
+          </div>
+          {aiQuestions.length > 0 && (
+            <div className="grid gap-2 mt-4">
+              {aiQuestions.map((q, idx) => (
+                <div key={`${q.question}-${idx}`} className="bg-slate-950/50 rounded-2xl p-3">
+                  <p className="text-white font-bold">{idx + 1}. {q.question}</p>
+                  <p className="text-xs text-indigo-200 mt-1">{Array.isArray(q.options) ? q.options.join(' • ') : 'Think, answer, and explain why.'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Screen maxWidth="max-w-5xl">
+      {showVictory && (
+        <VictoryOverlay
+          title="ENGLISH HERO"
+          xp={220}
+          coins={60}
+          badge={wordLevel >= 2 ? 'English Explorer' : undefined}
+          onNext={() => {
+            setShowVictory(false);
+            setMode('DAILY');
+            setScore(0);
+            setMissionAttempts(0);
+            setFeedback('');
+          }}
+          onQuit={onBack}
+        />
+      )}
+      <header className="flex justify-between items-center mb-5">
+        <button onClick={onBack} className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-white shadow-xl active:scale-90">
+          <ArrowLeft />
+        </button>
+        <div className="text-center">
+          <h2 className="font-display text-3xl sm:text-4xl text-white italic tracking-tight">English Quest AI</h2>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Level {wordLevel} • Score {score}</p>
+        </div>
+        <button onClick={() => { setMode('DAILY'); setFeedback(''); }} className="p-3 bg-slate-900 border border-white/10 rounded-2xl text-indigo-300 shadow-xl">
+          <Home size={18} />
+        </button>
+      </header>
+
+      <div className="bg-slate-900/70 border border-white/10 rounded-[2rem] p-5 sm:p-7 shadow-2xl">
+        {renderMission()}
+        {feedback && (
+          <div className="mt-5 bg-slate-950/70 border border-white/10 rounded-2xl p-4 text-center text-sm font-bold text-amber-200">
+            {feedback}
+          </div>
+        )}
+      </div>
+    </Screen>
+  );
+};
+
 const GamesPage: React.FC = () => {
-  const [activeGame, setActiveGame] = useState<'MATH' | 'GUESS' | 'SEARCH' | 'CROSSWORD' | 'MOUNTAIN' | null>(null);
+  const [activeGame, setActiveGame] = useState<'MATH' | 'GUESS' | 'SEARCH' | 'CROSSWORD' | 'MOUNTAIN' | 'ENGLISH' | null>(null);
   if (activeGame === 'MATH') return <MathGalaxy onBack={() => setActiveGame(null)} />;
   if (activeGame === 'GUESS') return <EmojiRiddle onBack={() => setActiveGame(null)} />;
   if (activeGame === 'SEARCH') return <WordSearchGame onBack={() => setActiveGame(null)} />;
   if (activeGame === 'CROSSWORD') return <CrosswordPro onBack={() => setActiveGame(null)} />;
   if (activeGame === 'MOUNTAIN') return <MultiplicationMountain onQuit={() => setActiveGame(null)} onComplete={() => setActiveGame(null)} />;
+  if (activeGame === 'ENGLISH') return <EnglishLearningQuest onBack={() => setActiveGame(null)} />;
   return (
     <div className="w-full px-4 sm:px-6 pt-6 pb-10 animate-fade-in mx-auto max-w-5xl">
       <div className="text-center mb-6">
         <h2 className="font-display text-3xl sm:text-5xl text-white italic tracking-tight drop-shadow-xl mb-1">Arcade Zone</h2>
         <p className="text-slate-400 text-sm font-medium tracking-tight">Level up and earn Star Treasures!</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+        <GameCard onClick={() => setActiveGame('ENGLISH')} icon="📚" title="English Quest AI" tag="AI Reading" color="from-sky-600 to-indigo-700" />
         <GameCard onClick={() => setActiveGame('MATH')} icon="🌌" title="Math Galaxy" tag="Logic" color="from-indigo-600 to-blue-700" />
         <GameCard onClick={() => setActiveGame('MOUNTAIN')} icon="🏔️" title="Multiplication Mountain" tag="Math" color="from-amber-600 to-orange-700" />
         <GameCard onClick={() => setActiveGame('SEARCH')} icon="🧩" title="Word Search" tag="Reading" color="from-emerald-600 to-teal-700" />
@@ -1892,5 +2242,3 @@ const MultiplicationMountain: React.FC<{
 };
 
 export default GamesPage;
-
-

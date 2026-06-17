@@ -54,6 +54,35 @@ const LIBRARY_CATEGORIES = [
   { id: 'instant_flower', label: 'Flower', emoji: '🌻', type: 'instant', url: 'https://cdn.pixabay.com/photo/2014/04/03/10/38/flower-310952_960_720.png' }
 ];
 
+const DRAWING_DRAFT_PREFIX = 'tiwaton_drawing_draft';
+const DRAWING_QUEUE_PREFIX = 'tiwaton_drawing_queue';
+const AUTO_SAVE_INTERVAL_MS = 20000;
+
+const safeLocalStorage = {
+  getItem: (key: string) => {
+    try { return window.localStorage.getItem(key); } catch { return null; }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      window.localStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  removeItem: (key: string) => {
+    try { window.localStorage.removeItem(key); } catch { }
+  }
+};
+
+type DrawingDraft = {
+  dataUrl: string;
+  title: string;
+  projectId: string;
+  version: number;
+  updatedAt: number;
+};
+
 const MUSIC_TRACKS = [
   { id: 'calm', label: 'Calm Forest', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
   { id: 'happy', label: 'Happy Day', url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3' },
@@ -202,6 +231,10 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [historyStep, setHistoryStep] = useState(-1);
+  const historyRef = useRef<string[]>([]);
+  const historyStepRef = useRef(-1);
+  const canvasSnapshotRef = useRef<string | null>(null);
+  const draftLoadedRef = useRef(false);
 
   const [appMode, setAppMode] = useState<AppMode>(profile?.mode || 'KIDS');
   const [showLibrary, setShowLibrary] = useState(false);
@@ -210,6 +243,13 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [transformedImage, setTransformedImage] = useState<string | null>(null);
   const [gallery, setGallery] = useState<Drawing[]>([]);
   const [showGallery, setShowGallery] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'queued' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('Auto-saved');
+  const [queuedDrawings, setQueuedDrawings] = useState<Drawing[]>([]);
+  const [pendingDraft, setPendingDraft] = useState<DrawingDraft | null>(null);
+  const [projectTitle, setProjectTitle] = useState('Untitled Masterpiece');
+  const [projectId, setProjectId] = useState(() => `drawing-${Date.now()}`);
+  const [projectVersion, setProjectVersion] = useState(1);
 
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -223,6 +263,9 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [activeChallenge, setActiveChallenge] = useState<StudioChallenge | null>(null);
   const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
   const [challengeResult, setChallengeResult] = useState<ChallengeResult | null>(null);
+
+  const draftKey = `${DRAWING_DRAFT_PREFIX}_${profile?.id || 'guest'}`;
+  const queueKey = `${DRAWING_QUEUE_PREFIX}_${profile?.id || 'guest'}`;
 
   useEffect(() => {
     const handleResize = () => setTimeout(initCanvas, 100);
@@ -264,6 +307,118 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  const readQueuedDrawings = useCallback((): Drawing[] => {
+    const raw = safeLocalStorage.getItem(queueKey);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed as Drawing[] : [];
+    } catch {
+      return [];
+    }
+  }, [queueKey]);
+
+  const writeQueuedDrawings = useCallback((items: Drawing[]) => {
+    safeLocalStorage.setItem(queueKey, JSON.stringify(items));
+    setQueuedDrawings(items);
+  }, [queueKey]);
+
+  const queueDrawingForRetry = useCallback((drawing: Drawing) => {
+    const existing = readQueuedDrawings();
+    const queued = [{ ...drawing, queuedAt: Date.now() }, ...existing.filter(item => item.id !== drawing.id)].slice(0, 20);
+    writeQueuedDrawings(queued);
+  }, [readQueuedDrawings, writeQueuedDrawings]);
+
+  const retryQueuedSaves = useCallback(async () => {
+    const queued = readQueuedDrawings();
+    if (queued.length === 0) return;
+
+    setSaveStatus('saving');
+    setSaveMessage(`Retrying ${queued.length} backed-up save${queued.length === 1 ? '' : 's'}…`);
+
+    const stillQueued: Drawing[] = [];
+    for (const drawing of queued) {
+      try {
+        await StorageService.saveDrawing(drawing);
+      } catch (error) {
+        console.error('Retry drawing save failed', error);
+        stillQueued.push(drawing);
+      }
+    }
+
+    writeQueuedDrawings(stillQueued);
+    await loadGallery();
+
+    if (stillQueued.length === 0) {
+      setSaveStatus('saved');
+      setSaveMessage('All backed-up art saved to gallery');
+    } else {
+      setSaveStatus('queued');
+      setSaveMessage(`${stillQueued.length} local backup${stillQueued.length === 1 ? '' : 's'} waiting to retry`);
+    }
+  }, [readQueuedDrawings, writeQueuedDrawings]);
+
+  const writeDraftBackup = useCallback((dataUrl: string) => {
+    const draft: DrawingDraft = {
+      dataUrl,
+      title: projectTitle.trim() || 'Untitled Masterpiece',
+      projectId,
+      version: projectVersion,
+      updatedAt: Date.now()
+    };
+
+    const stored = safeLocalStorage.setItem(draftKey, JSON.stringify(draft));
+    if (stored) {
+      setSaveStatus('saved');
+      setSaveMessage(`Local draft saved ${new Date(draft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    } else {
+      setSaveStatus('error');
+      setSaveMessage('Device storage is full. Download or gallery-save this art now.');
+    }
+  }, [draftKey, projectId, projectTitle, projectVersion]);
+
+  const readDraftBackup = useCallback((): DrawingDraft | null => {
+    const raw = safeLocalStorage.getItem(draftKey);
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.dataUrl) return parsed as DrawingDraft;
+    } catch {
+      return {
+        dataUrl: raw,
+        title: 'Recovered Masterpiece',
+        projectId: `drawing-${Date.now()}`,
+        version: 1,
+        updatedAt: Date.now()
+      };
+    }
+
+    return null;
+  }, [draftKey]);
+
+  useEffect(() => {
+    setQueuedDrawings(readQueuedDrawings());
+  }, [readQueuedDrawings]);
+
+  useEffect(() => {
+    const onOnline = () => {
+      retryQueuedSaves();
+    };
+
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [retryQueuedSaves]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (canvasSnapshotRef.current) {
+        writeDraftBackup(canvasSnapshotRef.current);
+      }
+    }, AUTO_SAVE_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, [writeDraftBackup]);
   useEffect(() => {
     if (!activeChallenge || !challengeStats || challengeStats.timeLeftSec <= 0) return;
     const timer = window.setInterval(() => {
@@ -285,7 +440,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
     if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
       const w = container.clientWidth;
       const h = container.clientHeight;
-      const savedData = historyStep >= 0 ? history[historyStep] : null;
+      const savedData = canvasSnapshotRef.current || (historyStepRef.current >= 0 ? historyRef.current[historyStepRef.current] : null);
 
       [canvas, bgCanvas, tempCanvas].forEach(c => {
         c.width = w;
@@ -307,7 +462,13 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         saveHistory();
       }
     }
-  }, [history, historyStep]);
+
+    if (!draftLoadedRef.current) {
+      draftLoadedRef.current = true;
+      const draft = readDraftBackup();
+      if (draft) setPendingDraft(draft);
+    }
+  }, [readDraftBackup]);
 
   const loadGallery = async () => {
     const g = await StorageService.getDrawings();
@@ -344,6 +505,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
 
   const handleSaveToGallery = async (customDataUrl?: string, isMagic = false) => {
     if (!canvasRef.current && !customDataUrl) return;
+    setSaveStatus('saving');
     let dataUrl = customDataUrl;
     if (!dataUrl && canvasRef.current) {
       const combinedCanvas = document.createElement('canvas');
@@ -363,13 +525,28 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         id: Date.now().toString(),
         dataUrl,
         author: profile.name,
+        title: projectTitle.trim() || 'Untitled Masterpiece',
+        projectId,
+        version: projectVersion,
         timestamp: Date.now(),
         isMagic
       };
-      await StorageService.saveDrawing(newDrawing);
-      await loadGallery();
-      AudioService.speak("Saved to gallery!");
-      if (!isMagic && !activeChallenge) setShowGallery(true);
+      try {
+        await StorageService.saveDrawing(newDrawing);
+        safeLocalStorage.removeItem(draftKey);
+        await loadGallery();
+        setSaveStatus('saved');
+        setSaveMessage(`Saved ${newDrawing.title} v${newDrawing.version} to gallery`);
+        setProjectVersion(prev => prev + 1);
+        AudioService.speak("Saved to gallery!");
+        if (!isMagic && !activeChallenge) setShowGallery(true);
+      } catch (error) {
+        console.error('Drawing save failed', error);
+        queueDrawingForRetry(newDrawing);
+        setSaveStatus('queued');
+        setSaveMessage('Gallery save failed. Local backup queued for retry.');
+        AudioService.speak("I saved a local backup. Please try gallery save again.");
+      }
     }
   };
 
@@ -504,20 +681,44 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   }, [storyResult]);
 
 
-  const handleLoadFromGallery = (dataUrl: string) => {
+  const restoreCanvasImage = (dataUrl: string, pushToHistory = true) => {
     const img = new Image();
     img.src = dataUrl;
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx && canvasRef.current) {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
-        saveHistory();
-        AudioService.speak("Ready to edit!");
-        setShowGallery(false);
+        canvasSnapshotRef.current = canvasRef.current.toDataURL('image/png');
+        if (pushToHistory) saveHistory();
       }
-    }
+    };
+  };
+
+  const restoreDraft = (draft: DrawingDraft) => {
+    setProjectTitle(draft.title || 'Recovered Masterpiece');
+    setProjectId(draft.projectId || `drawing-${Date.now()}`);
+    setProjectVersion(draft.version || 1);
+    restoreCanvasImage(draft.dataUrl, true);
+    setSaveStatus('saved');
+    setSaveMessage(`Restored local draft from ${new Date(draft.updatedAt).toLocaleString()}`);
+    setPendingDraft(null);
+  };
+
+  const discardDraft = () => {
+    safeLocalStorage.removeItem(draftKey);
+    setPendingDraft(null);
+    setSaveStatus('idle');
+    setSaveMessage('Draft discarded');
+  };
+
+  const handleLoadFromGallery = (drawing: Drawing) => {
+    setProjectTitle(drawing.title || 'Edited Masterpiece');
+    setProjectId(drawing.projectId || `drawing-${Date.now()}`);
+    setProjectVersion((drawing.version || 1) + 1);
+    restoreCanvasImage(drawing.dataUrl);
+    AudioService.speak("Ready to edit!");
+    setShowGallery(false);
   };
 
   const handleDownload = (urlToDownload?: string) => {
@@ -800,24 +1001,33 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
 
   const saveHistory = () => {
     if (!canvasRef.current) return;
-    const dataUrl = canvasRef.current.toDataURL();
-    const newHistory = history.slice(0, historyStep + 1);
+    const dataUrl = canvasRef.current.toDataURL('image/png');
+    canvasSnapshotRef.current = dataUrl;
+    writeDraftBackup(dataUrl);
+
+    const newHistory = historyRef.current.slice(0, historyStepRef.current + 1);
     newHistory.push(dataUrl);
     if (newHistory.length > 20) newHistory.shift();
+
+    historyRef.current = newHistory;
+    historyStepRef.current = newHistory.length - 1;
     setHistory(newHistory);
     setHistoryStep(newHistory.length - 1);
   };
 
   const undo = () => {
-    if (historyStep > 0) {
-      const prev = historyStep - 1;
+    if (historyStepRef.current > 0) {
+      const prev = historyStepRef.current - 1;
       const img = new Image();
-      img.src = history[prev];
+      img.src = historyRef.current[prev];
       img.onload = () => {
         const ctx = canvasRef.current?.getContext('2d');
         if (ctx && canvasRef.current) {
           ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
           ctx.drawImage(img, 0, 0);
+          canvasSnapshotRef.current = canvasRef.current.toDataURL('image/png');
+          writeDraftBackup(canvasSnapshotRef.current);
+          historyStepRef.current = prev;
           setHistoryStep(prev);
         }
       };
@@ -848,6 +1058,22 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
               </button>
             </div>
             <p className="text-slate-400 text-sm text-center">Automatically saved to Parent Gallery.</p>
+          </div>
+        </div>
+      )}
+
+      {pendingDraft && (
+        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-400/40 rounded-2xl p-5 max-w-md w-full shadow-2xl text-white">
+            <h3 className="text-xl font-display text-amber-300 mb-2">Restore unsaved art?</h3>
+            <p className="text-sm text-slate-300 mb-4">
+              I found a local backup for <span className="font-bold text-white">{pendingDraft.title}</span> from {new Date(pendingDraft.updatedAt).toLocaleString()}.
+            </p>
+            <img src={pendingDraft.dataUrl} className="w-full h-40 object-contain bg-white rounded-xl mb-4" />
+            <div className="flex gap-2 justify-end">
+              <button onClick={discardDraft} className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-bold">Discard</button>
+              <button onClick={() => restoreDraft(pendingDraft)} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-black">Restore</button>
+            </div>
           </div>
         </div>
       )}
@@ -1161,6 +1387,26 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
+        <div className="absolute top-4 right-4 z-30 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+          <input
+            value={projectTitle}
+            onChange={(e) => setProjectTitle(e.target.value)}
+            onBlur={() => {
+              if (canvasSnapshotRef.current) writeDraftBackup(canvasSnapshotRef.current);
+            }}
+            className="w-52 max-w-[55vw] bg-slate-900/90 text-white border border-slate-600 rounded-xl px-3 py-2 text-xs font-bold shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
+            aria-label="Drawing project name"
+          />
+          {queuedDrawings.length > 0 && (
+            <button
+              onClick={retryQueuedSaves}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-2 rounded-xl text-xs font-black shadow-lg"
+            >
+              Retry {queuedDrawings.length} save{queuedDrawings.length === 1 ? '' : 's'}
+            </button>
+          )}
+        </div>
+
         {appMode === 'STUDIO' && (
           <div className="absolute bottom-24 right-4 z-30 flex flex-col gap-2 bg-slate-800 p-2 rounded-xl border border-slate-600 shadow-xl">
             <button onClick={() => setTransform(t => ({ ...t, scale: Math.min(5, t.scale + 0.2) }))} data-tooltip="Zoom In" className="p-2 text-white hover:bg-slate-700 rounded"><ZoomIn size={20} /></button>
@@ -1210,7 +1456,13 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
           </div>
 
           {/* Save/Gallery */}
-          <div className="flex gap-1 shrink-0 bg-slate-700/30 p-1 rounded-xl">
+          <div className="flex items-center gap-2 shrink-0 bg-slate-700/30 p-1 rounded-xl">
+            <span
+              title={saveMessage}
+              className={`hidden sm:inline text-[10px] font-bold px-2 ${saveStatus === 'error' ? 'text-red-300' : saveStatus === 'queued' ? 'text-amber-300' : saveStatus === 'saving' ? 'text-amber-300' : 'text-emerald-300'}`}
+            >
+              {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'queued' ? `${queuedDrawings.length} queued` : saveStatus === 'error' ? 'Storage warning' : 'Auto-saved'}
+            </span>
             <button onClick={() => handleSaveToGallery()} data-tooltip="Save Masterpiece" className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Save size={18} /></button>
             <button onClick={() => handleDownload()} data-tooltip="Save to Device" className="p-2 bg-green-600 hover:bg-green-500 text-white rounded-lg"><Download size={18} /></button>
             <button onClick={() => setShowGallery(true)} data-tooltip="View Gallery" className="p-2 bg-slate-700 hover:bg-slate-600 text-amber-400 rounded-lg"><FolderOpen size={18} /></button>
@@ -1271,12 +1523,12 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
               <div key={img.id} className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition-colors">
                 <img src={img.dataUrl} className="w-full h-40 object-contain bg-white" />
                 <div className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <button onClick={() => handleLoadFromGallery(img.dataUrl)} data-tooltip="Load in Studio" className="p-2 bg-indigo-600 rounded-full text-white hover:scale-110 transition-transform"><Edit2 size={16} /></button>
+                  <button onClick={() => handleLoadFromGallery(img)} data-tooltip="Load in Studio" className="p-2 bg-indigo-600 rounded-full text-white hover:scale-110 transition-transform"><Edit2 size={16} /></button>
                   <button onClick={() => handleDownload(img.dataUrl)} data-tooltip="Download High-Res" className="p-2 bg-green-600 rounded-full text-white hover:scale-110 transition-transform"><Download size={16} /></button>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                   <p className="text-[10px] text-slate-300 font-mono flex justify-between">
-                    <span>{new Date(img.timestamp).toLocaleDateString()}</span>
+                    <span>{img.title || new Date(img.timestamp).toLocaleDateString()} {img.version ? `v${img.version}` : ''}</span>
                     {img.isMagic && <Sparkles size={10} className="text-amber-400" />}
                   </p>
                 </div>

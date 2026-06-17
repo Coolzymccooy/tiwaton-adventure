@@ -90,6 +90,54 @@ export interface Drawing {
   author: string;
   timestamp: number;
   isMagic?: boolean;
+  title?: string;
+  projectId?: string;
+  version?: number;
+  ownerChildId?: string;
+  createdByUid?: string;
+  queuedAt?: number;
+}
+
+export interface EnglishProgress {
+  id: string;
+  childId: string;
+  childName: string;
+  mode: 'VOCAB' | 'SPELL' | 'READ' | 'AI';
+  score: number;
+  attempts: number;
+  accuracy: number;
+  wordsPracticed: string[];
+  summary: string;
+  xpEarned: number;
+  coinsEarned: number;
+  createdAt: number;
+}
+
+export type LearningSubject = 'ENGLISH' | 'MATH' | 'ART' | 'STORY' | 'BIBLE';
+
+export interface DailyLearningTask {
+  id: string;
+  subject: LearningSubject;
+  title: string;
+  description: string;
+  skill: string;
+  why: string;
+  targetView: View;
+  xp: number;
+  estimatedMinutes: number;
+  completed: boolean;
+}
+
+export interface DailyLearningPath {
+  id: string;
+  date: string;
+  childId: string;
+  childName: string;
+  focusSkill: string;
+  streakDay: number;
+  tasks: DailyLearningTask[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export type EventCategory = 'birthday' | 'holiday' | 'trip' | 'school' | 'church' | 'sports' | 'family' | 'custom';

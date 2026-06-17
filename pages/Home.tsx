@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { View } from '../types';
-import type { FamilyProfile, GameStat, ParentComment } from '../types';
+import type { DailyLearningPath, DailyLearningTask, FamilyProfile, GameStat, LearningSubject, ParentComment } from '../types';
 import { StorageService } from '../services/storage';
-import { Palette, MessageCircle, ShieldCheck, LogOut, Lock, Star, Sparkles, TrendingUp, Trophy, ArrowRight, X } from 'lucide-react';
+import { Palette, MessageCircle, ShieldCheck, LogOut, Lock, Star, Sparkles, TrendingUp, Trophy, ArrowRight, X, CheckCircle2, Clock, Target } from 'lucide-react';
 import DailyQuestBanner from '../components/DailyQuestBanner';
 import { getTodayChallenges, isChallengeCompleted } from '../services/daily-challenges';
 import { useI18n } from '../i18n/I18nProvider';
@@ -17,20 +17,107 @@ interface HomeProps {
   setIsAdminMode: (val: boolean) => void;
 }
 
+const subjectStyles: Record<LearningSubject, { icon: string; label: string; color: string; glow: string }> = {
+  ENGLISH: { icon: '📚', label: 'English', color: 'from-violet-500 to-indigo-500', glow: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
+  MATH: { icon: '🧮', label: 'Math', color: 'from-emerald-500 to-teal-500', glow: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
+  ART: { icon: '🎨', label: 'Creative', color: 'from-pink-500 to-rose-500', glow: 'bg-pink-500/10 text-pink-300 border-pink-500/20' },
+  STORY: { icon: '📖', label: 'Reading', color: 'from-amber-500 to-orange-500', glow: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
+  BIBLE: { icon: '✨', label: 'Wisdom', color: 'from-sky-500 to-cyan-500', glow: 'bg-sky-500/10 text-sky-300 border-sky-500/20' }
+};
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+const makeTask = (
+  id: string,
+  subject: LearningSubject,
+  title: string,
+  description: string,
+  skill: string,
+  why: string,
+  targetView: View,
+  xp: number,
+  estimatedMinutes: number
+): DailyLearningTask => ({
+  id,
+  subject,
+  title,
+  description,
+  skill,
+  why,
+  targetView,
+  xp,
+  estimatedMinutes,
+  completed: false
+});
+
+const buildDailyLearningPath = (profile: FamilyProfile, stats: GameStat): DailyLearningPath => {
+  const date = todayKey();
+  const mathFocus = stats.mathLevel <= 2 ? 'Number Galaxy warm-up' : 'Challenge a new math planet';
+  const englishTitle = profile.age <= 8 ? 'Word Explorer Quest' : 'AI English Mission';
+  const creativeTask = stats.xp < 500 ? 'Draw your learning hero' : 'Paint today’s adventure scene';
+  const englishLevel = stats.wordQuestProgress?.level || 1;
+  const focusSkill = englishLevel <= stats.mathLevel ? 'English confidence' : 'Math fluency';
+
+  return {
+    id: `path-${profile.id}-${date}`,
+    date,
+    childId: profile.id,
+    childName: profile.name,
+    focusSkill,
+    streakDay: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    tasks: [
+      makeTask('english-quest', 'ENGLISH', englishTitle, 'Practice vocabulary, spelling, or reading in the English Quest.', 'Vocabulary + comprehension', 'Your English level is used to choose a friendly challenge.', View.GAMES, 120, 8),
+      makeTask('math-sprint', 'MATH', mathFocus, 'Play one focused math round matched to your current level.', 'Number fluency', 'Your math level decides whether today starts with warm-up or challenge work.', View.GAMES, 100, 7),
+      makeTask('creative-draw', 'ART', creativeTask, 'Create a quick picture and save it to your gallery.', 'Creative expression', 'Drawing helps kids explain what they learned in their own way.', View.DRAWING, 90, 6),
+      makeTask('story-time', 'STORY', 'Read or build one mini story', 'Reading stamina', 'Short stories improve focus, sequence, and imagination.', View.STORIES, 80, 5),
+      makeTask('wisdom-quiz', 'BIBLE', 'Finish one wisdom quiz', 'Complete a short quiz to earn XP and keep your streak alive.', 'Recall + values', 'A quick quiz keeps confidence high without overwhelming the child.', View.ACTIVITIES, 70, 5)
+    ]
+  };
+};
+
+const buildMasterySignals = (stats: GameStat, dailyProgress: number) => {
+  const english = Math.min(100, ((stats.wordQuestProgress?.level || 1) - 1) * 18 + dailyProgress * 0.25 + 20);
+  const math = Math.min(100, (stats.mathLevel || 1) * 14 + dailyProgress * 0.2 + 18);
+  const consistency = Math.min(100, dailyProgress + Math.min(stats.xp, 1000) / 20);
+  return [
+    { label: 'English Growth', value: Math.round(english), detail: 'Vocabulary, spelling, reading' },
+    { label: 'Math Fluency', value: Math.round(math), detail: 'Number sense and problem solving' },
+    { label: 'Learning Habit', value: Math.round(consistency), detail: 'Daily path completion and XP' }
+  ];
+};
+
 const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, isAdminMode, setIsAdminMode }) => {
   const [stats, setStats] = useState<GameStat>(StorageService.getGameStats());
   const [comments, setComments] = useState<ParentComment[]>([]);
   const [familyProfiles, setFamilyProfiles] = useState<FamilyProfile[]>([]);
+  const [dailyPath, setDailyPath] = useState<DailyLearningPath | null>(null);
 
   const [pinInput, setPinInput] = useState('');
   const [showPinPad, setShowPinPad] = useState(false);
   const { locale } = useI18n();
 
   useEffect(() => {
-    setStats(StorageService.getGameStats());
-    setComments(StorageService.getComments());
+    let cancelled = false;
+    const latestStats = StorageService.getGameStats();
+    setStats(latestStats);
     setFamilyProfiles(StorageService.getProfiles().sort((a, b) => (a.id === 'admin' ? -1 : 1)));
-  }, [profile.id]);
+    StorageService.getComments().then(items => {
+      if (!cancelled) setComments(items);
+    });
+
+    const cachedPath = StorageService.getDailyLearningPath(profile.id);
+    const needsFreshPath = !cachedPath || cachedPath.date !== todayKey() || !cachedPath.focusSkill || cachedPath.tasks.some(task => !task.skill || !task.why);
+    const activePath = needsFreshPath ? buildDailyLearningPath(profile, latestStats) : cachedPath;
+    if (needsFreshPath) {
+      StorageService.saveDailyLearningPath(activePath);
+    }
+    setDailyPath(activePath);
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id, profile.name]);
 
   const handleLogoutClick = () => onLogout();
 
@@ -70,6 +157,20 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
     setShowPinPad(false);
     setPinInput('');
   };
+
+  const handleDailyTaskClick = (task: DailyLearningTask) => {
+    const updated = StorageService.completeDailyLearningTask(task.id, profile.id);
+    if (updated) setDailyPath(updated);
+    onNavigate(task.targetView);
+  };
+
+  const completedDailyTasks = dailyPath?.tasks.filter(task => task.completed).length || 0;
+  const dailyTaskTotal = dailyPath?.tasks.length || 0;
+  const dailyProgress = dailyTaskTotal ? Math.round((completedDailyTasks / dailyTaskTotal) * 100) : 0;
+  const masterySignals = buildMasterySignals(stats, dailyProgress);
+  const coachNote = dailyPath
+    ? `${dailyPath.focusSkill} is today’s focus. Finish ${Math.max(dailyTaskTotal - completedDailyTasks, 0)} more quest${dailyTaskTotal - completedDailyTasks === 1 ? '' : 's'} to protect the streak.`
+    : 'Your coach is preparing today’s path.';
 
   // Mock leaderboard data (in a real app, this would be computed from storage for each user)
   const leaderboardData = familyProfiles.map(p => ({
@@ -177,6 +278,102 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Main Content Area */}
         <div className="lg:col-span-8 space-y-6">
+          {/* Personalized Daily Learning Path */}
+          {dailyPath && (
+            <div className="bg-slate-900 border border-white/5 rounded-[2rem] p-5 sm:p-6 shadow-2xl overflow-hidden relative">
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl"></div>
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-[9px] font-black text-indigo-300 uppercase tracking-[0.35em] mb-2 flex items-center gap-2">
+                    <Target size={14} /> Personalized Daily Path
+                  </p>
+                  <h3 className="font-display text-3xl sm:text-4xl text-white italic tracking-tighter">Today’s quests for {profile.name}</h3>
+                  <p className="text-xs text-slate-400 font-bold mt-1">A balanced plan across English, math, creativity, reading, and wisdom.</p>
+                </div>
+                <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-center">
+                  <p className="text-2xl font-black text-white">{completedDailyTasks}/{dailyTaskTotal}</p>
+                  <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Done</p>
+                </div>
+              </div>
+
+              <div className="relative z-10 mb-5">
+                <div className="h-3 bg-slate-800 rounded-full overflow-hidden border border-white/5">
+                  <div className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-pink-500 transition-all duration-700" style={{ width: `${dailyProgress}%` }}></div>
+                </div>
+                <div className="flex justify-between mt-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <span>{dailyProgress}% complete</span>
+                  <span>{dailyPath.tasks.reduce((total, task) => total + task.estimatedMinutes, 0)} min plan</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 grid sm:grid-cols-2 gap-3">
+                {dailyPath.tasks.map(task => {
+                  const style = subjectStyles[task.subject];
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => handleDailyTaskClick(task)}
+                      className={`text-left p-4 rounded-2xl border transition-all group ${task.completed ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950/60 border-white/5 hover:border-indigo-400/50 hover:-translate-y-1'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${style.color} flex items-center justify-center text-2xl shadow-lg shrink-0`}>
+                          {task.completed ? <CheckCircle2 size={24} className="text-white" /> : style.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className={`px-2 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest ${style.glow}`}>{style.label}</span>
+                            <span className="text-[9px] text-amber-300 font-black">+{task.xp} XP</span>
+                          </div>
+                          <h4 className="text-white font-black text-sm sm:text-base leading-tight">{task.title}</h4>
+                          <p className="text-[11px] text-slate-400 font-semibold leading-snug mt-1">{task.description}</p>
+                          <p className="text-[10px] text-indigo-200 font-bold mt-2">{task.skill}</p>
+                          <p className="mt-3 flex items-center gap-1.5 text-[9px] text-slate-500 font-black uppercase tracking-widest">
+                            <Clock size={12} /> {task.estimatedMinutes} min • {task.completed ? 'Completed' : 'Tap to start'}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative z-10 mt-5 grid md:grid-cols-3 gap-3">
+                {masterySignals.map(signal => (
+                  <div key={signal.label} className="bg-slate-950/60 border border-white/5 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{signal.label}</p>
+                      <p className="text-white font-black">{signal.value}%</p>
+                    </div>
+                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-emerald-400 to-indigo-400" style={{ width: `${signal.value}%` }}></div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-bold mt-2">{signal.detail}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative z-10 mt-4 bg-indigo-500/10 border border-indigo-400/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] text-indigo-300 font-black uppercase tracking-[0.3em]">AI Coach Note</p>
+                  <p className="text-sm text-white font-bold mt-1">{coachNote}</p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-2xl font-black text-amber-300">{dailyPath.streakDay}</p>
+                  <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Day streak</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Featured Quest */}
+          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-3xl shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
+            <div className="bg-slate-900/80 backdrop-blur-xl p-5 sm:p-8 rounded-[1.8rem] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 group-hover:scale-125 transition-transform"></div>
+              <div className="flex items-center gap-4 sm:gap-6 relative z-10">
+                <div className="bg-white/10 p-3.5 sm:p-5 rounded-2xl animate-float"><Palette size={32} className="text-white" /></div>
+                <div>
+                  <p className="text-[9px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
+                  <h3 className="font-display text-2xl sm:text-3xl text-white">"Paint a Neon Jungle!"</h3>
           {/* Featured Daily Quest */}
           {(() => {
             const todayChallenges = getTodayChallenges(3);

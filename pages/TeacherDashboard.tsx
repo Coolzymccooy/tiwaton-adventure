@@ -2,14 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StorageService } from '../services/storage';
 import { getInsightsSummary, InsightSummary } from '../services/insights';
+import { FamilyProfile, Drawing, EnglishProgress, DailyLearningPath } from '../types';
 import { computeDashboardAnalytics, computeProfileAnalytics, type DashboardAnalytics, type ProfileAnalytics } from '../services/analytics-engine';
-import { FamilyProfile, Drawing } from '../types';
 import {
   Users, Activity, Star, Trash2, MessageSquare,
   ChevronRight, ArrowLeft, BarChart3, Clock,
-  TrendingUp, Eye, LayoutDashboard,
-  Palette, Key, Save, Flame, CheckCircle2,
-  Trophy, Zap, Coins, Target, BookOpen,
+  TrendingUp, Eye, Sparkles, Heart, LayoutDashboard,
+  Palette, Edit2, Key, Save, BookOpen, Languages,
+  Flame, CheckCircle2, Trophy, Zap, Target,
   Gamepad2, PenTool, Brain, Crown, Shield,
   ChevronDown, ChevronUp, UserPlus, Copy, GraduationCap,
 } from 'lucide-react';
@@ -224,6 +224,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
   const [profiles, setProfiles] = useState<FamilyProfile[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [englishProgress, setEnglishProgress] = useState<EnglishProgress[]>([]);
+  const [dailyPath, setDailyPath] = useState<DailyLearningPath | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [usageData, setUsageData] = useState<any>({});
   const [insights, setInsights] = useState<InsightSummary | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [showTech, setShowTech] = useState(false);
@@ -244,11 +248,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
     if (p.length > 0 && !selectedChildId) setSelectedChildId(p[0].id);
 
     const loadData = async () => {
-      const d = await StorageService.getAllDrawings();
+      const d = await StorageService.getDrawings();
+      const usage = await StorageService.getFamilyUsage();
       setDrawings(d);
-    };
+      setUsageData(usage);
+    
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!selectedChildId) return;
+    StorageService.getEnglishProgress(selectedChildId)
+      .then(setEnglishProgress)
+      .catch(error => {
+        console.error('Failed to load English progress', error);
+        setEnglishProgress([]);
+      });
+    setDailyPath(StorageService.getDailyLearningPath(selectedChildId));
+  }, [selectedChildId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -271,6 +288,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
   );
 
   const selectedProfile = profiles.find(p => p.id === selectedChildId);
+  const childDrawings = drawings.filter(d => d.author === selectedProfile?.name);
+  const childUsage = selectedChildId ? usageData[selectedChildId] || {} : {};
+  const latestEnglish = englishProgress[0];
+  const englishAverage = englishProgress.length
+    ? Math.round(englishProgress.reduce((sum, item) => sum + (item.accuracy || 0), 0) / englishProgress.length)
+    : 0;
+  const englishWords = Array.from(new Set(englishProgress.flatMap(item => item.wordsPracticed || []))).slice(0, 6);
+
+  const totalArtCount = drawings.length;
+  const totalPlayMinutes = Math.round(
+    (Object.values(usageData) as any[]).reduce((total: number, childStats: any): number => {
+      const childTotal = (Object.values(childStats) as any[]).reduce((sum: number, val: any): number => sum + (Number(val) || 0), 0);
+      return total + childTotal;
+    }, 0) / 60
   const selectedAnalytics = useMemo<ProfileAnalytics | null>(
     () => selectedProfile ? computeProfileAnalytics(selectedProfile, drawings) : null,
     [selectedProfile, drawings]
@@ -308,12 +339,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
   };
 
   const deleteChild = (id: string) => {
+    if (id === 'admin') {
+      alert("Cannot delete the Master Hub account.");
+      return;
+    }
     const profile = profiles.find(p => p.id === id);
     if (profile?.role === 'TEACHER') { alert("Cannot delete the teacher account."); return; }
-    if (confirm("Permanently remove this student? This cannot be undone.")) {
-      const updated = profiles.filter(p => p.id !== id);
-      localStorage.setItem('tiwaton_profiles', JSON.stringify(updated));
-      setProfiles(updated);
+    if (confirm("Permanently remove this child profile? This cannot be undone.")) {
+      const all = StorageService.getProfiles();
+      const updated = all.filter(p => p.id !== id);
+      StorageService.setCachedProfiles(updated);
       if (selectedChildId === id) setSelectedChildId(null);
     }
   };
@@ -707,6 +742,100 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
                 )}
               </div>
 
+              {/* Activity Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <StatCard icon={<Clock className="text-emerald-400" />} label="Session Time" value={`${Math.round(((Object.values(childUsage) as any[]).reduce((sum: number, val: any): number => sum + (Number(val) || 0), 0) as number) / 60)}m`} color="emerald" />
+                <StatCard icon={<TrendingUp className="text-indigo-400" />} label="Preferred Hub" value={Object.keys(childUsage).sort((a, b) => childUsage[b] - childUsage[a])[0] || 'Exploring'} color="indigo" />
+                <StatCard icon={<Star className="text-amber-400" />} label="Tournament Badges" value="3 Earned" color="amber" />
+              </div>
+
+              <div className="bg-slate-900/70 border border-white/5 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl">
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <div>
+                    <p className="text-[10px] text-sky-400 font-black uppercase tracking-[0.25em]">English Progress</p>
+                    <h4 className="text-2xl font-black text-white italic">Reading & Vocabulary Coach</h4>
+                  </div>
+                  <BookOpen className="text-sky-300" size={32} />
+                </div>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Missions</p>
+                    <p className="text-3xl text-white font-black">{englishProgress.length}</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Accuracy</p>
+                    <p className="text-3xl text-emerald-300 font-black">{englishAverage}%</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Latest</p>
+                    <p className="text-sm text-white font-black uppercase">{latestEnglish?.mode || 'Not started'}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {englishWords.length > 0 ? englishWords.map(word => (
+                    <span key={word} className="px-3 py-1 bg-sky-500/10 text-sky-200 rounded-full text-xs font-bold border border-sky-400/20 flex items-center gap-1">
+                      <Languages size={12} /> {word}
+                    </span>
+                  )) : (
+                    <p className="text-slate-500 text-sm">No English missions completed yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/70 border border-white/5 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl">
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <div>
+                    <p className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.25em]">Daily Learning Path</p>
+                    <h4 className="text-2xl font-black text-white italic">Student Personalized Plan</h4>
+                  </div>
+                  <Sparkles className="text-indigo-300" size={32} />
+                </div>
+                {dailyPath ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-black uppercase tracking-widest">
+                      <span className="px-3 py-1 bg-indigo-500/10 text-indigo-200 rounded-full border border-indigo-400/20">Focus: {dailyPath.focusSkill}</span>
+                      <span className="px-3 py-1 bg-amber-500/10 text-amber-200 rounded-full border border-amber-400/20">{dailyPath.streakDay} day streak</span>
+                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-200 rounded-full border border-emerald-400/20">{dailyPath.tasks.filter(task => task.completed).length}/{dailyPath.tasks.length} done</span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {dailyPath.tasks.map(task => (
+                        <div key={task.id} className="bg-slate-950 p-3 rounded-2xl border border-white/5">
+                          <p className="text-white font-black text-sm">{task.completed ? '✅ ' : '⬜ '}{task.title}</p>
+                          <p className="text-[10px] text-slate-500 font-bold mt-1">{task.skill} • {task.estimatedMinutes} min</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm">No daily path has been opened by this student yet today.</p>
+                )}
+              </div>
+
+              {/* Gallery Snapshots */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-end px-4">
+                  <h4 className="text-slate-500 font-black uppercase tracking-widest text-[10px]">{selectedProfile.role === 'TEACHER' ? 'Recent Class Creations' : 'Recent Creations'}</h4>
+                  <span className="text-indigo-400 font-bold text-xs">{childDrawings.length} Saved Works</span>
+                </div>
+                <div className="grid grid-cols-3 gap-6">
+                  {childDrawings.slice(0, 3).map(drawing => (
+                    <div key={drawing.id} className="group relative aspect-square bg-white rounded-3xl overflow-hidden border-2 border-slate-800 hover:border-indigo-500 transition-all shadow-xl">
+                      <img src={drawing.dataUrl} className="w-full h-full object-contain" alt="creation" />
+                      <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center p-4 text-center transition-all backdrop-blur-sm">
+                        <Eye size={24} className="text-white mb-2" />
+                        <p className="text-[10px] text-white font-bold uppercase">{new Date(drawing.timestamp).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {childDrawings.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-slate-600 bg-slate-900/30 rounded-3xl border-2 border-dashed border-slate-800 italic">
+                      No masterpieces to show yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Logic Handout UI */}
               {/* Student Login Handout */}
               {selectedProfile.role !== 'TEACHER' && (
                 <div className="bg-sky-900/20 border border-sky-500/20 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-5">
