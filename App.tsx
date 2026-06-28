@@ -208,28 +208,69 @@ const App: React.FC = () => {
 
   const renderView = () => {
     if (currentView === View.LANDING) {
-      return <Landing onAction={handleLandingAction} profile={profile} />;
+      return <Landing
+        onAction={handleLandingAction}
+        activeProfile={profile}
+        disableHeavyEffects={isMobileLikeDevice}
+        sessionReady={sessionReady}
+      />;
     }
+
     if (currentView === View.LOGIN) {
-      return <Login onLogin={handleLogin} onBack={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} initialView={loginInitialView} />;
+      return <Login
+        onLogin={handleLogin}
+        initialViewMode={loginInitialView}
+        onBackToLanding={() => setCurrentView(View.LANDING)}
+        compactMode={isMobileLikeDevice}
+      />;
     }
-    if (!profile) return <Login onLogin={handleLogin} onBack={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} initialView={loginInitialView} />;
+
+    if (!profile) return <Login onLogin={handleLogin} initialViewMode={loginInitialView} onBackToLanding={() => setCurrentView(View.LANDING)} compactMode={isMobileLikeDevice} />;
+
     switch (currentView) {
-      case View.HOME: return <Home profile={profile} onLogout={handleLogout} onNavigate={setCurrentView} isAdminMode={isAdminMode} />;
-      case View.TEACHER_DASHBOARD: return <TeacherDashboard profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.PARENT_DASHBOARD: return <ParentDashboard profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.STORIES: return <StoriesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.DRAWING: return <DrawingPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.ACTIVITIES: return <ActivitiesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.GAMES: return <GamesPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      case View.COUNTDOWN: return <CountdownPage profile={profile} onBack={() => setCurrentView(View.HOME)} />;
-      default: return <Home profile={profile} onLogout={handleLogout} onNavigate={setCurrentView} isAdminMode={isAdminMode} />;
+      case View.HOME:
+        return <Home
+          onNavigate={setCurrentView}
+          profile={profile}
+          setProfile={setProfile}
+          onLogout={handleLogout}
+          isAdminMode={isAdminMode}
+          setIsAdminMode={setIsAdminMode}
+        />;
+      case View.TEACHER_DASHBOARD:
+        return <TeacherDashboard onBack={() => setCurrentView(View.HOME)} />;
+      case View.PARENT_DASHBOARD:
+        return <ParentDashboard onBack={() => setCurrentView(View.HOME)} />;
+      case View.STORIES:
+        return <StoriesPage onNavigate={setCurrentView} />;
+      case View.DRAWING:
+        return <DrawingPage onNavigate={setCurrentView} />;
+      case View.ACTIVITIES:
+        return <ActivitiesPage onNavigate={setCurrentView} />;
+      case View.GAMES:
+        return <GamesPage />;
+      case View.COUNTDOWN:
+        return <CountdownPage />;
+      default:
+        return <Home
+          onNavigate={setCurrentView}
+          profile={profile}
+          setProfile={setProfile}
+          onLogout={handleLogout}
+          isAdminMode={isAdminMode}
+          setIsAdminMode={setIsAdminMode}
+        />;
     }
   };
 
   return (
     <I18nProvider>
-      <Layout>
+      <Layout
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        name={profile?.name || ''}
+        onLogout={handleLogout}
+      >
         {renderView()}
       </Layout>
     </I18nProvider>
