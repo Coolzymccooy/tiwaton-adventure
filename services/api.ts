@@ -13,17 +13,18 @@ export class ApiRequestError extends Error {
   }
 }
 
-export function apiUrl(path: string) {
+export function apiUrl(path: string, baseOverride?: string) {
   if (!path.startsWith("/")) path = "/" + path;
-  return API_BASE ? `${API_BASE}${path}` : path;
+  const base = (baseOverride ?? API_BASE).replace(/\/+$/, "");
+  return base ? `${base}${path}` : path;
 }
 
-export async function postJson<T>(path: string, body: any): Promise<T> {
+export async function postJson<T>(path: string, body: any, baseOverride?: string): Promise<T> {
   const controller = new AbortController();
   const timeoutMs = Number((import.meta as any).env?.VITE_API_TIMEOUT_MS || 30000);
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
-  const res = await fetch(apiUrl(path), {
+  const res = await fetch(apiUrl(path, baseOverride), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

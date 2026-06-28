@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/ai/transform-sketch.js": {
+      "maxDuration": 60
+    }
+  }
+}
