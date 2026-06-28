@@ -252,7 +252,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
       const usage = await StorageService.getFamilyUsage();
       setDrawings(d);
       setUsageData(usage);
-    
+    };
+
     loadData();
   }, []);
 
@@ -302,6 +303,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack }) => {
       const childTotal = (Object.values(childStats) as any[]).reduce((sum: number, val: any): number => sum + (Number(val) || 0), 0);
       return total + childTotal;
     }, 0) / 60
+  );
+
   const selectedAnalytics = useMemo<ProfileAnalytics | null>(
     () => selectedProfile ? computeProfileAnalytics(selectedProfile, drawings) : null,
     [selectedProfile, drawings]

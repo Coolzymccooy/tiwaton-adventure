@@ -55,16 +55,11 @@ export const AIService = {
   },
 
   async transformSketch(imageBase64: string): Promise<string | null> {
-    try {
-      const optimized = await optimizeImage(imageBase64);
-      const data = await postJson<{ imageDataUrl: string }>("/api/ai/transform-sketch", {
-        imageDataUrl: optimized,
-      });
-      return data.imageDataUrl || null;
-    } catch (e) {
-      console.error("transformSketch error", e);
-      return null;
-    }
+    const optimized = await optimizeImage(imageBase64);
+    const data = await postJson<{ imageDataUrl: string }>("/api/ai/transform-sketch", {
+      imageDataUrl: optimized,
+    });
+    return data.imageDataUrl || null;
   },
 
   async cleanupDrawing(imageBase64: string): Promise<string | null> {

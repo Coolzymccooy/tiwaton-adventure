@@ -170,7 +170,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
       const usage = await StorageService.getFamilyUsage();
       setDrawings(d);
       setUsageData(usage);
-      
+    };
+
     loadData();
   }, []);
 
@@ -221,6 +222,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
       const childTotal = (Object.values(childStats) as any[]).reduce((sum: number, val: any): number => sum + (Number(val) || 0), 0);
       return total + childTotal;
     }, 0) / 60
+  );
+
   const selectedAnalytics = useMemo<ProfileAnalytics | null>(
     () => selectedProfile ? computeProfileAnalytics(selectedProfile, drawings) : null,
     [selectedProfile, drawings]
@@ -699,29 +702,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ onBack }) => {
                         <Eye size={24} className="text-white mb-2" />
                         <p className="text-[10px] text-white font-bold uppercase">{new Date(drawing.timestamp).toLocaleDateString()}</p>
                       </div>
-              {/* Gallery */}
-              {(() => {
-                const childDrawings = drawings.filter(d => d.author === selectedProfile.name);
-                return childDrawings.length > 0 ? (
-                  <div>
-                    <div className="flex justify-between items-end px-2 mb-3">
-                      <h4 className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Recent Creations</h4>
-                      <span className="text-indigo-400 font-bold text-xs">{childDrawings.length} Works</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      {childDrawings.slice(0, 3).map(d => (
-                        <div key={d.id} className="group relative aspect-square bg-white rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500 transition-all shadow-lg">
-                          <img src={d.dataUrl} className="w-full h-full object-contain" alt="creation" />
-                          <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all backdrop-blur-sm">
-                            <Eye size={20} className="text-white mb-1" />
-                            <p className="text-[10px] text-white font-bold">{new Date(d.timestamp).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                      ))}
+                  ))}
+                  {childDrawings.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-slate-600 bg-slate-900/30 rounded-3xl border-2 border-dashed border-slate-800 italic">
+                      No masterpieces to show yet.
                     </div>
-                  </div>
-                ) : null;
-              })()}
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -3,6 +3,16 @@ const RAW_API_BASE =
 
 const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+
+  constructor(path: string, status: number, details = "") {
+    super(`API ${path} failed: ${status}${details ? ` ${details}` : ""}`);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
 export function apiUrl(path: string) {
   if (!path.startsWith("/")) path = "/" + path;
   return API_BASE ? `${API_BASE}${path}` : path;
@@ -26,7 +36,7 @@ export async function postJson<T>(path: string, body: any): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const msg = text?.slice(0, 500) || "";
-    throw new Error(`API ${path} failed: ${res.status} ${msg}`);
+    throw new ApiRequestError(path, res.status, msg);
   }
 
   return res.json() as Promise<T>;

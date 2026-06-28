@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { View } from '../types';
 import type { DailyLearningPath, DailyLearningTask, FamilyProfile, GameStat, LearningSubject, ParentComment } from '../types';
 import { StorageService } from '../services/storage';
-import { Palette, MessageCircle, ShieldCheck, LogOut, Lock, Star, Sparkles, TrendingUp, Trophy, ArrowRight, X, CheckCircle2, Clock, Target } from 'lucide-react';
+import { MessageCircle, ShieldCheck, LogOut, Lock, Sparkles, TrendingUp, Trophy, ArrowRight, X, CheckCircle2, Clock, Target } from 'lucide-react';
 import DailyQuestBanner from '../components/DailyQuestBanner';
 import { getTodayChallenges, isChallengeCompleted } from '../services/daily-challenges';
 import { useI18n } from '../i18n/I18nProvider';
@@ -365,15 +365,6 @@ const Home: React.FC<HomeProps> = ({ onNavigate, profile, setProfile, onLogout, 
             </div>
           )}
 
-          {/* Featured Quest */}
-          <div onClick={() => onNavigate(View.DRAWING)} className="bg-gradient-to-r from-pink-600 to-purple-600 p-1 rounded-3xl shadow-2xl cursor-pointer hover:scale-[1.02] transition-all group">
-            <div className="bg-slate-900/80 backdrop-blur-xl p-5 sm:p-8 rounded-[1.8rem] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 group-hover:scale-125 transition-transform"></div>
-              <div className="flex items-center gap-4 sm:gap-6 relative z-10">
-                <div className="bg-white/10 p-3.5 sm:p-5 rounded-2xl animate-float"><Palette size={32} className="text-white" /></div>
-                <div>
-                  <p className="text-[9px] font-black text-pink-300 uppercase tracking-widest mb-1">Today's Star Quest</p>
-                  <h3 className="font-display text-2xl sm:text-3xl text-white">"Paint a Neon Jungle!"</h3>
           {/* Featured Daily Quest */}
           {(() => {
             const todayChallenges = getTodayChallenges(3);

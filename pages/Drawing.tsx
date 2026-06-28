@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
+import { ApiRequestError } from '../services/api';
 import { AudioService } from '../services/audio';
 import { Drawing, AppMode, View } from '../types';
 import { useI18n } from '../i18n/I18nProvider';
@@ -241,6 +242,7 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingText, setLoadingText] = useState(t('drawing.loadingMagicDust'));
   const [transformedImage, setTransformedImage] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [gallery, setGallery] = useState<Drawing[]>([]);
   const [showGallery, setShowGallery] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'queued' | 'error'>('idle');
@@ -781,18 +783,28 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
 
   const handleMagicTransform = async () => {
     if (!canvasRef.current) return;
+    setAiError(null);
     setIsGenerating(true);
     setLoadingText(t('drawing.loadingTransform'));
     AudioService.speak("Adding magic!");
-    const currentImage = canvasRef.current.toDataURL('image/png');
-    const result = await AIService.transformSketch(currentImage);
-    setIsGenerating(false);
-    if (result) {
+    try {
+      const currentImage = canvasRef.current.toDataURL('image/png');
+      const result = await AIService.transformSketch(currentImage);
+      if (!result) throw new Error('The AI returned no image.');
+
       setTransformedImage(result);
       AudioService.speak("Wow! Saved to your gallery.");
       await handleSaveToGallery(result, true);
-    } else {
-      AudioService.speak("Magic spell failed.");
+    } catch (error) {
+      const quotaExhausted = error instanceof ApiRequestError && error.status === 429;
+      setAiError(
+        quotaExhausted
+          ? 'AI image quota is exhausted for the configured Gemini key. Add billing or use a key with image-generation quota, then try again.'
+          : 'The AI image service is unavailable right now. Please try again later.'
+      );
+      AudioService.speak(quotaExhausted ? "The AI image quota is exhausted." : "Magic spell failed.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -1041,6 +1053,26 @@ const DrawingPage: React.FC<DrawingPageProps> = ({ onNavigate }) => {
         <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
           <Loader2 className="w-16 h-16 text-amber-400 animate-spin mb-4" />
           <h3 className="text-2xl font-display text-white animate-pulse">{loadingText}</h3>
+        </div>
+      )}
+
+      {aiError && (
+        <div role="alert" className="absolute top-4 left-1/2 z-[60] w-[min(92%,36rem)] -translate-x-1/2 rounded-2xl border border-amber-400/40 bg-slate-950/95 p-4 text-white shadow-2xl backdrop-blur">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 shrink-0 text-amber-400" size={22} />
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg text-amber-300">AI image unavailable</p>
+              <p className="mt-1 text-sm leading-6 text-slate-200">{aiError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiError(null)}
+              aria-label="Dismiss AI error"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
       )}
 

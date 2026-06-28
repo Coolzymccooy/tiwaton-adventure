@@ -76,6 +76,67 @@ function assertKey() {
   }
 }
 
+function getCloudflareConfig() {
+  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const token = String(
+    process.env.CLOUDFLARE_WORKERS_AI_TOKEN ||
+    process.env.CLOUDFLARE_AI_API_TOKEN ||
+    process.env.CLOUDFLARE_API_TOKEN ||
+    ""
+  ).trim();
+
+  return accountId && token ? { accountId, token } : null;
+}
+
+async function transformSketchWithCloudflare(inline) {
+  const config = getCloudflareConfig();
+  if (!config) return null;
+
+  const model = "@cf/runwayml/stable-diffusion-v1-5-img2img";
+  const url =
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.accountId)}` +
+    `/ai/run/${model}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+      Accept: "image/png, application/json",
+    },
+    body: JSON.stringify({
+      prompt:
+        "Transform this child-friendly sketch into a polished, bright 3D rendered illustration. " +
+        "Preserve the original subject, composition, colors, and friendly appearance.",
+      negative_prompt:
+        "scary, violent, dark, distorted, extra limbs, text, watermark, adult content",
+      image_b64: inline.data,
+      num_steps: 20,
+      strength: 0.72,
+      guidance: 7.5,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = (await response.text().catch(() => "")).slice(0, 400);
+    const error = new Error(`Cloudflare image transform failed: ${response.status} ${details}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    const payload = await response.json();
+    const imageBase64 = payload?.result?.image;
+    if (!imageBase64) throw new Error("Cloudflare returned no transformed image");
+    return `data:image/png;base64,${imageBase64}`;
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!bytes.length) throw new Error("Cloudflare returned an empty transformed image");
+  return `data:${contentType || "image/png"};base64,${bytes.toString("base64")}`;
+}
+
 // ---- routes ----
 
 router.post("/coloring-page", async (req, res, next) => {
@@ -108,12 +169,24 @@ router.post("/coloring-page", async (req, res, next) => {
 
 router.post("/transform-sketch", async (req, res, next) => {
   try {
-    assertKey();
     mustHave(req.body, "imageDataUrl");
 
     const inline = dataUrlToInlineData(String(req.body.imageDataUrl));
     if (!inline) return res.status(400).json({ error: "Invalid imageDataUrl" });
 
+    if (getCloudflareConfig()) {
+      try {
+        const imageDataUrl = await transformSketchWithCloudflare(inline);
+        if (imageDataUrl) return res.json({ imageDataUrl, provider: "cloudflare" });
+      } catch (cloudflareError) {
+        console.warn("[ai] Cloudflare transform failed; trying Gemini", {
+          status: cloudflareError.status,
+          message: cloudflareError.message,
+        });
+      }
+    }
+
+    assertKey();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
       contents: {
