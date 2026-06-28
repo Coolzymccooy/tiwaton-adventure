@@ -11,6 +11,10 @@ type ChallengeJudgeResult = {
 };
 
 import { apiUrl, postJson } from './api';
+
+const IMAGE_API_BASE =
+  (import.meta as any).env?.VITE_IMAGE_API_BASE_URL?.toString()?.trim() || undefined;
+
 /**
  * Optional: shrink big drawings before upload (keeps your app snappy + avoids 413 errors).
  * Accepts data URLs like "data:image/png;base64,..."
@@ -58,7 +62,7 @@ export const AIService = {
     const optimized = await optimizeImage(imageBase64);
     const data = await postJson<{ imageDataUrl: string }>("/api/ai/transform-sketch", {
       imageDataUrl: optimized,
-    });
+    }, IMAGE_API_BASE);
     return data.imageDataUrl || null;
   },
 
